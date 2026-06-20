@@ -1,5 +1,5 @@
 // @ts-ignore
-import * as wasmModule from './traverture_obsidian.js';
+import * as wasmModule from './engine.js';
 import { LanguageInfo } from './types';
 
 let cachedLanguages: LanguageInfo[] | null = null;
