@@ -1,0 +1,220 @@
+import { Plugin, requestUrl, WorkspaceLeaf, Notice } from 'obsidian';
+import wasmBinary from './engine_bg.wasm';
+// @ts-ignore
+import * as wasmModule from './engine.js';
+import { TRAVERTURE_CSS } from './styles';
+import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './types';
+import { getAvailableLanguages } from './languages';
+import { fetchVerse, escapeHtml } from './cache';
+import { VerseModal } from './modal';
+import { TravertureSidebarView } from './sidebar';
+import { TravertureSettingTab } from './settings';
+
+export default class TraverturePlugin extends Plugin {
+    settings = DEFAULT_SETTINGS;
+    engine: any = null;
+
+    async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); }
+    async saveSettings() { await this.saveData(this.settings); }
+
+    createEngine() {
+        try {
+            this.engine = new wasmModule.ObsidianEngine(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.nameFormat, false);
+        } catch (e) { console.error('Failed to create engine:', e); }
+    }
+
+    async parseReferences(text: string): Promise<SidebarRef[]> {
+        const results: SidebarRef[] = [];
+        if (!this.engine) return results;
+
+        const marked = this.engine.parse_with_markers(text);
+        const markerRegex = /\{\{(.+?)\}\}/g;
+        let match;
+        const orderedRefs: string[] = [];
+        while ((match = markerRegex.exec(marked)) !== null) orderedRefs.push(match[1].trim());
+        if (orderedRefs.length === 0) return results;
+
+        const parsed = this.engine.parse(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false, text);
+        if (!parsed) return results;
+        const data = JSON.parse(parsed);
+
+        const engFull = new wasmModule.ObsidianEngine('en', 'en', 'full', false);
+        const engStd = new wasmModule.ObsidianEngine('en', 'en', 'standard', false);
+        const engOff = new wasmModule.ObsidianEngine('en', 'en', 'official', false);
+
+        for (const scripture of orderedRefs) {
+            const bcvRanges = data[scripture];
+            if (!bcvRanges) continue;
+            const ranges = bcvRanges as string[][];
+            for (let i = 0; i < ranges.length; i++) {
+                const singleRange = [ranges[i]], rangeJson = JSON.stringify(singleRange);
+                const fullDecoded = JSON.parse(engFull.decode_scriptures(rangeJson));
+                const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
+                const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
+                const startBcv = ranges[i][0], endBcv = ranges[i][1];
+                results.push({
+                    scripture, fullRef: fullDecoded[0] || scripture, standardRef: stdDecoded[0] || '', officialRef: offDecoded[0] || '',
+                    startBcv, endBcv,
+                    startCh: parseInt(startBcv.substring(2, 5)), endCh: parseInt(endBcv.substring(2, 5)),
+                    startVerse: parseInt(startBcv.substring(5, 8)), endVerse: parseInt(endBcv.substring(5, 8)),
+                    bookNum: parseInt(startBcv.substring(0, 2)),
+                });
+            }
+        }
+        return results;
+    }
+
+    async onload() {
+        await this.loadSettings();
+
+        const styleEl = document.createElement('style');
+        styleEl.id = 'traverture-styles';
+        styleEl.textContent = TRAVERTURE_CSS;
+        document.head.appendChild(styleEl);
+
+        try { await wasmModule.default({ module_or_path: wasmBinary }); this.createEngine(); }
+        catch (e) { console.error('WASM error:', e); }
+
+        this.addSettingTab(new TravertureSettingTab(this.app, this));
+        this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
+
+        this.addCommand({ id: 'parse-document-references', name: 'Parse references in current document', callback: async () => {
+            const file = this.app.workspace.getActiveFile(); if (!file) return;
+            const refs = await this.parseReferences(await this.app.vault.read(file));
+            await this.showSidebarWithResults(refs);
+        }});
+
+        this.addCommand({ id: 'parse-selection-references', name: 'Parse references in selection', editorCallback: async (editor: any) => {
+            const selection = editor.getSelection(); if (!selection) return;
+            await this.showSidebarWithResults(await this.parseReferences(selection));
+        }});
+
+        this.registerMarkdownPostProcessor((element, _context) => {
+            const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, { acceptNode: (node) => node.nodeValue && /\{\{(.+?)\}\}/.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
+            const textNodes: Text[] = []; let node = walker.nextNode();
+            while (node) { textNodes.push(node as Text); node = walker.nextNode(); }
+            for (const textNode of textNodes) {
+                const text = textNode.nodeValue || '', regex = /\{\{(.+?)\}\}/g;
+                let lastIndex = 0, match; const fragment = document.createDocumentFragment();
+                while ((match = regex.exec(text)) !== null) {
+                    if (match.index > lastIndex) fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+                    const refText = match[1].trim();
+                    if (this.engine) {
+                        const marked = this.engine.parse_with_markers(refText), markerRegex = /\{\{(.+?)\}\}/g;
+                        let markerLastIndex = 0, markerMatch; const innerFragment = document.createDocumentFragment();
+                        while ((markerMatch = markerRegex.exec(marked)) !== null) {
+                            if (markerMatch.index > markerLastIndex) innerFragment.appendChild(document.createTextNode(marked.substring(markerLastIndex, markerMatch.index)));
+                            const innerRef = markerMatch[1].trim();
+                            const parsed = this.engine.parse(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.nameFormat, false, innerRef);
+                            const data = JSON.parse(parsed), keys = Object.keys(data);
+                            if (keys.length > 0) {
+                                const firstRange = (data[keys[0]] as string[][])[0];
+                                const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
+                                const link = document.createElement('a'); link.className = 'traverture-ref-link'; link.textContent = keys[0];
+                                link.setAttribute('data-bcv', bcv); link.setAttribute('data-ref', keys[0]);
+                                link.addEventListener('click', async (e) => {
+                                    e.preventDefault(); e.stopPropagation();
+                                    const verseData = await fetchVerse(bcv, this.settings.outputLanguage);
+                                    new VerseModal().show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: keys[0] }, bcv, this.settings.outputLanguage);
+                                });
+                                innerFragment.appendChild(link);
+                            } else { innerFragment.appendChild(document.createTextNode(markerMatch[0])); }
+                            markerLastIndex = markerMatch.index + markerMatch[0].length;
+                        }
+                        if (markerLastIndex < marked.length) innerFragment.appendChild(document.createTextNode(marked.substring(markerLastIndex)));
+                        fragment.appendChild(innerFragment);
+                    } else { fragment.appendChild(document.createTextNode(match[0])); }
+                    lastIndex = match.index + match[0].length;
+                }
+                if (lastIndex < text.length) fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+                textNode.parentNode?.replaceChild(fragment, textNode);
+            }
+        });
+
+        this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+            const target = evt.target as HTMLElement;
+            if (target.classList.contains('traverture-ref-link') && target.getAttribute('data-bcv')) {
+                evt.preventDefault(); evt.stopPropagation();
+                const bcv = target.getAttribute('data-bcv')!, refText = target.getAttribute('data-ref') || target.textContent || '';
+                const modal = new VerseModal();
+                modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage);
+                fetchVerse(bcv, this.settings.outputLanguage).then(verseData => modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage));
+            }
+        });
+
+        this.registerEvent(this.app.workspace.on('editor-menu', (menu, editor, _view) => {
+            const selection = editor.getSelection();
+            menu.addItem((item: any) => {
+                item.setTitle('tra.VER:ture').setIcon('book-open');
+                const submenu = item.setSubmenu();
+                if (selection) submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(selection)); }));
+                submenu.addItem((subItem: any) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(editor.getValue())); }));
+                if (selection) {
+                    submenu.addSeparator();
+                    submenu.addItem((subItem: any) => subItem.setTitle('Insert citation').setIcon('quote-glyph').onClick(async () => { await this.insertCitation(editor, selection); }));
+                    submenu.addSeparator();
+                    submenu.addItem((subItem: any) => {
+                        subItem.setTitle('Reformat').setIcon('pencil');
+                        const reformatMenu = subItem.setSubmenu();
+                        reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor, selection, 'full')));
+                        reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor, selection, 'standard')));
+                        reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor, selection, 'official')));
+                    });
+                }
+            });
+        }));
+
+        this.addRibbonIcon('book-open', 'tra.VER:ture: Parse document', async () => {
+            const file = this.app.workspace.getActiveFile(); if (!file) { new Notice('No file open.'); return; }
+            await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+        });
+    }
+
+    async showSidebarWithResults(refs: SidebarRef[]) {
+        const { workspace } = this.app;
+        let leaves = workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
+        let leaf: WorkspaceLeaf;
+        if (leaves.length > 0) { leaf = leaves[0]; }
+        else { const rightLeaf = workspace.getRightLeaf(false); if (!rightLeaf) return; await rightLeaf.setViewState({ type: VIEW_TYPE_TRAVERTURE_SIDEBAR, active: true }); leaf = rightLeaf; }
+        await leaf.loadIfDeferred();
+        workspace.revealLeaf(leaf);
+        (leaf.view as TravertureSidebarView).displayResults(refs);
+    }
+
+    reformatReferences(editor: any, text: string, format: string) {
+        const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.outputLanguage, format, false, text);
+        if (!parsed) return;
+        const data = JSON.parse(parsed); let processed = text;
+        for (const [ref, bcvRanges] of Object.entries(data)) {
+            const fmtEngine = new wasmModule.ObsidianEngine('en', 'en', format, false);
+            processed = processed.replace(ref, JSON.parse(fmtEngine.decode_scriptures(JSON.stringify(bcvRanges))).join('; '));
+        }
+        editor.replaceSelection(processed);
+    }
+
+    async insertCitation(editor: any, text: string) {
+        const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, this.settings.nameFormat, false, text);
+        if (!parsed || Object.keys(JSON.parse(parsed)).length === 0) { new Notice('No scripture references found.'); return; }
+        const data = JSON.parse(parsed); let result = text; const fetchedSet = new Set<string>();
+        for (const [originalRef, bcvRanges] of Object.entries(data)) {
+            const ranges = bcvRanges as string[][]; if (ranges.length === 0) continue;
+            const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
+            const cacheKey = `${this.settings.sourceLanguage}:${bcv}`;
+            let verseText = '';
+            if (!fetchedSet.has(cacheKey)) {
+                const verseData = await fetchVerse(bcv, this.settings.sourceLanguage);
+                if (verseData) {
+                    let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
+                    const tempDiv = document.createElement('div'); tempDiv.innerHTML = html;
+                    tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
+                    verseText = (tempDiv.textContent || '').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+                }
+                fetchedSet.add(cacheKey);
+            }
+            result = result.replace(originalRef, this.settings.insertCitationFormat === 'verseWithRef' ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`);
+        }
+        editor.replaceSelection(result);
+    }
+
+    onunload() { const styleEl = document.getElementById('traverture-styles'); if (styleEl) styleEl.remove(); }
+}
