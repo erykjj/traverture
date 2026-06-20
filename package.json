@@ -1,0 +1,19 @@
+{
+  "name": "obsidian-traverture",
+  "version": "1.0.0",
+  "description": "Scripture reference parser for Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "esbuild-plugin-wasm": "^1.1.0",
+    "obsidian": "^1.7.0",
+    "typescript": "^5.5.0"
+  }
+}
