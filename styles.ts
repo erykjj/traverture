@@ -1,0 +1,346 @@
+// styles.ts
+export const TRAVERTURE_CSS = `
+/* --- Reference Links --- */
+.traverture-ref-link {
+  color: #4a6da7;
+  text-decoration: none;
+  cursor: pointer;
+}
+.traverture-ref-link:hover {
+  text-decoration: underline;
+}
+
+/* --- Tooltip Container --- */
+#verse-tooltip {
+  font-weight: normal !important;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+}
+
+/* --- Tooltip Content Blocks --- */
+#verse-tooltip .style-l {
+  display: block;
+}
+#verse-tooltip .style-z {
+  display: block;
+  margin-left: 1.5em;
+}
+#verse-tooltip .style-w,
+#verse-tooltip .style-s {
+  display: block;
+  text-align: center;
+  font-style: italic;
+  margin: 0.75em 0 0.25em 0;
+}
+#verse-tooltip .parabreak {
+  display: block;
+  height: 0.75em;
+}
+#verse-tooltip .newblock {
+  display: block;
+}
+
+/* --- Tooltip Typography --- */
+#verse-tooltip sup.verseNum {
+  font-weight: 700 !important;
+}
+#verse-tooltip .chapterNum {
+  font-weight: 700 !important;
+}
+#verse-tooltip a {
+  text-decoration: none;
+  color: inherit;
+}
+#verse-tooltip em {
+  font-style: italic;
+}
+
+/* --- Sidebar Root --- */
+.traverture-sidebar {
+  padding: 8px !important;
+  font-size: 0.8rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  user-select: text !important;
+}
+
+/* --- Empty State --- */
+.traverture-sidebar-empty {
+  color: var(--text-muted, #999);
+  padding: 16px;
+  text-align: center;
+}
+
+/* --- Toolbar --- */
+.traverture-sidebar-toolbar {
+  flex-shrink: 0 !important;
+  margin-bottom: 6px !important;
+}
+
+/* --- Top Row (Search + Controls) --- */
+.traverture-sidebar-top-row {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  margin-bottom: 6px !important;
+  flex-wrap: nowrap !important;
+}
+
+/* --- Search Input --- */
+.traverture-sidebar-search-wrap {
+  position: relative !important;
+  flex-shrink: 0 !important;
+}
+.traverture-sidebar-search {
+  border: 1px solid var(--background-modifier-border, #ccc) !important;
+  border-radius: 4px !important;
+  padding: 4px 24px 4px 8px !important;
+  font-size: 0.78rem !important;
+  width: 160px !important;
+  outline: none !important;
+  background: var(--background-primary, white) !important;
+  color: var(--text-normal, #333) !important;
+  height: auto !important;
+  line-height: normal !important;
+}
+.traverture-sidebar-search:focus {
+  border-color: #4a6da7 !important;
+  box-shadow: none !important;
+}
+
+/* --- Search Clear Button --- */
+.traverture-sidebar-search-clear {
+  position: absolute !important;
+  right: 4px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 0.85rem !important;
+  color: var(--text-muted, #999) !important;
+  padding: 0 3px !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  height: auto !important;
+}
+.traverture-sidebar-search-clear:hover {
+  color: var(--text-normal, #333) !important;
+}
+
+/* --- Count Display --- */
+.traverture-sidebar-count {
+  font-size: 0.75rem !important;
+  color: var(--text-muted, #888) !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* --- Spacer --- */
+.traverture-sidebar-spacer {
+  flex: 1 !important;
+  min-width: 8px !important;
+}
+
+/* --- Language Selector --- */
+.traverture-sidebar-lang-select {
+  border: 1px solid var(--background-modifier-border, #ccc) !important;
+  border-radius: 4px !important;
+  padding: 3px 4px !important;
+  font-size: 0.75rem !important;
+  background: var(--background-primary, white) !important;
+  color: var(--text-normal, #333) !important;
+  flex-shrink: 0 !important;
+  max-width: 130px !important;
+  height: auto !important;
+  line-height: normal !important;
+}
+
+/* --- Capitalization Toggle --- */
+.traverture-sidebar-caps-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  font-size: 0.7rem !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  color: var(--text-muted, #666) !important;
+}
+.traverture-sidebar-caps-label input {
+  width: 13px !important;
+  height: 13px !important;
+  margin: 0 !important;
+}
+
+/* --- Copy Button --- */
+.traverture-sidebar-copy-btn {
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  background: #4a6da7 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 3px 12px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  letter-spacing: 0.5px !important;
+  height: auto !important;
+  line-height: normal !important;
+  box-shadow: none !important;
+}
+
+/* --- Column Controls Row --- */
+.traverture-sidebar-col-row {
+  display: flex !important;
+  gap: 4px !important;
+  align-items: center !important;
+  font-size: 0.7rem !important;
+  margin-bottom: 6px !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+}
+.traverture-sidebar-col-label {
+  color: var(--text-muted, #888) !important;
+  flex-shrink: 0 !important;
+}
+.traverture-sidebar-col-btn {
+  font-size: 0.68rem !important;
+  color: #4a6da7 !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  text-decoration: underline !important;
+  padding: 0 4px !important;
+  flex-shrink: 0 !important;
+  height: auto !important;
+  line-height: normal !important;
+  box-shadow: none !important;
+}
+
+/* --- Column Toggles Container --- */
+.traverture-sidebar-toggles {
+  display: flex !important;
+  gap: 2px !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  margin-left: 10px !important;
+}
+
+/* --- Individual Column Toggle --- */
+.traverture-sidebar-col-toggle {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  margin-left: 8px !important;
+  font-size: 0.68rem !important;
+  color: var(--text-muted, #666) !important;
+}
+
+/* --- Custom Checkboxes (Column Toggle & Caps Toggle) --- */
+.traverture-sidebar-col-toggle input[type="checkbox"],
+.traverture-sidebar-caps-label input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  border: 1.5px solid var(--text-muted, #888) !important;
+  border-radius: 2px !important;
+  background: transparent !important;
+  width: 13px !important;
+  height: 13px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+}
+.traverture-sidebar-col-toggle input[type="checkbox"]:checked,
+.traverture-sidebar-caps-label input[type="checkbox"]:checked {
+  background: #4a6da7 !important;
+  border-color: #4a6da7 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M4.5 8.5L2 6l-1 1 3.5 3.5 7-7-1-1z'/%3E%3C/svg%3E") !important;
+  background-size: 10px 10px !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+.traverture-sidebar-col-toggle input[type="checkbox"]::after,
+.traverture-sidebar-caps-label input[type="checkbox"]::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* --- Table Wrapper --- */
+.traverture-sidebar-table-wrapper {
+  flex: 1 !important;
+  overflow: auto !important;
+  border: 1px solid var(--background-modifier-border, #ccc) !important;
+  border-radius: 4px !important;
+  min-height: 0 !important;
+  user-select: text !important;
+}
+
+/* --- Table --- */
+.traverture-sidebar-table {
+  width: max-content !important;
+  min-width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 0.75rem !important;
+  table-layout: fixed !important;
+}
+
+/* --- Table Header --- */
+.traverture-sidebar-th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 1 !important;
+  background: var(--background-secondary-alt, #e8e8e8) !important;
+  padding: 6px 8px !important;
+  border: 1px solid var(--background-modifier-border, #ccc) !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  white-space: nowrap !important;
+  color: var(--text-normal, #333) !important;
+  font-size: 0.73rem !important;
+}
+.traverture-sidebar-th:hover {
+  background: var(--background-modifier-hover, #d8d8d8) !important;
+}
+
+/* --- Table Cells --- */
+.traverture-sidebar-td {
+  padding: 4px 8px !important;
+  border: 1px solid var(--background-modifier-border, #ddd) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  background: var(--background-primary, white) !important;
+  color: var(--text-normal, #333) !important;
+  font-size: 0.73rem !important;
+  user-select: text !important;
+}
+
+/* --- Table Row Striping & Hover --- */
+.traverture-sidebar-table tbody tr:nth-child(even) td {
+  background: var(--background-secondary, #f9f9f9) !important;
+}
+.traverture-sidebar-table tbody tr:hover td {
+  background: var(--background-modifier-hover, #eef2f7) !important;
+}
+
+/* --- Monospace Utility --- */
+.traverture-mono {
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace !important;
+  font-size: 0.72rem !important;
+}
+
+/* --- Source Label --- */
+.traverture-sidebar-src-label {
+  font-size: 0.65rem !important;
+  color: var(--text-muted, #888) !important;
+  flex-shrink: 0 !important;
+  margin-right: -4px !important;
+}
+`;
