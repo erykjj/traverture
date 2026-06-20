@@ -1,4 +1,5 @@
 import { Plugin, requestUrl, WorkspaceLeaf, Notice } from 'obsidian';
+// @ts-ignore
 import wasmBinary from './engine_bg.wasm';
 // @ts-ignore
 import * as wasmModule from './engine.js';
