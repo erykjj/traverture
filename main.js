@@ -452,6 +452,7 @@ var TRAVERTURE_CSS = `
   height: 100% !important;
   overflow: hidden !important;
   user-select: text !important;
+  container-type: inline-size !important;
 }
 
 /* --- Empty State --- */
@@ -588,7 +589,6 @@ var TRAVERTURE_CSS = `
   align-items: center !important;
   font-size: 0.7rem !important;
   margin-bottom: 6px !important;
-  flex-wrap: nowrap !important;
   overflow-x: auto !important;
 }
 .traverture-sidebar-col-label {
@@ -607,15 +607,6 @@ var TRAVERTURE_CSS = `
   height: auto !important;
   line-height: normal !important;
   box-shadow: none !important;
-}
-
-/* --- Column Toggles Container --- */
-.traverture-sidebar-toggles {
-  display: flex !important;
-  gap: 2px !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  margin-left: 10px !important;
 }
 
 /* --- Individual Column Toggle --- */
@@ -730,6 +721,14 @@ var TRAVERTURE_CSS = `
   color: var(--text-muted, #888) !important;
   flex-shrink: 0 !important;
   margin-right: -4px !important;
+}
+
+@container (max-width: 600px) {
+  .traverture-sidebar-top-row { flex-wrap: wrap !important; }
+  .traverture-sidebar-spacer { display: none !important; }
+}
+@container (max-width: 800px) {
+  .traverture-sidebar-col-row { flex-wrap: wrap !important; }
 }
 `;
 
@@ -1153,9 +1152,8 @@ ${body}`);
       this.visibleColumns = /* @__PURE__ */ new Set(["scripture", "fullRef", "standardRef", "officialRef"]);
       this.render();
     });
-    const togglesContainer = colRow.createDiv({ cls: "traverture-sidebar-toggles" });
     for (const col of SIDEBAR_COLUMNS) {
-      const label = togglesContainer.createEl("label", { cls: "traverture-sidebar-col-toggle" });
+      const label = colRow.createEl("label", { cls: "traverture-sidebar-col-toggle" });
       const cb = label.createEl("input", { type: "checkbox" });
       cb.checked = this.visibleColumns.has(col.key);
       cb.addEventListener("change", () => {
