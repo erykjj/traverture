@@ -189,13 +189,15 @@ export class TravertureSidebarView extends ItemView {
 
         const colRow = toolbar.createDiv({ cls: 'traverture-sidebar-col-row' });
         colRow.createEl('span', { text: 'Columns:', cls: 'traverture-sidebar-col-label' });
+
         const allBtn = colRow.createEl('button', { text: 'ALL', cls: 'traverture-sidebar-col-btn' });
         allBtn.addEventListener('click', () => { this.visibleColumns = new Set(SIDEBAR_COLUMNS.map(c => c.key)); this.render(); });
+
         const listBtn = colRow.createEl('button', { text: 'LIST', cls: 'traverture-sidebar-col-btn' });
         listBtn.addEventListener('click', () => { this.visibleColumns = new Set(['scripture', 'fullRef', 'standardRef', 'officialRef']); this.render(); });
-        const togglesContainer = colRow.createDiv({ cls: 'traverture-sidebar-toggles' });
+
         for (const col of SIDEBAR_COLUMNS) {
-            const label = togglesContainer.createEl('label', { cls: 'traverture-sidebar-col-toggle' });
+            const label = colRow.createEl('label', { cls: 'traverture-sidebar-col-toggle' });
             const cb = label.createEl('input', { type: 'checkbox' });
             cb.checked = this.visibleColumns.has(col.key);
             cb.addEventListener('change', () => { if (cb.checked) this.visibleColumns.add(col.key); else this.visibleColumns.delete(col.key); this.render(); });
