@@ -1499,90 +1499,48 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
     }));
     this.addRibbonIcon("scroll", "tra.VER:ture", () => {
       const file = this.app.workspace.getActiveFile();
+      const editor = this.app.workspace.activeEditor?.editor;
+      const sel = editor?.getSelection();
       const menu = new import_obsidian4.Menu();
-      menu.addItem((item) => item.setTitle("Parse document").setIcon("file-text").onClick(async () => {
+      if (sel) {
+        menu.addItem((item) => item.setTitle("Parse selection").setIcon("sidebar-right").onClick(async () => {
+          await this.showSidebarWithResults(await this.parseReferences(sel));
+        }));
+        menu.addItem((item) => item.setTitle("Insert citation").setIcon("quote-glyph").onClick(async () => {
+          await this.insertCitation(editor, sel);
+        }));
+        menu.addItem((item) => item.setTitle("Tag selection").setIcon("hash").onClick(() => {
+          this.tagReferences(editor, sel);
+        }));
+        menu.addItem((item) => {
+          item.setTitle("Reformat selection").setIcon("pencil");
+          const submenu = item.setSubmenu();
+          submenu.addItem((fmtItem) => fmtItem.setTitle("Full (1 Corinthians)").onClick(() => this.reformatReferences(editor, sel, "full")));
+          submenu.addItem((fmtItem) => fmtItem.setTitle("Standard (1 Cor.)").onClick(() => this.reformatReferences(editor, sel, "standard")));
+          submenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => this.reformatReferences(editor, sel, "official")));
+        });
+        menu.addSeparator();
+      }
+      menu.addItem((item) => item.setTitle("Parse document").setIcon("sidebar-right").onClick(async () => {
         if (!file) {
           new import_obsidian4.Notice("No file open.");
           return;
         }
         await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
       }));
-      menu.addItem((item) => item.setTitle("Parse selection").setIcon("sidebar-right").onClick(async () => {
-        const editor = this.app.workspace.activeEditor?.editor;
-        if (!editor) {
-          new import_obsidian4.Notice("No editor active.");
-          return;
-        }
-        const sel = editor.getSelection();
-        if (!sel) {
-          new import_obsidian4.Notice("No selection.");
-          return;
-        }
-        await this.showSidebarWithResults(await this.parseReferences(sel));
+      menu.addItem((item) => item.setTitle("Tag document").setIcon("hash").onClick(() => {
+        if (editor) this.tagReferences(editor, editor.getValue(), true);
       }));
-      menu.addItem((item) => item.setTitle("Insert citation").setIcon("quote-glyph").onClick(async () => {
-        const editor = this.app.workspace.activeEditor?.editor;
-        if (!editor) {
-          new import_obsidian4.Notice("No editor active.");
-          return;
-        }
-        const sel = editor.getSelection();
-        if (!sel) {
-          new import_obsidian4.Notice("No selection.");
-          return;
-        }
-        await this.insertCitation(editor, sel);
-      }));
-      menu.addItem((item) => item.setTitle("Tag selection").setIcon("hash").onClick(() => {
-        const editor = this.app.workspace.activeEditor?.editor;
-        if (!editor) {
-          new import_obsidian4.Notice("No editor active.");
-          return;
-        }
-        const sel = editor.getSelection();
-        if (!sel) {
-          new import_obsidian4.Notice("No selection.");
-          return;
-        }
-        this.tagReferences(editor, sel);
-      }));
-      menu.addItem((item) => item.setTitle("Tag document").setIcon("hash").onClick(async () => {
-        const editor = this.app.workspace.activeEditor?.editor;
-        if (!editor) {
-          new import_obsidian4.Notice("No editor active.");
-          return;
-        }
-        this.tagReferences(editor, editor.getValue(), true);
-      }));
-      menu.addItem((item) => {
-        item.setTitle("Reformat selection").setIcon("pencil");
-        const submenu = item.setSubmenu();
-        submenu.addItem((fmtItem) => fmtItem.setTitle("Full (1 Corinthians)").onClick(() => {
-          const editor = this.app.workspace.activeEditor?.editor;
-          if (editor) this.reformatReferences(editor, editor.getSelection(), "full");
-        }));
-        submenu.addItem((fmtItem) => fmtItem.setTitle("Standard (1 Cor.)").onClick(() => {
-          const editor = this.app.workspace.activeEditor?.editor;
-          if (editor) this.reformatReferences(editor, editor.getSelection(), "standard");
-        }));
-        submenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => {
-          const editor = this.app.workspace.activeEditor?.editor;
-          if (editor) this.reformatReferences(editor, editor.getSelection(), "official");
-        }));
-      });
       menu.addItem((item) => {
         item.setTitle("Reformat document").setIcon("pencil");
         const submenu = item.setSubmenu();
         submenu.addItem((fmtItem) => fmtItem.setTitle("Full (1 Corinthians)").onClick(() => {
-          const editor = this.app.workspace.activeEditor?.editor;
           if (editor) this.reformatReferences(editor, editor.getValue(), "full", true);
         }));
         submenu.addItem((fmtItem) => fmtItem.setTitle("Standard (1 Cor.)").onClick(() => {
-          const editor = this.app.workspace.activeEditor?.editor;
           if (editor) this.reformatReferences(editor, editor.getValue(), "standard", true);
         }));
         submenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => {
-          const editor = this.app.workspace.activeEditor?.editor;
           if (editor) this.reformatReferences(editor, editor.getValue(), "official", true);
         }));
       });
