@@ -1348,13 +1348,12 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
     }
     this.addSettingTab(new TravertureSettingTab(this.app, this));
     this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
-    this.addCommand({ id: "parse-document-references", name: "Parse references in current document", callback: async () => {
+    this.addCommand({ id: "parse-document-references", name: "tra.VER:ture: Parse document", callback: async () => {
       const file = this.app.workspace.getActiveFile();
       if (!file) return;
-      const refs = await this.parseReferences(await this.app.vault.read(file));
-      await this.showSidebarWithResults(refs);
+      await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
     } });
-    this.addCommand({ id: "parse-selection-references", name: "Parse references in selection", editorCallback: async (editor) => {
+    this.addCommand({ id: "parse-selection-references", name: "tra.VER:ture: Parse selection", editorCallback: async (editor) => {
       const selection = editor.getSelection();
       if (!selection) return;
       await this.showSidebarWithResults(await this.parseReferences(selection));
@@ -1452,13 +1451,67 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
         }
       });
     }));
-    this.addRibbonIcon("book-open", "tra.VER:ture: Parse document", async () => {
+    this.addRibbonIcon("scroll", "tra.VER:ture", () => {
       const file = this.app.workspace.getActiveFile();
-      if (!file) {
-        new import_obsidian4.Notice("No file open.");
-        return;
-      }
-      await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+      const menu = new import_obsidian4.Menu();
+      menu.addItem(
+        (item) => item.setTitle("Parse document").setIcon("file-text").onClick(async () => {
+          if (!file) {
+            new import_obsidian4.Notice("No file open.");
+            return;
+          }
+          const refs = await this.parseReferences(await this.app.vault.read(file));
+          await this.showSidebarWithResults(refs);
+        })
+      );
+      menu.addItem(
+        (item) => item.setTitle("Parse selection").setIcon("sidebar-right").onClick(async () => {
+          const editor = this.app.workspace.activeEditor?.editor;
+          if (!editor) {
+            new import_obsidian4.Notice("No editor active.");
+            return;
+          }
+          const sel = editor.getSelection();
+          if (!sel) {
+            new import_obsidian4.Notice("No selection.");
+            return;
+          }
+          const refs = await this.parseReferences(sel);
+          await this.showSidebarWithResults(refs);
+        })
+      );
+      menu.addItem(
+        (item) => item.setTitle("Insert citation").setIcon("quote-glyph").onClick(async () => {
+          const editor = this.app.workspace.activeEditor?.editor;
+          if (!editor) {
+            new import_obsidian4.Notice("No editor active.");
+            return;
+          }
+          const sel = editor.getSelection();
+          if (!sel) {
+            new import_obsidian4.Notice("No selection.");
+            return;
+          }
+          await this.insertCitation(editor, sel);
+        })
+      );
+      menu.addItem((item) => {
+        item.setTitle("Reformat").setIcon("pencil");
+        const submenu = item.setSubmenu();
+        submenu.addItem((fmtItem) => fmtItem.setTitle("Full (1 Corinthians)").onClick(() => {
+          const editor = this.app.workspace.activeEditor?.editor;
+          if (editor) this.reformatReferences(editor, editor.getSelection(), "full");
+        }));
+        submenu.addItem((fmtItem) => fmtItem.setTitle("Standard (1 Cor.)").onClick(() => {
+          const editor = this.app.workspace.activeEditor?.editor;
+          if (editor) this.reformatReferences(editor, editor.getSelection(), "standard");
+        }));
+        submenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => {
+          const editor = this.app.workspace.activeEditor?.editor;
+          if (editor) this.reformatReferences(editor, editor.getSelection(), "official");
+        }));
+      });
+      menu.showAtMouseEvent({ clientX: 100, clientY: 100 });
     });
   }
   async showSidebarWithResults(refs) {
