@@ -3,8 +3,6 @@ import { ItemView, WorkspaceLeaf } from 'obsidian';
 import * as wasmModule from './engine.js';
 import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR } from './types';
 import { getAvailableLanguages } from './languages';
-import { fetchVerse } from './cache';
-import { VerseModal } from './modal';
 import type TraverturePlugin from './main';
 
 export const SIDEBAR_COLUMNS = [
