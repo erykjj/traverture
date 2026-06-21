@@ -19,7 +19,7 @@ export default class TraverturePlugin extends Plugin {
 
     createEngine() {
         try {
-            this.engine = new wasmModule.ObsidianEngine(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.nameFormat, false);
+            this.engine = new wasmModule.ObsidianEngine(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false);
         } catch (e) { console.error('Failed to create engine:', e); }
     }
 
@@ -70,7 +70,7 @@ export default class TraverturePlugin extends Plugin {
         const parsed = this.engine?.parse(
             this.settings.sourceLanguage,
             this.settings.sourceLanguage,
-            this.settings.nameFormat,
+            'full',
             false,
             text
         );
@@ -135,7 +135,7 @@ export default class TraverturePlugin extends Plugin {
                         while ((markerMatch = markerRegex.exec(marked)) !== null) {
                             if (markerMatch.index > markerLastIndex) innerFragment.appendChild(document.createTextNode(marked.substring(markerLastIndex, markerMatch.index)));
                             const innerRef = markerMatch[1].trim();
-                            const parsed = this.engine.parse(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.nameFormat, false, innerRef);
+                            const parsed = this.engine.parse(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false, innerRef);
                             const data = JSON.parse(parsed), keys = Object.keys(data);
                             if (keys.length > 0) {
                                 const firstRange = (data[keys[0]] as string[][])[0];
@@ -180,7 +180,16 @@ export default class TraverturePlugin extends Plugin {
 
                 if (selection) {
                     submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(selection)); }));
-                    submenu.addItem((subItem: any) => subItem.setTitle('Insert citation').setIcon('quote-glyph').onClick(async () => { await this.insertCitation(editor, selection); }));
+                        submenu.addItem((subItem: any) => {
+                            subItem.setTitle('Insert citation').setIcon('quote-glyph');
+                            const citeMenu = subItem.setSubmenu();
+                            citeMenu.addItem((citeItem: any) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
+                                await this.insertCitation(editor, selection, false);
+                            }));
+                            citeMenu.addItem((citeItem: any) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
+                                await this.insertCitation(editor, selection, true);
+                            }));
+                        });
                     submenu.addItem((subItem: any) => subItem.setTitle('Tag selection').setIcon('hash').onClick(() => { this.tagReferences(editor, selection); }));
                     submenu.addItem((subItem: any) => {
                         subItem.setTitle('Reformat selection').setIcon('pencil');
@@ -215,9 +224,16 @@ export default class TraverturePlugin extends Plugin {
                 menu.addItem((item: any) => item.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
                     await this.showSidebarWithResults(await this.parseReferences(sel));
                 }));
-                menu.addItem((item: any) => item.setTitle('Insert citation').setIcon('quote-glyph').onClick(async () => {
-                    await this.insertCitation(editor!, sel);
-                }));
+                menu.addItem((item: any) => {
+                    item.setTitle('Insert citation').setIcon('quote-glyph');
+                    const citeMenu = item.setSubmenu();
+                    citeMenu.addItem((citeItem: any) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
+                        if (editor && sel) await this.insertCitation(editor, sel, false);
+                    }));
+                    citeMenu.addItem((citeItem: any) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
+                        if (editor && sel) await this.insertCitation(editor, sel, true);
+                    }));
+                });
                 menu.addItem((item: any) => item.setTitle('Tag selection').setIcon('hash').onClick(() => {
                     this.tagReferences(editor!, sel);
                 }));
@@ -281,8 +297,8 @@ export default class TraverturePlugin extends Plugin {
         else { editor.replaceSelection(processed); }
     }
 
-    async insertCitation(editor: any, text: string) {
-        const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, this.settings.nameFormat, false, text);
+    async insertCitation(editor: any, text: string, withRef: boolean) {
+        const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, 'full', false, text);
         if (!parsed || Object.keys(JSON.parse(parsed)).length === 0) { new Notice('No scripture references found.'); return; }
         const data = JSON.parse(parsed); let result = text; const fetchedSet = new Set<string>();
         for (const [originalRef, bcvRanges] of Object.entries(data)) {
@@ -295,12 +311,19 @@ export default class TraverturePlugin extends Plugin {
                 if (verseData) {
                     let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
                     const tempDiv = document.createElement('div'); tempDiv.innerHTML = html;
-                    tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
+                    if (withRef) {
+                        tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
+                    } else {
+                        tempDiv.querySelectorAll('.chapterNum').forEach(el => {
+                            const textNode = el.querySelector('a') || el;
+                            if (textNode) textNode.textContent = '1 ';
+                        });
+                    }
                     verseText = (tempDiv.textContent || '').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
                 }
                 fetchedSet.add(cacheKey);
             }
-            result = result.replace(originalRef, this.settings.insertCitationFormat === 'verseWithRef' ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`);
+            result = result.replace(originalRef, withRef ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`);
         }
         editor.replaceSelection(result);
     }
