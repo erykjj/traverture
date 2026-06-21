@@ -1,7 +1,7 @@
 {
   "id": "traverture",
   "name": "tra.VER:ture",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.0.0",
   "description": "Parse, convert, preview, and insert Bible scripture references.",
   "author": "Eryk J.",
