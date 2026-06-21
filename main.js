@@ -735,14 +735,7 @@ var TRAVERTURE_CSS = `
 // types.ts
 var DEFAULT_SETTINGS = {
   sourceLanguage: "en",
-  outputLanguage: "en",
-  nameFormat: "full",
-  insertCitationFormat: "verseOnly"
-};
-var NAME_FORMAT_OPTIONS = {
-  "full": "Full (1 Corinthians)",
-  "official": "Official (1Co)",
-  "standard": "Standard (1 Cor.)"
+  outputLanguage: "en"
 };
 var VIEW_TYPE_TRAVERTURE_SIDEBAR = "traverture-sidebar-view";
 
@@ -1247,22 +1240,6 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
         this.plugin.createEngine();
       });
     });
-    new import_obsidian3.Setting(containerEl).setName("Default name format").setDesc("How book names are displayed in references").addDropdown((dropdown) => {
-      for (const [value, label] of Object.entries(NAME_FORMAT_OPTIONS)) dropdown.addOption(value, label);
-      dropdown.setValue(this.plugin.settings.nameFormat).onChange(async (value) => {
-        this.plugin.settings.nameFormat = value;
-        await this.plugin.saveSettings();
-        this.plugin.createEngine();
-      });
-    });
-    new import_obsidian3.Setting(containerEl).setName("Insert citation format").setDesc("Format when inserting verse text via right-click").addDropdown((dropdown) => {
-      dropdown.addOption("verseOnly", 'Reference: "verse"');
-      dropdown.addOption("verseWithRef", '"verse" (Reference)');
-      dropdown.setValue(this.plugin.settings.insertCitationFormat).onChange(async (value) => {
-        this.plugin.settings.insertCitationFormat = value;
-        await this.plugin.saveSettings();
-      });
-    });
     new import_obsidian3.Setting(containerEl).setName("Verse cache").setDesc("Fetched verses are cached in memory for 60 minutes.").addButton((button) => button.setButtonText("Clear cache").onClick(() => {
       clearVerseCache();
       new import_obsidian3.Notice("Verse cache cleared.");
@@ -1285,7 +1262,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
   }
   createEngine() {
     try {
-      this.engine = new ObsidianEngine(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.nameFormat, false);
+      this.engine = new ObsidianEngine(this.settings.sourceLanguage, this.settings.outputLanguage, "full", false);
     } catch (e) {
       console.error("Failed to create engine:", e);
     }
@@ -1340,7 +1317,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
     const parsed = this.engine?.parse(
       this.settings.sourceLanguage,
       this.settings.sourceLanguage,
-      this.settings.nameFormat,
+      "full",
       false,
       text
     );
@@ -1412,7 +1389,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
             while ((markerMatch = markerRegex.exec(marked)) !== null) {
               if (markerMatch.index > markerLastIndex) innerFragment.appendChild(document.createTextNode(marked.substring(markerLastIndex, markerMatch.index)));
               const innerRef = markerMatch[1].trim();
-              const parsed = this.engine.parse(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.nameFormat, false, innerRef);
+              const parsed = this.engine.parse(this.settings.sourceLanguage, this.settings.outputLanguage, "full", false, innerRef);
               const data = JSON.parse(parsed), keys = Object.keys(data);
               if (keys.length > 0) {
                 const firstRange = data[keys[0]][0];
@@ -1465,9 +1442,16 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
           submenu.addItem((subItem) => subItem.setTitle("Parse selection").setIcon("sidebar-right").onClick(async () => {
             await this.showSidebarWithResults(await this.parseReferences(selection));
           }));
-          submenu.addItem((subItem) => subItem.setTitle("Insert citation").setIcon("quote-glyph").onClick(async () => {
-            await this.insertCitation(editor, selection);
-          }));
+          submenu.addItem((subItem) => {
+            subItem.setTitle("Insert citation").setIcon("quote-glyph");
+            const citeMenu = subItem.setSubmenu();
+            citeMenu.addItem((citeItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
+              await this.insertCitation(editor, selection, false);
+            }));
+            citeMenu.addItem((citeItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
+              await this.insertCitation(editor, selection, true);
+            }));
+          });
           submenu.addItem((subItem) => subItem.setTitle("Tag selection").setIcon("hash").onClick(() => {
             this.tagReferences(editor, selection);
           }));
@@ -1504,9 +1488,16 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
         menu.addItem((item) => item.setTitle("Parse selection").setIcon("sidebar-right").onClick(async () => {
           await this.showSidebarWithResults(await this.parseReferences(sel));
         }));
-        menu.addItem((item) => item.setTitle("Insert citation").setIcon("quote-glyph").onClick(async () => {
-          await this.insertCitation(editor, sel);
-        }));
+        menu.addItem((item) => {
+          item.setTitle("Insert citation").setIcon("quote-glyph");
+          const citeMenu = item.setSubmenu();
+          citeMenu.addItem((citeItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
+            if (editor && sel) await this.insertCitation(editor, sel, false);
+          }));
+          citeMenu.addItem((citeItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
+            if (editor && sel) await this.insertCitation(editor, sel, true);
+          }));
+        });
         menu.addItem((item) => item.setTitle("Tag selection").setIcon("hash").onClick(() => {
           this.tagReferences(editor, sel);
         }));
@@ -1576,8 +1567,8 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
       editor.replaceSelection(processed);
     }
   }
-  async insertCitation(editor, text) {
-    const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, this.settings.nameFormat, false, text);
+  async insertCitation(editor, text, withRef) {
+    const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, "full", false, text);
     if (!parsed || Object.keys(JSON.parse(parsed)).length === 0) {
       new import_obsidian4.Notice("No scripture references found.");
       return;
@@ -1597,12 +1588,19 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
           let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, " ").replace(/<span class="newblock"><\/span>/g, " ");
           const tempDiv = document.createElement("div");
           tempDiv.innerHTML = html;
-          tempDiv.querySelectorAll("sup.verseNum, .chapterNum").forEach((el) => el.remove());
+          if (withRef) {
+            tempDiv.querySelectorAll("sup.verseNum, .chapterNum").forEach((el) => el.remove());
+          } else {
+            tempDiv.querySelectorAll(".chapterNum").forEach((el) => {
+              const textNode = el.querySelector("a") || el;
+              if (textNode) textNode.textContent = "1 ";
+            });
+          }
           verseText = (tempDiv.textContent || "").replace(/\u00A0/g, " ").replace(/\u202F/g, " ").replace(/\+/g, "").replace(/\*/g, "").replace(/\s+/g, " ").trim();
         }
         fetchedSet.add(cacheKey);
       }
-      result = result.replace(originalRef, this.settings.insertCitationFormat === "verseWithRef" ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`);
+      result = result.replace(originalRef, withRef ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`);
     }
     editor.replaceSelection(result);
   }
