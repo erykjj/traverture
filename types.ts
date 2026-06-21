@@ -1,21 +1,11 @@
 export interface TravertureSettings {
     sourceLanguage: string;
     outputLanguage: string;
-    nameFormat: string;
-    insertCitationFormat: string;
 }
 
 export const DEFAULT_SETTINGS: TravertureSettings = {
     sourceLanguage: 'en',
     outputLanguage: 'en',
-    nameFormat: 'full',
-    insertCitationFormat: 'verseOnly',
-};
-
-export const NAME_FORMAT_OPTIONS: Record<string, string> = {
-    'full': 'Full (1 Corinthians)',
-    'official': 'Official (1Co)',
-    'standard': 'Standard (1 Cor.)',
 };
 
 export interface LanguageInfo {
