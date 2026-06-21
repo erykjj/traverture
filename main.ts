@@ -1,12 +1,11 @@
-import { Plugin, requestUrl, WorkspaceLeaf, Notice } from 'obsidian';
+import { Plugin, WorkspaceLeaf, Notice, Menu } from 'obsidian';
 // @ts-ignore
 import wasmBinary from './engine_bg.wasm';
 // @ts-ignore
 import * as wasmModule from './engine.js';
 import { TRAVERTURE_CSS } from './styles';
 import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './types';
-import { getAvailableLanguages } from './languages';
-import { fetchVerse, escapeHtml } from './cache';
+import { fetchVerse } from './cache';
 import { VerseModal } from './modal';
 import { TravertureSidebarView } from './sidebar';
 import { TravertureSettingTab } from './settings';
@@ -79,13 +78,12 @@ export default class TraverturePlugin extends Plugin {
         this.addSettingTab(new TravertureSettingTab(this.app, this));
         this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
 
-        this.addCommand({ id: 'parse-document-references', name: 'Parse references in current document', callback: async () => {
+        this.addCommand({ id: 'parse-document-references', name: 'tra.VER:ture: Parse document', callback: async () => {
             const file = this.app.workspace.getActiveFile(); if (!file) return;
-            const refs = await this.parseReferences(await this.app.vault.read(file));
-            await this.showSidebarWithResults(refs);
+            await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
         }});
 
-        this.addCommand({ id: 'parse-selection-references', name: 'Parse references in selection', editorCallback: async (editor: any) => {
+        this.addCommand({ id: 'parse-selection-references', name: 'tra.VER:ture: Parse selection', editorCallback: async (editor: any) => {
             const selection = editor.getSelection(); if (!selection) return;
             await this.showSidebarWithResults(await this.parseReferences(selection));
         }});
@@ -165,9 +163,64 @@ export default class TraverturePlugin extends Plugin {
             });
         }));
 
-        this.addRibbonIcon('book-open', 'tra.VER:ture: Parse document', async () => {
-            const file = this.app.workspace.getActiveFile(); if (!file) { new Notice('No file open.'); return; }
-            await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+        // Ribbon icon — show traverture menu on mobile
+        this.addRibbonIcon('scroll', 'tra.VER:ture', () => {
+            const file = this.app.workspace.getActiveFile();
+            const menu = new Menu();
+
+            menu.addItem((item: any) => item
+                .setTitle('Parse document')
+                .setIcon('file-text')
+                .onClick(async () => {
+                    if (!file) { new Notice('No file open.'); return; }
+                    const refs = await this.parseReferences(await this.app.vault.read(file));
+                    await this.showSidebarWithResults(refs);
+                })
+            );
+
+            menu.addItem((item: any) => item
+                .setTitle('Parse selection')
+                .setIcon('sidebar-right')
+                .onClick(async () => {
+                    const editor = this.app.workspace.activeEditor?.editor;
+                    if (!editor) { new Notice('No editor active.'); return; }
+                    const sel = editor.getSelection();
+                    if (!sel) { new Notice('No selection.'); return; }
+                    const refs = await this.parseReferences(sel);
+                    await this.showSidebarWithResults(refs);
+                })
+            );
+
+            menu.addItem((item: any) => item
+                .setTitle('Insert citation')
+                .setIcon('quote-glyph')
+                .onClick(async () => {
+                    const editor = this.app.workspace.activeEditor?.editor;
+                    if (!editor) { new Notice('No editor active.'); return; }
+                    const sel = editor.getSelection();
+                    if (!sel) { new Notice('No selection.'); return; }
+                    await this.insertCitation(editor, sel);
+                })
+            );
+
+            menu.addItem((item: any) => {
+                item.setTitle('Reformat').setIcon('pencil');
+                const submenu = item.setSubmenu();
+                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => {
+                    const editor = this.app.workspace.activeEditor?.editor;
+                    if (editor) this.reformatReferences(editor, editor.getSelection(), 'full');
+                }));
+                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => {
+                    const editor = this.app.workspace.activeEditor?.editor;
+                    if (editor) this.reformatReferences(editor, editor.getSelection(), 'standard');
+                }));
+                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => {
+                    const editor = this.app.workspace.activeEditor?.editor;
+                    if (editor) this.reformatReferences(editor, editor.getSelection(), 'official');
+                }));
+            });
+
+            menu.showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
         });
     }
 
