@@ -3,7 +3,7 @@
   "name": "tra.VER:ture",
   "version": "1.0.1",
   "minAppVersion": "1.0.0",
-  "description": "Parse, convert, preview, and insert Bible scripture references.",
+  "description": "Parse, convert, and preview scripture references; insert citations from NWT Bible, and launch in JW Library and JW.ORG.",
   "author": "Eryk J.",
   "authorUrl": "https://github.com/erykjj",
   "isDesktopOnly": false
