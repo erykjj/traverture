@@ -3,6 +3,8 @@ import { ItemView, WorkspaceLeaf } from 'obsidian';
 import * as wasmModule from './engine.js';
 import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR } from './types';
 import { getAvailableLanguages } from './languages';
+import { VerseModal } from './modal';
+import { fetchVerse } from './cache';
 import type TraverturePlugin from './main';
 
 export const SIDEBAR_COLUMNS = [
@@ -80,14 +82,12 @@ export class TravertureSidebarView extends ItemView {
     private getDisplayRef(ref: SidebarRef, format: 'full' | 'standard' | 'official'): string {
         const bookName = wasmModule.ObsidianEngine.get_book_name(ref.bookNum, this.outputLang, format, this.capitalize);
         if (!bookName) return ref.fullRef;
-        const sc = ref.startCh, sv = ref.startVerse, ec = ref.endCh, ev = ref.endVerse;
-        let versePart: string;
-        if (sc === ec) {
-            versePart = sv === ev ? `${sc}:${sv}` : `${sc}:${sv}-${ev}`;
-        } else {
-            versePart = `${sc}:${sv}-${ec}:${ev}`;
+        const engBookName = wasmModule.ObsidianEngine.get_book_name(ref.bookNum, 'en', 'full', false);
+        if (engBookName && ref.fullRef.startsWith(engBookName)) {
+            const rest = ref.fullRef.substring(engBookName.length); // " 3" or " 1:3"
+            return `${bookName}${rest}`;
         }
-        return `${bookName} ${versePart}`;
+        return `${bookName}`;
     }
 
     private getFilteredSortedRefs(): SidebarRef[] {
@@ -240,6 +240,11 @@ export class TravertureSidebarView extends ItemView {
                     const bcv = ref.startBcv === ref.endBcv ? ref.startBcv : `${ref.startBcv}-${ref.endBcv}`;
                     link.setAttribute('data-bcv', bcv);
                     link.setAttribute('data-ref', displayVal);
+                    link.addEventListener('click', async (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        const verseData = await fetchVerse(bcv, this.outputLang);
+                        new VerseModal().show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
+                    });
                 } else { td.setText(displayVal); }
             }
         }
