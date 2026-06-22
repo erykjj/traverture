@@ -20,7 +20,7 @@ export default class TraverturePlugin extends Plugin {
     createEngine() {
         try {
             this.engine = new wasmModule.ObsidianEngine(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false);
-        } catch (e) { console.error('Failed to create engine:', e); }
+        } catch (e) { console.error('tra.VER:ture: Failed to create engine:', e); }
     }
 
     async parseReferences(text: string): Promise<SidebarRef[]> {
@@ -104,7 +104,7 @@ export default class TraverturePlugin extends Plugin {
         document.head.appendChild(styleEl);
 
         try { await wasmModule.default({ module_or_path: wasmBinary }); this.createEngine(); }
-        catch (e) { console.error('WASM error:', e); }
+        catch (e) { console.error('tra.VER:ture: WASM error:', e); }
 
         this.addSettingTab(new TravertureSettingTab(this.app, this));
         this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
@@ -219,7 +219,7 @@ export default class TraverturePlugin extends Plugin {
             });
         }));
 
-        // Movile traverture menu
+        // Mobile traverture menu
         this.addRibbonIcon('scroll', 'tra.VER:ture', () => {
             const file = this.app.workspace.getActiveFile();
             const editor = this.app.workspace.activeEditor?.editor;

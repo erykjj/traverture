@@ -10,7 +10,7 @@ export function getAvailableLanguages(): LanguageInfo[] {
             const json = wasmModule.ObsidianEngine.get_available_languages();
             cachedLanguages = JSON.parse(json);
         } catch (e) {
-            console.error('Failed to get languages from WASM:', e);
+            console.error('tra.VER:ture: Failed to get languages from WASM:', e);
             cachedLanguages = [];
         }
     }

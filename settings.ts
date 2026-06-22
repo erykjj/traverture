@@ -37,7 +37,7 @@ export class TravertureSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Verse cache')
-            .setDesc('Fetched verses are cached in memory for 60 minutes.')
+            .setDesc('Fetched verses are cached in memory for 60 minutes')
             .addButton(button => button.setButtonText('Clear cache').onClick(() => { clearVerseCache(); new Notice('Verse cache cleared.'); }));
     }
 }
