@@ -11,9 +11,9 @@
 ### Removed
 
 ____
-## [v1.0.0] - 2026-06-20
+## [v1.0.1] - 2026-06-22
 
 - Initial release
 
 ____
-[v1.0.0]:https://github.com/erykjj/traverture/releases/tag/v1.0.0
+[v1.0.1]:https://github.com/erykjj/traverture/releases/tag/v1.0.1
