@@ -141,11 +141,14 @@ export default class TraverturePlugin extends Plugin {
                                 const firstRange = (data[keys[0]] as string[][])[0];
                                 const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
                                 const link = document.createElement('a'); link.className = 'traverture-ref-link'; link.textContent = keys[0];
-                                link.setAttribute('data-bcv', bcv); link.setAttribute('data-ref', keys[0]);
+                                link.setAttribute('data-bcv', bcv); link.setAttribute('data-ref', link.textContent || keys[0]);
                                 link.addEventListener('click', async (e) => {
                                     e.preventDefault(); e.stopPropagation();
+                                    const linkText = link.getAttribute('data-ref') || link.textContent || '';
+                                    const modal = new VerseModal();
+                                    modal.show({ html: `<p><em>Loading...</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
                                     const verseData = await fetchVerse(bcv, this.settings.outputLanguage);
-                                    new VerseModal().show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: keys[0] }, bcv, this.settings.outputLanguage);
+                                    modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
                                 });
                                 innerFragment.appendChild(link);
                             } else { innerFragment.appendChild(document.createTextNode(markerMatch[0])); }
@@ -165,10 +168,13 @@ export default class TraverturePlugin extends Plugin {
             const target = evt.target as HTMLElement;
             if (target.classList.contains('traverture-ref-link') && target.getAttribute('data-bcv')) {
                 evt.preventDefault(); evt.stopPropagation();
-                const bcv = target.getAttribute('data-bcv')!, refText = target.getAttribute('data-ref') || target.textContent || '';
+                const bcv = target.getAttribute('data-bcv')!;
+                const refText = target.getAttribute('data-ref') || target.textContent || '';
                 const modal = new VerseModal();
-                modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage);
-                fetchVerse(bcv, this.settings.outputLanguage).then(verseData => modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage));
+                modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+                fetchVerse(bcv, this.settings.outputLanguage).then(verseData => {
+                    modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+                });
             }
         });
 
