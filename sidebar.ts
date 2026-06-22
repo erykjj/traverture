@@ -146,7 +146,7 @@ export class TravertureSidebarView extends ItemView {
         this.searchInputEl.addEventListener('input', () => { this.searchQuery = this.searchInputEl!.value; this.render(); });
         if (this.searchQuery) {
             const clearX = searchWrap.createEl('button', { cls: 'traverture-sidebar-search-clear' });
-            clearX.innerHTML = '&#x2715;';
+            clearX.setText('\u2715');
             clearX.addEventListener('click', () => { this.searchQuery = ''; this.render(); });
         }
 

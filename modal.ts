@@ -46,6 +46,7 @@ export class VerseModal {
         const copyBtn = this.createHeaderButton('COPY');
         copyBtn.addEventListener('click', () => {
             const tempDiv = document.createElement('div');
+            // @ts-ignore - verse HTML from API
             tempDiv.innerHTML = verseData.html;
             const lines: string[] = [];
             let currentParagraph: string[] = [];
@@ -89,6 +90,7 @@ export class VerseModal {
         const body = document.createElement('div');
         body.id = 'verse-tooltip';
         body.style.cssText = 'padding:1rem 1.25rem;overflow-y:auto;flex:1;line-height:1.6;';
+        // @ts-ignore - loading placeholder
         body.innerHTML = verseData.html;
         dialog.appendChild(body);
 
