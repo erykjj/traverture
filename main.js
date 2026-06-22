@@ -826,12 +826,14 @@ async function fetchVerse(range, langCode) {
 var VerseModal = class {
   constructor() {
     this.modalEl = null;
+    this.currentTitle = "";
   }
-  show(verseData, bcv, outputLang) {
+  show(verseData, bcv, outputLang, titleOverride) {
     this.hide();
     const languages = getAvailableLanguages();
     const langObj = languages.find((l) => l.code === outputLang);
     const langSymbol = langObj ? ObsidianEngine.get_lang_symbol(outputLang) : "E";
+    this.currentTitle = titleOverride || verseData.citation;
     const modal = document.createElement("div");
     modal.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;";
     modal.addEventListener("click", (e) => {
@@ -843,7 +845,7 @@ var VerseModal = class {
     header.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;border-bottom:1px solid var(--background-modifier-border,#e5e7eb);flex-shrink:0;gap:0.5rem;flex-wrap:wrap;";
     const title = document.createElement("span");
     title.style.cssText = "font-weight:600;font-size:1rem;color:var(--text-normal,#333);";
-    title.textContent = verseData.citation;
+    title.textContent = titleOverride || verseData.citation;
     header.appendChild(title);
     const buttonGroup = document.createElement("div");
     buttonGroup.style.cssText = "display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;";
@@ -896,7 +898,8 @@ var VerseModal = class {
       for (const child of Array.from(tempDiv.childNodes)) walkNode(child);
       if (currentParagraph.length > 0) lines.push(currentParagraph.join(" "));
       let text = lines.join("\n").replace(/\u00A0/g, " ").replace(/\u202F/g, " ").replace(/\+/g, "").replace(/\*/g, "").replace(/\n{3,}/g, "\n\n").trim();
-      navigator.clipboard.writeText(`${verseData.citation}
+      const copyTitle = titleOverride || verseData.citation;
+      navigator.clipboard.writeText(`${this.currentTitle}
 
 ${text}`);
       copyBtn.textContent = "COPIED";
@@ -1398,12 +1401,15 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
                 link.className = "traverture-ref-link";
                 link.textContent = keys[0];
                 link.setAttribute("data-bcv", bcv);
-                link.setAttribute("data-ref", keys[0]);
+                link.setAttribute("data-ref", link.textContent || keys[0]);
                 link.addEventListener("click", async (e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  const linkText = link.getAttribute("data-ref") || link.textContent || "";
+                  const modal = new VerseModal();
+                  modal.show({ html: `<p><em>Loading...</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
                   const verseData = await fetchVerse(bcv, this.settings.outputLanguage);
-                  new VerseModal().show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: keys[0] }, bcv, this.settings.outputLanguage);
+                  modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
                 });
                 innerFragment.appendChild(link);
               } else {
@@ -1427,10 +1433,13 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
       if (target.classList.contains("traverture-ref-link") && target.getAttribute("data-bcv")) {
         evt.preventDefault();
         evt.stopPropagation();
-        const bcv = target.getAttribute("data-bcv"), refText = target.getAttribute("data-ref") || target.textContent || "";
+        const bcv = target.getAttribute("data-bcv");
+        const refText = target.getAttribute("data-ref") || target.textContent || "";
         const modal = new VerseModal();
-        modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage);
-        fetchVerse(bcv, this.settings.outputLanguage).then((verseData) => modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage));
+        modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+        fetchVerse(bcv, this.settings.outputLanguage).then((verseData) => {
+          modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+        });
       }
     });
     this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor, _view) => {
