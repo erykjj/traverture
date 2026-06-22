@@ -74,7 +74,7 @@ export class VerseModal {
             let text = lines.join('\n').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\n{3,}/g, '\n\n').trim();
             navigator.clipboard.writeText(`${this.currentTitle}\n\n${text}`);
             copyBtn.textContent = 'COPIED';
-            setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
+            window.setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
         });
         buttonGroup.appendChild(copyBtn);
 

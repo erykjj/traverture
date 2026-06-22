@@ -184,7 +184,7 @@ export class TravertureSidebarView extends ItemView {
             }).join('\t')).join('\n');
             navigator.clipboard.writeText(`${headers}\n${body}`);
             copyBtn.textContent = 'COPIED';
-            setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
+            window.setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
         });
 
         const colRow = toolbar.createDiv({ cls: 'traverture-sidebar-col-row' });
