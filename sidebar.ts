@@ -242,8 +242,10 @@ export class TravertureSidebarView extends ItemView {
                     link.setAttribute('data-ref', displayVal);
                     link.addEventListener('click', async (e) => {
                         e.preventDefault(); e.stopPropagation();
+                        const modal = new VerseModal();
+                        modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
                         const verseData = await fetchVerse(bcv, this.outputLang);
-                        new VerseModal().show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
+                        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
                     });
                 } else { td.setText(displayVal); }
             }
