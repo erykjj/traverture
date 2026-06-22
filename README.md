@@ -35,7 +35,7 @@ A scripture reference parser and formatter for Obsidian. Create interactive link
 - **Reformat references** – Convert references between Full (1 Corinthians), Standard (1 Cor.), and Official (1Co) name formats. Works on selections or entire documents.
 
 - **Multi-language support** – Parse references in any supported language, and display or fetch verse text in a different language.
-  - Supported languages: Danish, Dutch, English, French, German, Italian, Japanese, Korean, Norwegian, Polish, Portuguese, Russian, Spanish, Swedish, Ukrainian, Chinese
+  - Supported languages: Danish, Dutch, English, French, German, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Russian, Spanish, Swedish, Ukrainian
 
 ---
 
