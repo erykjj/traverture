@@ -46,8 +46,7 @@ export class VerseModal {
         const copyBtn = this.createHeaderButton('COPY');
         copyBtn.addEventListener('click', () => {
             const tempDiv = activeDocument.createElement('div');
-            // @ts-ignore
-            tempDiv.innerHTML = verseData.html;
+            tempDiv.insertAdjacentHTML('beforeend', verseData.html);
             const lines: string[] = [];
             let currentParagraph: string[] = [];
             const walkNode = (node: Node) => {
@@ -90,8 +89,7 @@ export class VerseModal {
         const body = activeDocument.createElement('div');
         body.id = 'verse-tooltip';
         body.className = 'traverture-modal-body';
-        // @ts-ignore
-        body.innerHTML = verseData.html;
+        body.insertAdjacentHTML('beforeend', verseData.html);
         dialog.appendChild(body);
 
         modal.appendChild(dialog);

@@ -315,8 +315,7 @@ export default class TraverturePlugin extends Plugin {
                 if (verseData) {
                     let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
                     const tempDiv = activeDocument.createElement('div');
-                    // @ts-ignore
-                    tempDiv.innerHTML = html;
+                    tempDiv.insertAdjacentHTML('beforeend', html);
                     if (withRef) {
                         tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
                     } else {
