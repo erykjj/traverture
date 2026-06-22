@@ -388,6 +388,7 @@ async function __wbg_init(module_or_path) {
 
 // styles.ts
 var TRAVERTURE_CSS = `
+
 /* --- Reference Links --- */
 .traverture-ref-link {
   color: #4a6da7;
@@ -898,7 +899,6 @@ var VerseModal = class {
       for (const child of Array.from(tempDiv.childNodes)) walkNode(child);
       if (currentParagraph.length > 0) lines.push(currentParagraph.join(" "));
       let text = lines.join("\n").replace(/\u00A0/g, " ").replace(/\u202F/g, " ").replace(/\+/g, "").replace(/\*/g, "").replace(/\n{3,}/g, "\n\n").trim();
-      const copyTitle = titleOverride || verseData.citation;
       navigator.clipboard.writeText(`${this.currentTitle}
 
 ${text}`);
@@ -1014,14 +1014,12 @@ var TravertureSidebarView = class extends import_obsidian2.ItemView {
   getDisplayRef(ref, format) {
     const bookName = ObsidianEngine.get_book_name(ref.bookNum, this.outputLang, format, this.capitalize);
     if (!bookName) return ref.fullRef;
-    const sc = ref.startCh, sv = ref.startVerse, ec = ref.endCh, ev = ref.endVerse;
-    let versePart;
-    if (sc === ec) {
-      versePart = sv === ev ? `${sc}:${sv}` : `${sc}:${sv}-${ev}`;
-    } else {
-      versePart = `${sc}:${sv}-${ec}:${ev}`;
+    const engBookName = ObsidianEngine.get_book_name(ref.bookNum, "en", "full", false);
+    if (engBookName && ref.fullRef.startsWith(engBookName)) {
+      const rest = ref.fullRef.substring(engBookName.length);
+      return `${bookName}${rest}`;
     }
-    return `${bookName} ${versePart}`;
+    return `${bookName}`;
   }
   getFilteredSortedRefs() {
     let refs = [...this.allRefs];
@@ -1202,6 +1200,12 @@ ${body}`);
           const bcv = ref.startBcv === ref.endBcv ? ref.startBcv : `${ref.startBcv}-${ref.endBcv}`;
           link.setAttribute("data-bcv", bcv);
           link.setAttribute("data-ref", displayVal);
+          link.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const verseData = await fetchVerse(bcv, this.outputLang);
+            new VerseModal().show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
+          });
         } else {
           td.setText(displayVal);
         }
