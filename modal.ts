@@ -5,13 +5,15 @@ import { getAvailableLanguages } from './languages';
 
 export class VerseModal {
     private modalEl: HTMLElement | null = null;
+    private currentTitle: string = '';
 
-    show(verseData: VerseData, bcv: string, outputLang: string) {
+        show(verseData: VerseData, bcv: string, outputLang: string, titleOverride?: string) {
         this.hide();
 
         const languages = getAvailableLanguages();
         const langObj = languages.find(l => l.code === outputLang);
         const langSymbol = langObj ? wasmModule.ObsidianEngine.get_lang_symbol(outputLang) : 'E';
+        this.currentTitle = titleOverride || verseData.citation;
 
         const modal = document.createElement('div');
         modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;';
@@ -25,7 +27,7 @@ export class VerseModal {
 
         const title = document.createElement('span');
         title.style.cssText = 'font-weight:600;font-size:1rem;color:var(--text-normal,#333);';
-        title.textContent = verseData.citation;
+        title.textContent = titleOverride || verseData.citation;
         header.appendChild(title);
 
         const buttonGroup = document.createElement('div');
@@ -69,7 +71,8 @@ export class VerseModal {
             for (const child of Array.from(tempDiv.childNodes)) walkNode(child);
             if (currentParagraph.length > 0) lines.push(currentParagraph.join(' '));
             let text = lines.join('\n').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\n{3,}/g, '\n\n').trim();
-            navigator.clipboard.writeText(`${verseData.citation}\n\n${text}`);
+            const copyTitle = titleOverride || verseData.citation;
+            navigator.clipboard.writeText(`${this.currentTitle}\n\n${text}`);
             copyBtn.textContent = 'COPIED';
             setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
         });
