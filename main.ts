@@ -314,7 +314,9 @@ export default class TraverturePlugin extends Plugin {
                 const verseData = await fetchVerse(bcv, this.settings.sourceLanguage);
                 if (verseData) {
                     let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
-                    const tempDiv = activeDocument.createElement('div'); tempDiv.innerHTML = html;
+                    const tempDiv = activeDocument.createElement('div');
+                    // @ts-ignore
+                    tempDiv.innerHTML = html;
                     if (withRef) {
                         tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
                     } else {
