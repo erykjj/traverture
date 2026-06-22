@@ -11,6 +11,11 @@
 ### Removed
 
 ____
+## [1.0.5] - 2026-06-22
+### Changed
+
+- Simplify CSS to reduce false-positive warnings
+
 ## [1.0.4] - 2026-06-22
 ### Changed
 
@@ -21,5 +26,6 @@ ____
 - Initial Obidian Community release
 
 ____
+[1.0.5]:https://github.com/erykjj/traverture/releases/tag/1.0.5
 [1.0.4]:https://github.com/erykjj/traverture/releases/tag/1.0.4
 [1.0.0]:https://github.com/erykjj/traverture/releases/tag/1.0.0
