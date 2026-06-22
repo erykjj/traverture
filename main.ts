@@ -3,7 +3,6 @@ import { Plugin, WorkspaceLeaf, Notice, Menu } from 'obsidian';
 import wasmBinary from './engine_bg.wasm';
 // @ts-ignore
 import * as wasmModule from './engine.js';
-import { TRAVERTURE_CSS } from './styles';
 import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './types';
 import { fetchVerse } from './cache';
 import { VerseModal } from './modal';
@@ -97,11 +96,6 @@ export default class TraverturePlugin extends Plugin {
 
     async onload() {
         await this.loadSettings();
-
-        const styleEl = document.createElement('style');
-        styleEl.id = 'traverture-styles';
-        styleEl.textContent = TRAVERTURE_CSS;
-        document.head.appendChild(styleEl);
 
         try { await wasmModule.default({ module_or_path: wasmBinary }); this.createEngine(); }
         catch (e) { console.error('tra.VER:ture: WASM error:', e); }
@@ -334,5 +328,5 @@ export default class TraverturePlugin extends Plugin {
         editor.replaceSelection(result);
     }
 
-    onunload() { const styleEl = document.getElementById('traverture-styles'); if (styleEl) styleEl.remove(); }
+    onunload() { }
 }
