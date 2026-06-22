@@ -1,5 +1,5 @@
-// styles.ts
 export const TRAVERTURE_CSS = `
+
 /* --- Reference Links --- */
 .traverture-ref-link {
   color: #4a6da7;
