@@ -520,7 +520,7 @@ var VerseModal = class {
     const copyBtn = this.createHeaderButton("COPY");
     copyBtn.addEventListener("click", () => {
       const tempDiv = activeDocument.createElement("div");
-      tempDiv.innerHTML = verseData.html;
+      tempDiv.insertAdjacentHTML("beforeend", verseData.html);
       const lines = [];
       let currentParagraph = [];
       const walkNode = (node) => {
@@ -571,7 +571,7 @@ ${text}`);
     const body = activeDocument.createElement("div");
     body.id = "verse-tooltip";
     body.className = "traverture-modal-body";
-    body.innerHTML = verseData.html;
+    body.insertAdjacentHTML("beforeend", verseData.html);
     dialog.appendChild(body);
     modal.appendChild(dialog);
     activeDocument.body.appendChild(modal);
@@ -1251,7 +1251,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
         if (verseData) {
           let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, " ").replace(/<span class="newblock"><\/span>/g, " ");
           const tempDiv = activeDocument.createElement("div");
-          tempDiv.innerHTML = html;
+          tempDiv.insertAdjacentHTML("beforeend", html);
           if (withRef) {
             tempDiv.querySelectorAll("sup.verseNum, .chapterNum").forEach((el) => el.remove());
           } else {
