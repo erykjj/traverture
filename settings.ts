@@ -14,7 +14,7 @@ export class TravertureSettingTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.createEl('h2', { text: 'tra.VER:ture Settings' });
+        new Setting(containerEl).setName('tra.VER:ture Settings').setHeading();
         const languages = getAvailableLanguages();
 
         new Setting(containerEl)
