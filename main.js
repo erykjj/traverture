@@ -386,353 +386,6 @@ async function __wbg_init(module_or_path) {
   return __wbg_finalize_init(instance, module2);
 }
 
-// styles.ts
-var TRAVERTURE_CSS = `
-
-/* --- Reference Links --- */
-.traverture-ref-link {
-  color: #4a6da7;
-  text-decoration: none;
-  cursor: pointer;
-}
-.traverture-ref-link:hover {
-  text-decoration: underline;
-}
-
-/* --- Tooltip Container --- */
-#verse-tooltip {
-  font-weight: normal !important;
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  line-height: 1.6;
-}
-
-/* --- Tooltip Content Blocks --- */
-#verse-tooltip .style-l {
-  display: block;
-}
-#verse-tooltip .style-z {
-  display: block;
-  margin-left: 1.5em;
-}
-#verse-tooltip .style-w,
-#verse-tooltip .style-s {
-  display: block;
-  text-align: center;
-  font-style: italic;
-  margin: 0.75em 0 0.25em 0;
-}
-#verse-tooltip .parabreak {
-  display: block;
-  height: 0.75em;
-}
-#verse-tooltip .newblock {
-  display: block;
-}
-
-/* --- Tooltip Typography --- */
-#verse-tooltip sup.verseNum {
-  font-weight: 700 !important;
-}
-#verse-tooltip .chapterNum {
-  font-weight: 700 !important;
-}
-#verse-tooltip a {
-  text-decoration: none;
-  color: inherit;
-}
-#verse-tooltip em {
-  font-style: italic;
-}
-
-/* --- Sidebar Root --- */
-.traverture-sidebar {
-  padding: 8px !important;
-  font-size: 0.8rem !important;
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100% !important;
-  overflow: hidden !important;
-  user-select: text !important;
-  container-type: inline-size !important;
-}
-
-/* --- Empty State --- */
-.traverture-sidebar-empty {
-  color: var(--text-muted, #999);
-  padding: 16px;
-  text-align: center;
-}
-
-/* --- Toolbar --- */
-.traverture-sidebar-toolbar {
-  flex-shrink: 0 !important;
-  margin-bottom: 6px !important;
-}
-
-/* --- Top Row (Search + Controls) --- */
-.traverture-sidebar-top-row {
-  display: flex !important;
-  gap: 8px !important;
-  align-items: center !important;
-  margin-bottom: 6px !important;
-  flex-wrap: nowrap !important;
-}
-
-/* --- Search Input --- */
-.traverture-sidebar-search-wrap {
-  position: relative !important;
-  flex-shrink: 0 !important;
-}
-.traverture-sidebar-search {
-  border: 1px solid var(--background-modifier-border, #ccc) !important;
-  border-radius: 4px !important;
-  padding: 4px 24px 4px 8px !important;
-  font-size: 0.78rem !important;
-  width: 160px !important;
-  outline: none !important;
-  background: var(--background-primary, white) !important;
-  color: var(--text-normal, #333) !important;
-  height: auto !important;
-  line-height: normal !important;
-}
-.traverture-sidebar-search:focus {
-  border-color: #4a6da7 !important;
-  box-shadow: none !important;
-}
-
-/* --- Search Clear Button --- */
-.traverture-sidebar-search-clear {
-  position: absolute !important;
-  right: 4px !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  background: none !important;
-  border: none !important;
-  cursor: pointer !important;
-  font-size: 0.85rem !important;
-  color: var(--text-muted, #999) !important;
-  padding: 0 3px !important;
-  line-height: 1 !important;
-  box-shadow: none !important;
-  height: auto !important;
-}
-.traverture-sidebar-search-clear:hover {
-  color: var(--text-normal, #333) !important;
-}
-
-/* --- Count Display --- */
-.traverture-sidebar-count {
-  font-size: 0.75rem !important;
-  color: var(--text-muted, #888) !important;
-  flex-shrink: 0 !important;
-  white-space: nowrap !important;
-}
-
-/* --- Spacer --- */
-.traverture-sidebar-spacer {
-  flex: 1 !important;
-  min-width: 8px !important;
-}
-
-/* --- Language Selector --- */
-.traverture-sidebar-lang-select {
-  border: 1px solid var(--background-modifier-border, #ccc) !important;
-  border-radius: 4px !important;
-  padding: 3px 4px !important;
-  font-size: 0.75rem !important;
-  background: var(--background-primary, white) !important;
-  color: var(--text-normal, #333) !important;
-  flex-shrink: 0 !important;
-  max-width: 130px !important;
-  height: auto !important;
-  line-height: normal !important;
-}
-
-/* --- Capitalization Toggle --- */
-.traverture-sidebar-caps-label {
-  display: flex !important;
-  align-items: center !important;
-  gap: 3px !important;
-  font-size: 0.7rem !important;
-  cursor: pointer !important;
-  flex-shrink: 0 !important;
-  font-weight: 600 !important;
-  white-space: nowrap !important;
-  color: var(--text-muted, #666) !important;
-}
-.traverture-sidebar-caps-label input {
-  width: 13px !important;
-  height: 13px !important;
-  margin: 0 !important;
-}
-
-/* --- Copy Button --- */
-.traverture-sidebar-copy-btn {
-  font-size: 0.72rem !important;
-  font-weight: 600 !important;
-  background: #4a6da7 !important;
-  color: white !important;
-  border: none !important;
-  border-radius: 4px !important;
-  padding: 3px 12px !important;
-  cursor: pointer !important;
-  flex-shrink: 0 !important;
-  letter-spacing: 0.5px !important;
-  height: auto !important;
-  line-height: normal !important;
-  box-shadow: none !important;
-}
-
-/* --- Column Controls Row --- */
-.traverture-sidebar-col-row {
-  display: flex !important;
-  gap: 4px !important;
-  align-items: center !important;
-  font-size: 0.7rem !important;
-  margin-bottom: 6px !important;
-  overflow-x: auto !important;
-}
-.traverture-sidebar-col-label {
-  color: var(--text-muted, #888) !important;
-  flex-shrink: 0 !important;
-}
-.traverture-sidebar-col-btn {
-  font-size: 0.68rem !important;
-  color: #4a6da7 !important;
-  background: none !important;
-  border: none !important;
-  cursor: pointer !important;
-  text-decoration: underline !important;
-  padding: 0 4px !important;
-  flex-shrink: 0 !important;
-  height: auto !important;
-  line-height: normal !important;
-  box-shadow: none !important;
-}
-
-/* --- Individual Column Toggle --- */
-.traverture-sidebar-col-toggle {
-  display: flex !important;
-  align-items: center !important;
-  gap: 3px !important;
-  cursor: pointer !important;
-  white-space: nowrap !important;
-  margin-left: 8px !important;
-  font-size: 0.68rem !important;
-  color: var(--text-muted, #666) !important;
-}
-
-/* --- Custom Checkboxes (Column Toggle & Caps Toggle) --- */
-.traverture-sidebar-col-toggle input[type="checkbox"],
-.traverture-sidebar-caps-label input[type="checkbox"] {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  border: 1.5px solid var(--text-muted, #888) !important;
-  border-radius: 2px !important;
-  background: transparent !important;
-  width: 13px !important;
-  height: 13px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  cursor: pointer !important;
-}
-.traverture-sidebar-col-toggle input[type="checkbox"]:checked,
-.traverture-sidebar-caps-label input[type="checkbox"]:checked {
-  background: #4a6da7 !important;
-  border-color: #4a6da7 !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M4.5 8.5L2 6l-1 1 3.5 3.5 7-7-1-1z'/%3E%3C/svg%3E") !important;
-  background-size: 10px 10px !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
-}
-.traverture-sidebar-col-toggle input[type="checkbox"]::after,
-.traverture-sidebar-caps-label input[type="checkbox"]::after {
-  display: none !important;
-  content: none !important;
-}
-
-/* --- Table Wrapper --- */
-.traverture-sidebar-table-wrapper {
-  flex: 1 !important;
-  overflow: auto !important;
-  border: 1px solid var(--background-modifier-border, #ccc) !important;
-  border-radius: 4px !important;
-  min-height: 0 !important;
-  user-select: text !important;
-}
-
-/* --- Table --- */
-.traverture-sidebar-table {
-  width: max-content !important;
-  min-width: 100% !important;
-  border-collapse: collapse !important;
-  font-size: 0.75rem !important;
-  table-layout: fixed !important;
-}
-
-/* --- Table Header --- */
-.traverture-sidebar-th {
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 1 !important;
-  background: var(--background-secondary-alt, #e8e8e8) !important;
-  padding: 6px 8px !important;
-  border: 1px solid var(--background-modifier-border, #ccc) !important;
-  font-weight: 600 !important;
-  cursor: pointer !important;
-  user-select: none !important;
-  white-space: nowrap !important;
-  color: var(--text-normal, #333) !important;
-  font-size: 0.73rem !important;
-}
-.traverture-sidebar-th:hover {
-  background: var(--background-modifier-hover, #d8d8d8) !important;
-}
-
-/* --- Table Cells --- */
-.traverture-sidebar-td {
-  padding: 4px 8px !important;
-  border: 1px solid var(--background-modifier-border, #ddd) !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  background: var(--background-primary, white) !important;
-  color: var(--text-normal, #333) !important;
-  font-size: 0.73rem !important;
-  user-select: text !important;
-}
-
-/* --- Table Row Striping & Hover --- */
-.traverture-sidebar-table tbody tr:nth-child(even) td {
-  background: var(--background-secondary, #f9f9f9) !important;
-}
-.traverture-sidebar-table tbody tr:hover td {
-  background: var(--background-modifier-hover, #eef2f7) !important;
-}
-
-/* --- Monospace Utility --- */
-.traverture-mono {
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace !important;
-  font-size: 0.72rem !important;
-}
-
-/* --- Source Label --- */
-.traverture-sidebar-src-label {
-  font-size: 0.65rem !important;
-  color: var(--text-muted, #888) !important;
-  flex-shrink: 0 !important;
-  margin-right: -4px !important;
-}
-
-@container (max-width: 600px) {
-  .traverture-sidebar-top-row { flex-wrap: wrap !important; }
-  .traverture-sidebar-spacer { display: none !important; }
-}
-@container (max-width: 800px) {
-  .traverture-sidebar-col-row { flex-wrap: wrap !important; }
-}
-`;
-
 // types.ts
 var DEFAULT_SETTINGS = {
   sourceLanguage: "en",
@@ -835,21 +488,21 @@ var VerseModal = class {
     const langObj = languages.find((l) => l.code === outputLang);
     const langSymbol = langObj ? ObsidianEngine.get_lang_symbol(outputLang) : "E";
     this.currentTitle = titleOverride || verseData.citation;
-    const modal = document.createElement("div");
-    modal.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;";
+    const modal = activeDocument.createElement("div");
+    modal.setAttribute("style", "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;");
     modal.addEventListener("click", (e) => {
       if (e.target === modal) this.hide();
     });
-    const dialog = document.createElement("div");
-    dialog.style.cssText = "background:var(--background-primary,white);border:2px solid var(--background-modifier-border,#d1d5db);border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,0.2);width:900px;max-height:85vh;display:flex;flex-direction:column;user-select:text;";
-    const header = document.createElement("div");
-    header.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;border-bottom:1px solid var(--background-modifier-border,#e5e7eb);flex-shrink:0;gap:0.5rem;flex-wrap:wrap;";
-    const title = document.createElement("span");
-    title.style.cssText = "font-weight:600;font-size:1rem;color:var(--text-normal,#333);";
+    const dialog = activeDocument.createElement("div");
+    dialog.setAttribute("style", "background:var(--background-primary,white);border:2px solid var(--background-modifier-border,#d1d5db);border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,0.2);width:900px;max-height:85vh;display:flex;flex-direction:column;user-select:text;");
+    const header = activeDocument.createElement("div");
+    header.setAttribute("style", "display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;border-bottom:1px solid var(--background-modifier-border,#e5e7eb);flex-shrink:0;gap:0.5rem;flex-wrap:wrap;");
+    const title = activeDocument.createElement("span");
+    title.setAttribute("style", "font-weight:600;font-size:1rem;color:var(--text-normal,#333);");
     title.textContent = titleOverride || verseData.citation;
     header.appendChild(title);
-    const buttonGroup = document.createElement("div");
-    buttonGroup.style.cssText = "display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;";
+    const buttonGroup = activeDocument.createElement("div");
+    buttonGroup.setAttribute("style", "display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;");
     const jwlibUrl = `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`;
     const jwlibBtn = this.createHeaderButton("JW Library");
     jwlibBtn.addEventListener("click", () => {
@@ -866,7 +519,7 @@ var VerseModal = class {
     buttonGroup.appendChild(jworgBtn);
     const copyBtn = this.createHeaderButton("COPY");
     copyBtn.addEventListener("click", () => {
-      const tempDiv = document.createElement("div");
+      const tempDiv = activeDocument.createElement("div");
       tempDiv.innerHTML = verseData.html;
       const lines = [];
       let currentParagraph = [];
@@ -903,29 +556,29 @@ var VerseModal = class {
 
 ${text}`);
       copyBtn.textContent = "COPIED";
-      setTimeout(() => {
+      window.setTimeout(() => {
         copyBtn.textContent = "COPY";
       }, 1500);
     });
     buttonGroup.appendChild(copyBtn);
-    const closeBtn = document.createElement("button");
-    closeBtn.style.cssText = "color:var(--text-muted,#6b7280);font-size:1.125rem;border:none;background:none;cursor:pointer;line-height:1;padding:0 0.25rem;";
+    const closeBtn = activeDocument.createElement("button");
+    closeBtn.setAttribute("style", "color:var(--text-muted,#6b7280);font-size:1.125rem;border:none;background:none;cursor:pointer;line-height:1;padding:0 0.25rem;");
     closeBtn.textContent = "\u2715";
     closeBtn.addEventListener("click", () => this.hide());
     buttonGroup.appendChild(closeBtn);
     header.appendChild(buttonGroup);
     dialog.appendChild(header);
-    const body = document.createElement("div");
+    const body = activeDocument.createElement("div");
     body.id = "verse-tooltip";
-    body.style.cssText = "padding:1rem 1.25rem;overflow-y:auto;flex:1;line-height:1.6;";
+    body.setAttribute("style", "padding:1rem 1.25rem;overflow-y:auto;flex:1;line-height:1.6;");
     body.innerHTML = verseData.html;
     dialog.appendChild(body);
     modal.appendChild(dialog);
-    document.body.appendChild(modal);
+    activeDocument.body.appendChild(modal);
     this.modalEl = modal;
   }
   createHeaderButton(text) {
-    const btn = document.createElement("button");
+    const btn = activeDocument.createElement("button");
     btn.style.cssText = "font-size:0.72rem;font-weight:600;letter-spacing:0.3px;border:1px solid var(--background-modifier-border,#9ca3af);color:var(--text-normal,#374151);padding:0.3rem 0.6rem;border-radius:4px;background:var(--background-secondary,#f3f3f3);cursor:pointer;white-space:nowrap;width:85px;text-align:center;";
     btn.textContent = text;
     return btn;
@@ -1062,7 +715,7 @@ var TravertureSidebarView = class extends import_obsidian2.ItemView {
     return refs;
   }
   render() {
-    const wasFocused = this.searchInputEl && document.activeElement === this.searchInputEl;
+    const wasFocused = this.searchInputEl && activeDocument.activeElement === this.searchInputEl;
     this.contentEl.empty();
     this.contentEl.addClass("traverture-sidebar");
     if (this.allRefs.length === 0) {
@@ -1084,7 +737,7 @@ var TravertureSidebarView = class extends import_obsidian2.ItemView {
     });
     if (this.searchQuery) {
       const clearX = searchWrap.createEl("button", { cls: "traverture-sidebar-search-clear" });
-      clearX.innerHTML = "&#x2715;";
+      clearX.setText("\u2715");
       clearX.addEventListener("click", () => {
         this.searchQuery = "";
         this.render();
@@ -1130,7 +783,7 @@ var TravertureSidebarView = class extends import_obsidian2.ItemView {
       navigator.clipboard.writeText(`${headers}
 ${body}`);
       copyBtn.textContent = "COPIED";
-      setTimeout(() => {
+      window.setTimeout(() => {
         copyBtn.textContent = "COPY";
       }, 1500);
     });
@@ -1231,7 +884,7 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "tra.VER:ture Settings" });
+    new import_obsidian3.Setting(containerEl).setName("tra.VER:ture Settings").setHeading();
     const languages = getAvailableLanguages();
     new import_obsidian3.Setting(containerEl).setName("Source language").setDesc("Language of the scripture references in your notes").addDropdown((dropdown) => {
       for (const lang of languages) dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
@@ -1354,10 +1007,6 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
   }
   async onload() {
     await this.loadSettings();
-    const styleEl = document.createElement("style");
-    styleEl.id = "traverture-styles";
-    styleEl.textContent = TRAVERTURE_CSS;
-    document.head.appendChild(styleEl);
     try {
       await __wbg_init({ module_or_path: engine_bg_default });
       this.createEngine();
@@ -1377,7 +1026,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
       await this.showSidebarWithResults(await this.parseReferences(selection));
     } });
     this.registerMarkdownPostProcessor((element, _context) => {
-      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, { acceptNode: (node2) => node2.nodeValue && /\{\{(.+?)\}\}/.test(node2.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
+      const walker = activeDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT, { acceptNode: (node2) => node2.nodeValue && /\{\{(.+?)\}\}/.test(node2.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
       const textNodes = [];
       let node = walker.nextNode();
       while (node) {
@@ -1387,23 +1036,23 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
       for (const textNode of textNodes) {
         const text = textNode.nodeValue || "", regex = /\{\{(.+?)\}\}/g;
         let lastIndex = 0, match;
-        const fragment = document.createDocumentFragment();
+        const fragment = activeDocument.createDocumentFragment();
         while ((match = regex.exec(text)) !== null) {
-          if (match.index > lastIndex) fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+          if (match.index > lastIndex) fragment.appendChild(activeDocument.createTextNode(text.substring(lastIndex, match.index)));
           const refText = match[1].trim();
           if (this.engine) {
             const marked = this.engine.parse_with_markers(refText), markerRegex = /\{\{(.+?)\}\}/g;
             let markerLastIndex = 0, markerMatch;
-            const innerFragment = document.createDocumentFragment();
+            const innerFragment = activeDocument.createDocumentFragment();
             while ((markerMatch = markerRegex.exec(marked)) !== null) {
-              if (markerMatch.index > markerLastIndex) innerFragment.appendChild(document.createTextNode(marked.substring(markerLastIndex, markerMatch.index)));
+              if (markerMatch.index > markerLastIndex) innerFragment.appendChild(activeDocument.createTextNode(marked.substring(markerLastIndex, markerMatch.index)));
               const innerRef = markerMatch[1].trim();
               const parsed = this.engine.parse(this.settings.sourceLanguage, this.settings.outputLanguage, "full", false, innerRef);
               const data = JSON.parse(parsed), keys = Object.keys(data);
               if (keys.length > 0) {
                 const firstRange = data[keys[0]][0];
                 const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
-                const link = document.createElement("a");
+                const link = activeDocument.createElement("a");
                 link.className = "traverture-ref-link";
                 link.textContent = keys[0];
                 link.setAttribute("data-bcv", bcv);
@@ -1419,18 +1068,18 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
                 });
                 innerFragment.appendChild(link);
               } else {
-                innerFragment.appendChild(document.createTextNode(markerMatch[0]));
+                innerFragment.appendChild(activeDocument.createTextNode(markerMatch[0]));
               }
               markerLastIndex = markerMatch.index + markerMatch[0].length;
             }
-            if (markerLastIndex < marked.length) innerFragment.appendChild(document.createTextNode(marked.substring(markerLastIndex)));
+            if (markerLastIndex < marked.length) innerFragment.appendChild(activeDocument.createTextNode(marked.substring(markerLastIndex)));
             fragment.appendChild(innerFragment);
           } else {
-            fragment.appendChild(document.createTextNode(match[0]));
+            fragment.appendChild(activeDocument.createTextNode(match[0]));
           }
           lastIndex = match.index + match[0].length;
         }
-        if (lastIndex < text.length) fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+        if (lastIndex < text.length) fragment.appendChild(activeDocument.createTextNode(text.substring(lastIndex)));
         textNode.parentNode?.replaceChild(fragment, textNode);
       }
     });
@@ -1601,7 +1250,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
         const verseData = await fetchVerse(bcv, this.settings.sourceLanguage);
         if (verseData) {
           let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, " ").replace(/<span class="newblock"><\/span>/g, " ");
-          const tempDiv = document.createElement("div");
+          const tempDiv = activeDocument.createElement("div");
           tempDiv.innerHTML = html;
           if (withRef) {
             tempDiv.querySelectorAll("sup.verseNum, .chapterNum").forEach((el) => el.remove());
@@ -1620,7 +1269,5 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
     editor.replaceSelection(result);
   }
   onunload() {
-    const styleEl = document.getElementById("traverture-styles");
-    if (styleEl) styleEl.remove();
   }
 };
