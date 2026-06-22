@@ -751,7 +751,7 @@ function getAvailableLanguages() {
       const json = ObsidianEngine.get_available_languages();
       cachedLanguages = JSON.parse(json);
     } catch (e) {
-      console.error("Failed to get languages from WASM:", e);
+      console.error("tra.VER:ture: Failed to get languages from WASM:", e);
       cachedLanguages = [];
     }
   }
@@ -1203,8 +1203,10 @@ ${body}`);
           link.addEventListener("click", async (e) => {
             e.preventDefault();
             e.stopPropagation();
+            const modal = new VerseModal();
+            modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
             const verseData = await fetchVerse(bcv, this.outputLang);
-            new VerseModal().show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
+            modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
           });
         } else {
           td.setText(displayVal);
@@ -1247,7 +1249,7 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
         this.plugin.createEngine();
       });
     });
-    new import_obsidian3.Setting(containerEl).setName("Verse cache").setDesc("Fetched verses are cached in memory for 60 minutes.").addButton((button) => button.setButtonText("Clear cache").onClick(() => {
+    new import_obsidian3.Setting(containerEl).setName("Verse cache").setDesc("Fetched verses are cached in memory for 60 minutes").addButton((button) => button.setButtonText("Clear cache").onClick(() => {
       clearVerseCache();
       new import_obsidian3.Notice("Verse cache cleared.");
     }));
@@ -1271,7 +1273,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
     try {
       this.engine = new ObsidianEngine(this.settings.sourceLanguage, this.settings.outputLanguage, "full", false);
     } catch (e) {
-      console.error("Failed to create engine:", e);
+      console.error("tra.VER:ture: Failed to create engine:", e);
     }
   }
   async parseReferences(text) {
@@ -1360,7 +1362,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
       await __wbg_init({ module_or_path: engine_bg_default });
       this.createEngine();
     } catch (e) {
-      console.error("WASM error:", e);
+      console.error("tra.VER:ture: WASM error:", e);
     }
     this.addSettingTab(new TravertureSettingTab(this.app, this));
     this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
