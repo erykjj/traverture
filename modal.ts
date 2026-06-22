@@ -7,7 +7,7 @@ export class VerseModal {
     private modalEl: HTMLElement | null = null;
     private currentTitle: string = '';
 
-        show(verseData: VerseData, bcv: string, outputLang: string, titleOverride?: string) {
+    show(verseData: VerseData, bcv: string, outputLang: string, titleOverride?: string) {
         this.hide();
 
         const languages = getAvailableLanguages();
@@ -16,22 +16,22 @@ export class VerseModal {
         this.currentTitle = titleOverride || verseData.citation;
 
         const modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;';
+        modal.setAttribute('style', 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;');
         modal.addEventListener('click', (e) => { if (e.target === modal) this.hide(); });
 
         const dialog = document.createElement('div');
-        dialog.style.cssText = 'background:var(--background-primary,white);border:2px solid var(--background-modifier-border,#d1d5db);border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,0.2);width:900px;max-height:85vh;display:flex;flex-direction:column;user-select:text;';
+        dialog.setAttribute('style', 'background:var(--background-primary,white);border:2px solid var(--background-modifier-border,#d1d5db);border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,0.2);width:900px;max-height:85vh;display:flex;flex-direction:column;user-select:text;');
 
         const header = document.createElement('div');
-        header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;border-bottom:1px solid var(--background-modifier-border,#e5e7eb);flex-shrink:0;gap:0.5rem;flex-wrap:wrap;';
+        header.setAttribute('style', 'display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;border-bottom:1px solid var(--background-modifier-border,#e5e7eb);flex-shrink:0;gap:0.5rem;flex-wrap:wrap;');
 
         const title = document.createElement('span');
-        title.style.cssText = 'font-weight:600;font-size:1rem;color:var(--text-normal,#333);';
+        title.setAttribute('style', 'font-weight:600;font-size:1rem;color:var(--text-normal,#333);');
         title.textContent = titleOverride || verseData.citation;
         header.appendChild(title);
 
         const buttonGroup = document.createElement('div');
-        buttonGroup.style.cssText = 'display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;';
+        buttonGroup.setAttribute('style', 'display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;');
 
         const jwlibUrl = `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`;
         const jwlibBtn = this.createHeaderButton('JW Library');
@@ -79,7 +79,7 @@ export class VerseModal {
         buttonGroup.appendChild(copyBtn);
 
         const closeBtn = document.createElement('button');
-        closeBtn.style.cssText = 'color:var(--text-muted,#6b7280);font-size:1.125rem;border:none;background:none;cursor:pointer;line-height:1;padding:0 0.25rem;';
+        closeBtn.setAttribute('style', 'color:var(--text-muted,#6b7280);font-size:1.125rem;border:none;background:none;cursor:pointer;line-height:1;padding:0 0.25rem;');
         closeBtn.textContent = '\u2715';
         closeBtn.addEventListener('click', () => this.hide());
         buttonGroup.appendChild(closeBtn);
@@ -89,8 +89,8 @@ export class VerseModal {
 
         const body = document.createElement('div');
         body.id = 'verse-tooltip';
-        body.style.cssText = 'padding:1rem 1.25rem;overflow-y:auto;flex:1;line-height:1.6;';
-        // @ts-ignore - loading placeholder
+        body.setAttribute('style', 'padding:1rem 1.25rem;overflow-y:auto;flex:1;line-height:1.6;');
+        // @ts-ignore - verse HTML from API
         body.innerHTML = verseData.html;
         dialog.appendChild(body);
 
