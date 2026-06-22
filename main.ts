@@ -160,7 +160,7 @@ export default class TraverturePlugin extends Plugin {
             }
         });
 
-        this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+        this.registerDomEvent(activeDocument, 'click', (evt: MouseEvent) => {
             const target = evt.target as HTMLElement;
             if (target.classList.contains('traverture-ref-link') && target.getAttribute('data-bcv')) {
                 evt.preventDefault(); evt.stopPropagation();
