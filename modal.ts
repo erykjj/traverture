@@ -71,7 +71,6 @@ export class VerseModal {
             for (const child of Array.from(tempDiv.childNodes)) walkNode(child);
             if (currentParagraph.length > 0) lines.push(currentParagraph.join(' '));
             let text = lines.join('\n').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\n{3,}/g, '\n\n').trim();
-            const copyTitle = titleOverride || verseData.citation;
             navigator.clipboard.writeText(`${this.currentTitle}\n\n${text}`);
             copyBtn.textContent = 'COPIED';
             setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
