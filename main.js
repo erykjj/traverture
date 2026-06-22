@@ -489,20 +489,20 @@ var VerseModal = class {
     const langSymbol = langObj ? ObsidianEngine.get_lang_symbol(outputLang) : "E";
     this.currentTitle = titleOverride || verseData.citation;
     const modal = activeDocument.createElement("div");
-    modal.setAttribute("style", "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;");
+    modal.className = "traverture-modal";
     modal.addEventListener("click", (e) => {
       if (e.target === modal) this.hide();
     });
     const dialog = activeDocument.createElement("div");
-    dialog.setAttribute("style", "background:var(--background-primary,white);border:2px solid var(--background-modifier-border,#d1d5db);border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,0.2);width:900px;max-height:85vh;display:flex;flex-direction:column;user-select:text;");
+    dialog.className = "traverture-modal-dialog";
     const header = activeDocument.createElement("div");
-    header.setAttribute("style", "display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;border-bottom:1px solid var(--background-modifier-border,#e5e7eb);flex-shrink:0;gap:0.5rem;flex-wrap:wrap;");
+    header.className = "traverture-modal-header";
     const title = activeDocument.createElement("span");
-    title.setAttribute("style", "font-weight:600;font-size:1rem;color:var(--text-normal,#333);");
+    title.className = "traverture-modal-title";
     title.textContent = titleOverride || verseData.citation;
     header.appendChild(title);
     const buttonGroup = activeDocument.createElement("div");
-    buttonGroup.setAttribute("style", "display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;");
+    buttonGroup.className = "traverture-modal-buttons";
     const jwlibUrl = `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`;
     const jwlibBtn = this.createHeaderButton("JW Library");
     jwlibBtn.addEventListener("click", () => {
@@ -562,7 +562,7 @@ ${text}`);
     });
     buttonGroup.appendChild(copyBtn);
     const closeBtn = activeDocument.createElement("button");
-    closeBtn.setAttribute("style", "color:var(--text-muted,#6b7280);font-size:1.125rem;border:none;background:none;cursor:pointer;line-height:1;padding:0 0.25rem;");
+    closeBtn.className = "traverture-modal-close";
     closeBtn.textContent = "\u2715";
     closeBtn.addEventListener("click", () => this.hide());
     buttonGroup.appendChild(closeBtn);
@@ -570,7 +570,7 @@ ${text}`);
     dialog.appendChild(header);
     const body = activeDocument.createElement("div");
     body.id = "verse-tooltip";
-    body.setAttribute("style", "padding:1rem 1.25rem;overflow-y:auto;flex:1;line-height:1.6;");
+    body.className = "traverture-modal-body";
     body.innerHTML = verseData.html;
     dialog.appendChild(body);
     modal.appendChild(dialog);
@@ -579,7 +579,7 @@ ${text}`);
   }
   createHeaderButton(text) {
     const btn = activeDocument.createElement("button");
-    btn.style.cssText = "font-size:0.72rem;font-weight:600;letter-spacing:0.3px;border:1px solid var(--background-modifier-border,#9ca3af);color:var(--text-normal,#374151);padding:0.3rem 0.6rem;border-radius:4px;background:var(--background-secondary,#f3f3f3);cursor:pointer;white-space:nowrap;width:85px;text-align:center;";
+    btn.className = "traverture-modal-btn";
     btn.textContent = text;
     return btn;
   }
@@ -884,7 +884,7 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian3.Setting(containerEl).setName("tra.VER:ture Settings").setHeading();
+    new import_obsidian3.Setting(containerEl).setName("tra.VER:ture").setHeading();
     const languages = getAvailableLanguages();
     new import_obsidian3.Setting(containerEl).setName("Source language").setDesc("Language of the scripture references in your notes").addDropdown((dropdown) => {
       for (const lang of languages) dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
@@ -1083,7 +1083,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
         textNode.parentNode?.replaceChild(fragment, textNode);
       }
     });
-    this.registerDomEvent(document, "click", (evt) => {
+    this.registerDomEvent(activeDocument, "click", (evt) => {
       const target = evt.target;
       if (target.classList.contains("traverture-ref-link") && target.getAttribute("data-bcv")) {
         evt.preventDefault();
