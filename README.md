@@ -37,6 +37,8 @@ A scripture reference parser and formatter for Obsidian. Create interactive link
 - **Multi-language support** – Parse references in any supported language, and display or fetch verse text in a different language.
   - Supported languages: Danish, Dutch, English, French, German, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Russian, Spanish, Swedish, Ukrainian
 
+![preview](traverture.gif)
+
 ---
 
 ## Usage
