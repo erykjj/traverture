@@ -127,7 +127,7 @@ export class TravertureSidebarView extends ItemView {
     }
 
     render() {
-        const wasFocused = this.searchInputEl && document.activeElement === this.searchInputEl;
+        const wasFocused = this.searchInputEl && activeDocument.activeElement === this.searchInputEl;
         this.contentEl.empty();
         this.contentEl.addClass('traverture-sidebar');
         if (this.allRefs.length === 0) { this.renderEmpty('No references found.'); return; }
