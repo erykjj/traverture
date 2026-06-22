@@ -3,7 +3,7 @@ name: 'Release tra.VER:ture'
 on:
   push:
     tags:
-      - 'v*'
+      - '*'
   workflow_dispatch:
     inputs:
       TAG:
