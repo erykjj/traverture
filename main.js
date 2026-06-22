@@ -520,7 +520,10 @@ var VerseModal = class {
     const copyBtn = this.createHeaderButton("COPY");
     copyBtn.addEventListener("click", () => {
       const tempDiv = activeDocument.createElement("div");
-      tempDiv.insertAdjacentHTML("beforeend", verseData.html);
+      const parsed2 = new DOMParser().parseFromString(verseData.html, "text/html");
+      for (const child of Array.from(parsed2.body.childNodes)) {
+        tempDiv.appendChild(child.cloneNode(true));
+      }
       const lines = [];
       let currentParagraph = [];
       const walkNode = (node) => {
@@ -571,7 +574,10 @@ ${text}`);
     const body = activeDocument.createElement("div");
     body.id = "verse-tooltip";
     body.className = "traverture-modal-body";
-    body.insertAdjacentHTML("beforeend", verseData.html);
+    const parsed = new DOMParser().parseFromString(verseData.html, "text/html");
+    for (const child of Array.from(parsed.body.childNodes)) {
+      body.appendChild(child.cloneNode(true));
+    }
     dialog.appendChild(body);
     modal.appendChild(dialog);
     activeDocument.body.appendChild(modal);
@@ -1251,7 +1257,10 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
         if (verseData) {
           let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, " ").replace(/<span class="newblock"><\/span>/g, " ");
           const tempDiv = activeDocument.createElement("div");
-          tempDiv.insertAdjacentHTML("beforeend", html);
+          const parsed2 = new DOMParser().parseFromString(html, "text/html");
+          for (const child of Array.from(parsed2.body.childNodes)) {
+            tempDiv.appendChild(child.cloneNode(true));
+          }
           if (withRef) {
             tempDiv.querySelectorAll("sup.verseNum, .chapterNum").forEach((el) => el.remove());
           } else {
