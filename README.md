@@ -1,8 +1,12 @@
 # tra.VER:ture – Obsidian plugin
 
-**traverture** (n.): The act of traversing text to find, convert, and reformat scripture references – a turning across formats, translations, and styles. From Latin *trans-* ("across") + *vertere* ("to turn") + *-ura* (action/result).
+> **traverture** (n.): The act of traversing text to find, convert, and reformat scripture references – a turning across formats, translations, and styles. From Latin *trans-* ("across") + *vertere* ("to turn") + *-ura* (action/result).
 
 A scripture reference parser and formatter for Obsidian. Create interactive links with verse previews, or parse entire documents into a searchable, sortable sidebar table.
+
+## Security and Privacy
+
+If you are concerned about the "Scorecard" results or the "Caution" warning on the [Obsidian Community plugins page](https://community.obsidian.md/plugins/traverture), see [SECURITY]().
 
 ---
 
@@ -59,20 +63,6 @@ Tap the three-line hamburger menu and look for **tra.VER:ture** (scroll icon) to
 
 - **Source language** – Language of the scripture references in your notes
 - **Output language** – Language for displaying book names in the sidebar and fetching verse text for previews
-
----
-
-## Network Use
-
-This plugin fetches scripture text from the official *jw.org* API when displaying verse previews or inserting citations. No data is sent; only scripture BCV codes are used in the URL to retrieve verse content. Fetched content is cached locally in memory for 1 hour.
-
-No other network requests are made. **No telemetry, tracking, or third-party services** are used. **No HTML web-scraping** is involved.
-
----
-
-## Privacy
-
-This plugin writes to the system clipboard only when you click a COPY button (to copy scripture text or table data). **No clipboard data is ever read. No data is collected, stored, or transmitted**.
 
 ---
 
