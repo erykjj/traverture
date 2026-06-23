@@ -507,14 +507,14 @@ var VerseModal = class {
     const jwlibBtn = this.createHeaderButton("JW Library");
     jwlibBtn.addEventListener("click", () => {
       window.open(jwlibUrl, "_blank");
-      navigator.clipboard.writeText(jwlibUrl);
+      void navigator.clipboard.writeText(jwlibUrl);
     });
     buttonGroup.appendChild(jwlibBtn);
     const jworgUrl = `https://www.jw.org/finder?wtlocale=${langSymbol}&bible=${bcv}`;
     const jworgBtn = this.createHeaderButton("JW.ORG");
     jworgBtn.addEventListener("click", () => {
       window.open(jworgUrl, "_blank");
-      navigator.clipboard.writeText(jworgUrl);
+      void navigator.clipboard.writeText(jworgUrl);
     });
     buttonGroup.appendChild(jworgBtn);
     const copyBtn = this.createHeaderButton("COPY");
@@ -555,7 +555,7 @@ var VerseModal = class {
       for (const child of Array.from(tempDiv.childNodes)) walkNode(child);
       if (currentParagraph.length > 0) lines.push(currentParagraph.join(" "));
       let text = lines.join("\n").replace(/\u00A0/g, " ").replace(/\u202F/g, " ").replace(/\+/g, "").replace(/\*/g, "").replace(/\n{3,}/g, "\n\n").trim();
-      navigator.clipboard.writeText(`${this.currentTitle}
+      void navigator.clipboard.writeText(`${this.currentTitle}
 
 ${text}`);
       copyBtn.textContent = "COPIED";
@@ -786,7 +786,7 @@ var TravertureSidebarView = class extends import_obsidian2.ItemView {
         if (c.key === "officialRef") return this.getDisplayRef(r, "official");
         return String(r[c.key] ?? "");
       }).join("	")).join("\n");
-      navigator.clipboard.writeText(`${headers}
+      void navigator.clipboard.writeText(`${headers}
 ${body}`);
       copyBtn.textContent = "COPIED";
       window.setTimeout(() => {
@@ -859,13 +859,15 @@ ${body}`);
           const bcv = ref.startBcv === ref.endBcv ? ref.startBcv : `${ref.startBcv}-${ref.endBcv}`;
           link.setAttribute("data-bcv", bcv);
           link.setAttribute("data-ref", displayVal);
-          link.addEventListener("click", async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const modal = new VerseModal();
-            modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
-            const verseData = await fetchVerse(bcv, this.outputLang);
-            modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
+          link.addEventListener("click", (e) => {
+            void (async () => {
+              e.preventDefault();
+              e.stopPropagation();
+              const modal = new VerseModal();
+              modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
+              const verseData = await fetchVerse(bcv, this.outputLang);
+              modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
+            })();
           });
         } else {
           td.setText(displayVal);
@@ -1063,14 +1065,16 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
                 link.textContent = keys[0];
                 link.setAttribute("data-bcv", bcv);
                 link.setAttribute("data-ref", link.textContent || keys[0]);
-                link.addEventListener("click", async (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const linkText = link.getAttribute("data-ref") || link.textContent || "";
-                  const modal = new VerseModal();
-                  modal.show({ html: `<p><em>Loading...</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
-                  const verseData = await fetchVerse(bcv, this.settings.outputLanguage);
-                  modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
+                link.addEventListener("click", (e) => {
+                  void (async () => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const linkText = link.getAttribute("data-ref") || link.textContent || "";
+                    const modal = new VerseModal();
+                    modal.show({ html: `<p><em>Loading...</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
+                    const verseData = await fetchVerse(bcv, this.settings.outputLanguage);
+                    modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
+                  })();
                 });
                 innerFragment.appendChild(link);
               } else {
@@ -1098,7 +1102,7 @@ var TraverturePlugin = class extends import_obsidian4.Plugin {
         const refText = target.getAttribute("data-ref") || target.textContent || "";
         const modal = new VerseModal();
         modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-        fetchVerse(bcv, this.settings.outputLanguage).then((verseData) => {
+        void fetchVerse(bcv, this.settings.outputLanguage).then((verseData) => {
           modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
         });
       }
