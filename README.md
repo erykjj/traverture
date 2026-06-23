@@ -6,7 +6,7 @@ A scripture reference parser and formatter for Obsidian. Create interactive link
 
 ## Security and Privacy
 
-If you are concerned about the "Scorecard" results or the "Caution" warning on the [Obsidian Community plugins page](https://community.obsidian.md/plugins/traverture), see [SECURITY]().
+If you are concerned about the "Scorecard" results or the "Caution" warning on the [Obsidian Community plugins page](https://community.obsidian.md/plugins/traverture), see [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
 
 ---
 
