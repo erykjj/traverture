@@ -77,12 +77,6 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
-      - name: Package plugin
-        run: |
-          mkdir ${{ env.PLUGIN_NAME }}
-          cp main.js manifest.json styles.css ${{ env.PLUGIN_NAME }}
-          zip -r ${{ env.PLUGIN_NAME }}.zip ${{ env.PLUGIN_NAME }}
-
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v4
         with:
@@ -103,4 +97,4 @@ jobs:
           gh release create "$TAG" \
             --title="$TAG" \
             --notes="${{ steps.extract.outputs.changelog_section }}" \
-            main.js manifest.json styles.css ${{ env.PLUGIN_NAME }}.zip
+            main.js manifest.json styles.css
