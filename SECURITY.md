@@ -37,4 +37,4 @@ The plugin uses `!important` CSS flags in a few places to override Obsidian's de
 
 ## TypeScript Warnings
 
-The plugin source contains TypeScript strictness warnings. These warnings are cosmetic and do not affect functionality or security. All external data (API responses) is validated before use.
+The plugin source contains TypeScript strictness warnings. **These warnings are cosmetic and do not affect functionality or security**. All external data (API responses) is validated before use.
