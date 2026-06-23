@@ -82,12 +82,12 @@ Depending on the length of the scripture passage and the device, initial verse l
 
 ---
 
-## Installation
+## Installation & Updating
 
-1. Download the [latest release](https://github.com/erykjj/traverture/releases/latest/download/traverture.zip)
-2. Unzip and copy the folder to your vault's `.obsidian/plugins/` directory
-3. Enable the plugin in Obsidian Settings → Community plugins
-4. Configure source and output languages in the plugin settings
+1. In your vault's `.obsidian/plugins/` directory, make a directory (folder) called `traverture`, if you don't already have one
+2. Download [main.js](https://github.com/erykjj/traverture/releases/latest/download/main.js), [styles.css](https://github.com/erykjj/traverture/releases/latest/download/styles.css) and [manifest.json](https://github.com/erykjj/traverture/releases/latest/download/manifest.json) and put them in that directory (over-writing to update)
+3. If not already enabled, enable the plugin in Obsidian Settings → Community plugins
+4. Configure source and output languages in the plugin settings (if installing for the first time)
 
 ______
 
