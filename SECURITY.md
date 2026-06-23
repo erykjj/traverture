@@ -1,6 +1,6 @@
 # tra.VER:ture Security and Privacy
 
-If you are concerned about the "Scorecard" results or the "Caution" warning on the [Obsidian Community plugins page](https://community.obsidian.md/plugins/traverture), here is some information to ease your mind.
+If you are concerned about the "Scorecard" review or the "Caution" warning on the [Obsidian Community plugins page](https://community.obsidian.md/plugins/traverture), here is some information to ease your mind.
 
 ---
 
