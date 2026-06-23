@@ -136,16 +136,16 @@ export default class TraverturePlugin extends Plugin {
                                 const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
                                 const link = activeDocument.createElement('a'); link.className = 'traverture-ref-link'; link.textContent = keys[0];
                                 link.setAttribute('data-bcv', bcv); link.setAttribute('data-ref', link.textContent || keys[0]);
-                                link.addEventListener('click', async (e) => {
+                                link.addEventListener('click', (e) => { void (async () => {
                                     e.preventDefault(); e.stopPropagation();
                                     const linkText = link.getAttribute('data-ref') || link.textContent || '';
                                     const modal = new VerseModal();
-                                    // @ts-ignore - loading placeholder
+                                    // @ts-ignore
                                     modal.show({ html: `<p><em>Loading...</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
                                     const verseData = await fetchVerse(bcv, this.settings.outputLanguage);
-                                    // @ts-ignore - loading placeholder
+                                    // @ts-ignore
                                     modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
-                                });
+                                })(); });
                                 innerFragment.appendChild(link);
                             } else { innerFragment.appendChild(activeDocument.createTextNode(markerMatch[0])); }
                             markerLastIndex = markerMatch.index + markerMatch[0].length;
@@ -169,10 +169,10 @@ export default class TraverturePlugin extends Plugin {
                 const modal = new VerseModal();
                 // @ts-ignore
                 modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-                fetchVerse(bcv, this.settings.outputLanguage).then(verseData => {
+                void fetchVerse(bcv, this.settings.outputLanguage).then(verseData => {
                     // @ts-ignore
                     modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-                }).catch(() => {});
+                });
             }
         });
 
