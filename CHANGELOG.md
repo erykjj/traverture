@@ -11,6 +11,11 @@
 ### Removed
 
 ____
+## [1.1.0] - 2026-06-23
+### Changed
+
+- Clean up for official release
+
 ## [1.0.6] - 2026-06-23
 ### Changed
 
@@ -31,6 +36,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[1.1.0]:https://github.com/erykjj/traverture/releases/tag/1.1.0
 [1.0.6]:https://github.com/erykjj/traverture/releases/tag/1.0.6
 [1.0.5]:https://github.com/erykjj/traverture/releases/tag/1.0.5
 [1.0.4]:https://github.com/erykjj/traverture/releases/tag/1.0.4
