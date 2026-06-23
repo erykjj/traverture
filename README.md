@@ -70,6 +70,12 @@ No other network requests are made. **No telemetry, tracking, or third-party ser
 
 ---
 
+## Privacy
+
+This plugin writes to the system clipboard only when you click a COPY button (to copy scripture text or table data). **No clipboard data is ever read. No data is collected, stored, or transmitted**.
+
+---
+
 ## Performance
 
 Depending on the length of the scripture passage and the device, initial verse lookup requires a network request and may take a moment. Parsing large documents on mobile may take a few seconds.
