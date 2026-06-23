@@ -167,12 +167,12 @@ export default class TraverturePlugin extends Plugin {
                 const bcv = target.getAttribute('data-bcv')!;
                 const refText = target.getAttribute('data-ref') || target.textContent || '';
                 const modal = new VerseModal();
-                // @ts-ignore - loading placeholder
+                // @ts-ignore
                 modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
                 fetchVerse(bcv, this.settings.outputLanguage).then(verseData => {
-                    // @ts-ignore - loading placeholder
+                    // @ts-ignore
                     modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-                });
+                }).catch(() => {});
             }
         });
 

@@ -182,7 +182,7 @@ export class TravertureSidebarView extends ItemView {
                 if (c.key === 'officialRef') return this.getDisplayRef(r, 'official');
                 return String((r as any)[c.key] ?? '');
             }).join('\t')).join('\n');
-            navigator.clipboard.writeText(`${headers}\n${body}`);
+            void navigator.clipboard.writeText(`${headers}\n${body}`);
             copyBtn.textContent = 'COPIED';
             window.setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
         });
@@ -240,13 +240,13 @@ export class TravertureSidebarView extends ItemView {
                     const bcv = ref.startBcv === ref.endBcv ? ref.startBcv : `${ref.startBcv}-${ref.endBcv}`;
                     link.setAttribute('data-bcv', bcv);
                     link.setAttribute('data-ref', displayVal);
-                    link.addEventListener('click', async (e) => {
+                    link.addEventListener('click', (e) => { void (async () => {
                         e.preventDefault(); e.stopPropagation();
                         const modal = new VerseModal();
                         modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
                         const verseData = await fetchVerse(bcv, this.outputLang);
                         modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
-                    });
+                    })(); });
                 } else { td.setText(displayVal); }
             }
         }

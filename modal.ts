@@ -35,12 +35,12 @@ export class VerseModal {
 
         const jwlibUrl = `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`;
         const jwlibBtn = this.createHeaderButton('JW Library');
-        jwlibBtn.addEventListener('click', () => { window.open(jwlibUrl, '_blank'); navigator.clipboard.writeText(jwlibUrl); });
+        jwlibBtn.addEventListener('click', () => { window.open(jwlibUrl, '_blank'); void navigator.clipboard.writeText(jwlibUrl); });
         buttonGroup.appendChild(jwlibBtn);
 
         const jworgUrl = `https://www.jw.org/finder?wtlocale=${langSymbol}&bible=${bcv}`;
         const jworgBtn = this.createHeaderButton('JW.ORG');
-        jworgBtn.addEventListener('click', () => { window.open(jworgUrl, '_blank'); navigator.clipboard.writeText(jworgUrl); });
+        jworgBtn.addEventListener('click', () => { window.open(jworgUrl, '_blank'); void navigator.clipboard.writeText(jworgUrl); });
         buttonGroup.appendChild(jworgBtn);
 
         const copyBtn = this.createHeaderButton('COPY');
@@ -74,7 +74,7 @@ export class VerseModal {
             for (const child of Array.from(tempDiv.childNodes)) walkNode(child);
             if (currentParagraph.length > 0) lines.push(currentParagraph.join(' '));
             let text = lines.join('\n').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\n{3,}/g, '\n\n').trim();
-            navigator.clipboard.writeText(`${this.currentTitle}\n\n${text}`);
+            void navigator.clipboard.writeText(`${this.currentTitle}\n\n${text}`);
             copyBtn.textContent = 'COPIED';
             window.setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
         });
