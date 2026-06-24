@@ -79,6 +79,12 @@ Depending on the length of the scripture passage and the device, initial verse l
 3. If not already enabled, enable the plugin in Obsidian Settings → Community plugins
 4. Configure source and output languages in the plugin settings (if installing for the first time)
 
+---
+
+[![Static Badge](https://img.shields.io/badge/releases-orange?style=plastic&logo=rss&logoColor=orange&color=black)](https://github.com/erykjj/traverture/releases.atom)
+
+Feel free to get in touch and post any [issues and/or suggestions](https://github.com/erykjj/traverture/issues).
+
 ______
 
 [^1]: Bible citation text is taken from [*New World Translation of the Holy Scriptures*](https://www.jw.org/en/library/bible/study-bible/books/) (*NWT*) (© Watch Tower Bible and Tract Society of Pennsylvania). In the future, other translations may be included.
