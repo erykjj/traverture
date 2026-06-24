@@ -193,14 +193,26 @@ export class TravertureSidebarView extends ItemView {
         const allBtn = colRow.createEl('button', { text: 'ALL', cls: 'traverture-sidebar-col-btn' });
         allBtn.addEventListener('click', () => { this.visibleColumns = new Set(SIDEBAR_COLUMNS.map(c => c.key)); this.render(); });
 
-        const listBtn = colRow.createEl('button', { text: 'LIST', cls: 'traverture-sidebar-col-btn' });
+        const listBtn = colRow.createEl('button', { text: 'REFS', cls: 'traverture-sidebar-col-btn' });
         listBtn.addEventListener('click', () => { this.visibleColumns = new Set(['scripture', 'fullRef', 'standardRef', 'officialRef']); this.render(); });
 
         for (const col of SIDEBAR_COLUMNS) {
             const label = colRow.createEl('label', { cls: 'traverture-sidebar-col-toggle' });
             const cb = label.createEl('input', { type: 'checkbox' });
             cb.checked = this.visibleColumns.has(col.key);
-            cb.addEventListener('change', () => { if (cb.checked) this.visibleColumns.add(col.key); else this.visibleColumns.delete(col.key); this.render(); });
+            cb.addEventListener('change', () => {
+                if (cb.checked) {
+                    this.visibleColumns.add(col.key);
+                } else {
+                    const remaining = [...this.visibleColumns].filter(k => k !== col.key);
+                    if (remaining.length === 0) {
+                        cb.checked = true;
+                        return;
+                    }
+                    this.visibleColumns.delete(col.key);
+                }
+                this.render();
+            });
             label.createEl('span', { text: col.label });
         }
 
