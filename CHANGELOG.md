@@ -6,6 +6,9 @@
 
 ### Changed
 
+- Allow unchecking all but last column
+- Renames "LIST" to "REFS" - to quickly enable only the 4 columns with references
+
 ### Fixed
 
 ### Removed
