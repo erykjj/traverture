@@ -4,8 +4,6 @@
 
 ### Added
 
-- Implemented study notes pane and cross-references/footnotes tooltip
-
 ### Changed
 
 ### Fixed
@@ -13,6 +11,17 @@
 ### Removed
 
 ____
+## [2.0.0] - 2026-06-25
+
+### Added
+
+- Implemented study notes pane and tooltips for cross-references/footnotes
+
+### Removed
+
+- Removed clear cache preference
+  - the verse cache expires automatically after 1 hour and is cleared on Obsidian exit, so no need for a manual trigger
+
 ## [1.2.1] - 2026-06-24
 ### Added
 
@@ -49,6 +58,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[2.0.0]:https://github.com/erykjj/traverture/releases/tag/2.0.0
 [1.2.1]:https://github.com/erykjj/traverture/releases/tag/1.2.1
 [1.2.0]:https://github.com/erykjj/traverture/releases/tag/1.2.0
 [1.1.0]:https://github.com/erykjj/traverture/releases/tag/1.1.0
