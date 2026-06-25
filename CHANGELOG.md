@@ -17,6 +17,10 @@ ____
 
 - Implemented study notes pane and tooltips for cross-references/footnotes
 
+### Fixed
+
+- Various fixes for Edit/View mode linking
+
 ### Removed
 
 - Removed clear cache preference
