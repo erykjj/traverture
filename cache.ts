@@ -26,10 +26,6 @@ function setCachedVerse(key: string, data: VerseData): void {
     verseCache.set(key, { data, ts: Date.now() });
 }
 
-export function clearVerseCache(): void {
-    verseCache.clear();
-}
-
 export async function fetchVerseWithExtras(range: string, langCode: string): Promise<VerseData | null> {
     const cacheKey = `${langCode}:${range}:extras`;
     const cached = getCachedVerse(cacheKey);

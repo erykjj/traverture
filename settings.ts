@@ -1,6 +1,5 @@
 import { PluginSettingTab, Setting, Notice } from 'obsidian';
 import { getAvailableLanguages } from './languages';
-import { clearVerseCache } from './cache';
 import TraverturePlugin from './main';
 
 export class TravertureSettingTab extends PluginSettingTab {
@@ -34,10 +33,5 @@ export class TravertureSettingTab extends PluginSettingTab {
                 dropdown.setValue(this.plugin.settings.outputLanguage)
                     .onChange(async (value) => { this.plugin.settings.outputLanguage = value; await this.plugin.saveSettings(); this.plugin.createEngine(); });
             });
-
-        new Setting(containerEl)
-            .setName('Verse cache')
-            .setDesc('Fetched verses are cached in memory for 60 minutes')
-            .addButton(button => button.setButtonText('Clear cache').onClick(() => { clearVerseCache(); new Notice('Verse cache cleared.'); }));
     }
 }
