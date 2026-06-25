@@ -3,11 +3,12 @@ import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView } from 'obsidian';
 import wasmBinary from './engine_bg.wasm';
 // @ts-ignore
 import * as wasmModule from './engine.js';
-import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './types';
 import { fetchVerse } from './cache';
+import { createTravertureEditorPlugin } from './editor';
 import { VerseModal } from './modal';
 import { TravertureSidebarView } from './sidebar';
 import { TravertureSettingTab } from './settings';
+import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './types';
 
 export default class TraverturePlugin extends Plugin {
     settings = DEFAULT_SETTINGS;
@@ -112,6 +113,8 @@ export default class TraverturePlugin extends Plugin {
             const selection = editor.getSelection(); if (!selection) return;
             await this.showSidebarWithResults(await this.parseReferences(selection));
         }});
+
+        this.registerEditorExtension(createTravertureEditorPlugin(this));
 
         this.registerMarkdownPostProcessor((element, _context) => {
             const walker = activeDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT, { acceptNode: (node) => node.nodeValue && /\{\{(.+?)\}\}/.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
