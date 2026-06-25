@@ -152,7 +152,7 @@ export class VerseModal {
 
         const popover = activeDocument.createElement('div');
         popover.className = 'traverture-marker-popover';
-        popover.innerHTML = content;
+        popover.textContent = content;
         popover.addEventListener('click', (e) => e.stopPropagation());
         popover.addEventListener('mousedown', (e) => e.stopPropagation());
 
@@ -188,24 +188,24 @@ export class VerseModal {
         paneCopyBtn.addEventListener('click', () => {
             let text = '';
             for (const c of commentaries) {
+                const note = activeDocument.createElement('div');
+                note.className = 'traverture-modal-commentary-note';
+
                 const bookNum = parseInt(c.source.substring(0, 2));
                 const bookName = wasmModule.ObsidianEngine.get_book_name(bookNum, outputLang, 'full', false);
                 const ch = parseInt(c.source.substring(2, 5));
                 const vs = parseInt(c.source.substring(5, 8));
-                const citation = `${bookName} ${ch}:${vs}`;
+                const citation = activeDocument.createElement('div');
+                citation.className = 'traverture-modal-commentary-citation';
+                citation.textContent = `${bookName} ${ch}:${vs}`;
+                note.appendChild(citation);
 
-                const div = activeDocument.createElement('div');
-                div.innerHTML = c.content;
-                div.querySelectorAll('a').forEach(a => a.replaceWith(a.textContent || ''));
-                const paras = div.querySelectorAll('p');
-                let noteText = '';
-                if (paras.length > 0) {
-                    noteText = Array.from(paras).map(p => (p.textContent || '').replace(/\s+/g, ' ').trim()).join('\n\n');
-                } else {
-                    noteText = (div.textContent || '').replace(/\s+/g, ' ').trim();
+                const parsed = new DOMParser().parseFromString(c.content, 'text/html');
+                parsed.body.querySelectorAll('a').forEach(a => a.replaceWith(a.textContent || ''));
+                for (const child of Array.from(parsed.body.childNodes)) {
+                    note.appendChild(child.cloneNode(true));
                 }
-
-                text += `${citation}\n\n${noteText}\n\n`;
+                paneContent.appendChild(note);
             }
             void navigator.clipboard.writeText(text.trim());
             setIcon(paneCopyBtn, 'check');
@@ -243,9 +243,8 @@ export class VerseModal {
     }
 
     private stripHtml(html: string): string {
-        const div = activeDocument.createElement('div');
-        div.innerHTML = html;
-        return (div.textContent || '').replace(/\s+/g, ' ').trim();
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        return (parsed.body.textContent || '').replace(/\s+/g, ' ').trim();
     }
 
     private createHeaderButton(text: string): HTMLButtonElement {

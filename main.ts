@@ -93,10 +93,11 @@ export default class TraverturePlugin extends Plugin {
             return result;
         });
 
+        // @ts-ignore
         el.innerHTML = html;
 
         el.querySelectorAll('.traverture-ref-link').forEach(link => {
-            link.addEventListener('click', async (e) => {
+            link.addEventListener('click', (e) => { void (async () => {
                 e.preventDefault(); e.stopPropagation();
                 const bcv = link.getAttribute('data-bcv')!;
                 const refText = link.getAttribute('data-ref') || link.textContent || '';
@@ -104,7 +105,7 @@ export default class TraverturePlugin extends Plugin {
                 modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
                 const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
                 modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-            });
+            })(); });
         });
     }
 
