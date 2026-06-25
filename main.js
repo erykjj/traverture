@@ -1262,14 +1262,14 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       const refText = inner.replace(/\*\*/g, "").replace(/\*/g, "");
       const marked = this.engine.parse_with_markers(refText);
       let result = marked.replace(/\{\{(.+?)\}\}/g, (_m, ref) => {
-        const parsed = this.engine.parse(
+        const parsed2 = this.engine.parse(
           this.settings.sourceLanguage,
           this.settings.outputLanguage,
           "full",
           false,
           ref
         );
-        const data = JSON.parse(parsed);
+        const data = JSON.parse(parsed2);
         const keys = Object.keys(data);
         if (keys.length > 0) {
           const firstRange = data[keys[0]][0];
@@ -1280,7 +1280,11 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       });
       return result;
     });
-    el.innerHTML = html;
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    while (el.firstChild) el.removeChild(el.firstChild);
+    for (const child of Array.from(parsed.body.childNodes)) {
+      el.appendChild(child.cloneNode(true));
+    }
     el.querySelectorAll(".traverture-ref-link").forEach((link) => {
       link.addEventListener("click", (e) => {
         void (async () => {
