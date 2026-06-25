@@ -93,8 +93,11 @@ export default class TraverturePlugin extends Plugin {
             return result;
         });
 
-        // @ts-ignore
-        el.innerHTML = html;
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        while (el.firstChild) el.removeChild(el.firstChild);
+        for (const child of Array.from(parsed.body.childNodes)) {
+            el.appendChild(child.cloneNode(true));
+        }
 
         el.querySelectorAll('.traverture-ref-link').forEach(link => {
             link.addEventListener('click', (e) => { void (async () => {
