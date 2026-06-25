@@ -18,6 +18,9 @@ export interface LanguageInfo {
 export interface VerseData {
     html: string;
     citation: string;
+    footnotes?: Array<{ id: number; content: string; source: string }>;
+    crossReferences?: Array<{ id: number; source: string; targets: Array<{ vs: string; standardCitation: string; abbreviatedCitation: string }> }>;
+    commentaries?: Array<{ id: number; content: string; source: string }>;
 }
 
 export const VIEW_TYPE_TRAVERTURE_SIDEBAR = 'traverture-sidebar-view';
