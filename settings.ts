@@ -1,4 +1,4 @@
-import { PluginSettingTab, Setting, Notice } from 'obsidian';
+import { PluginSettingTab, Setting } from 'obsidian';
 import { getAvailableLanguages } from './languages';
 import TraverturePlugin from './main';
 
