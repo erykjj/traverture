@@ -356,6 +356,7 @@
   display: flex;
   flex-direction: column;
   user-select: text;
+  container-type: inline-size;
 }
 .traverture-modal-header {
   display: flex;
@@ -418,10 +419,106 @@
   text-decoration: underline;
 }
 
+/* --- Modal Content Layout --- */
+.traverture-modal-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* --- Commentary Side Pane --- */
+.traverture-modal-commentary {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--background-modifier-border, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.traverture-modal-commentary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--background-modifier-border, #e5e7eb);
+  font-weight: 600;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.traverture-modal-commentary-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.traverture-modal-commentary-note {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--background-modifier-border, #eee);
+}
+.traverture-modal-commentary-note:last-child {
+  border-bottom: none;
+}
+.traverture-modal-commentary-note p {
+  margin: 0.3em 0;
+}
+.traverture-modal-commentary-note strong {
+  color: var(--text-normal, #333);
+}
+.traverture-modal-commentary-note a {
+  color: #4a6da7;
+  text-decoration: none;
+}
+.traverture-modal-commentary-note em {
+  font-style: italic;
+}
+
+.traverture-modal-commentary-citation {
+  font-weight: 600;
+  margin-bottom: 0.3em;
+}
+
+/* --- Commentary Copy Button --- */
+.traverture-modal-commentary-copy {
+  width: auto;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+}
+
+/* --- Footnote & Cross-Reference Markers --- */
+.traverture-footnote-marker,
+.traverture-xref-marker {
+  color: #4a6da7;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.85em;
+}
+.traverture-footnote-marker:hover,
+.traverture-xref-marker:hover {
+  text-decoration: underline;
+}
+
+/* --- Marker Popover --- */
+.traverture-marker-popover {
+  position: fixed;
+  z-index: 1001;
+  background: var(--background-primary, white);
+  border: 1px solid var(--background-modifier-border, #ccc);
+  border-radius: 4px;
+  padding: 6px 10px;
+  max-width: 350px;
+  font-size: 0.8rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  user-select: text;
+}
+
 @container (max-width: 600px) {
   .traverture-sidebar-top-row { flex-wrap: wrap; }
   .traverture-sidebar-spacer { display: none; }
 }
 @container (max-width: 800px) {
   .traverture-sidebar-col-row { flex-wrap: wrap; }
+  .traverture-modal-content { flex-direction: column; }
+  .traverture-modal-commentary { width: 100%; max-height: 40vh; border-left: none; border-top: 1px solid var(--background-modifier-border, #e5e7eb); }
 }
