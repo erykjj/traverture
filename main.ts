@@ -3,11 +3,11 @@ import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView } from 'obsidian';
 import wasmBinary from './engine_bg.wasm';
 // @ts-ignore
 import * as wasmModule from './engine.js';
-import { fetchVerse } from './cache';
+import { fetchVerseWithExtras } from './cache';
 import { createTravertureEditorPlugin } from './editor';
 import { VerseModal } from './modal';
-import { TravertureSidebarView } from './sidebar';
 import { TravertureSettingTab } from './settings';
+import { TravertureSidebarView } from './sidebar';
 import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './types';
 
 export default class TraverturePlugin extends Plugin {
@@ -145,7 +145,7 @@ export default class TraverturePlugin extends Plugin {
                                     const modal = new VerseModal();
                                     // @ts-ignore
                                     modal.show({ html: `<p><em>Loading...</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
-                                    const verseData = await fetchVerse(bcv, this.settings.outputLanguage);
+                                    const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
                                     // @ts-ignore
                                     modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
                                 })(); });
@@ -172,7 +172,7 @@ export default class TraverturePlugin extends Plugin {
                 const modal = new VerseModal();
                 // @ts-ignore
                 modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-                void fetchVerse(bcv, this.settings.outputLanguage).then(verseData => {
+                void fetchVerseWithExtras(bcv, this.settings.outputLanguage).then(verseData => {
                     // @ts-ignore
                     modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
                 });
@@ -344,7 +344,7 @@ export default class TraverturePlugin extends Plugin {
             const cacheKey = `${this.settings.sourceLanguage}:${bcv}`;
             let verseText = '';
             if (!fetchedSet.has(cacheKey)) {
-                const verseData = await fetchVerse(bcv, this.settings.sourceLanguage);
+                const verseData = await fetchVerseWithExtras(bcv, this.settings.sourceLanguage);
                 if (verseData) {
                     let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
                     const tempDiv = activeDocument.createElement('div');
