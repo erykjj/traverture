@@ -1,10 +1,10 @@
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 // @ts-ignore
 import * as wasmModule from './engine.js';
-import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR } from './types';
+import { fetchVerseWithExtras } from './cache';
 import { getAvailableLanguages } from './languages';
 import { VerseModal } from './modal';
-import { fetchVerse } from './cache';
+import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR } from './types';
 import type TraverturePlugin from './main';
 
 export const SIDEBAR_COLUMNS = [
@@ -256,7 +256,7 @@ export class TravertureSidebarView extends ItemView {
                         e.preventDefault(); e.stopPropagation();
                         const modal = new VerseModal();
                         modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
-                        const verseData = await fetchVerse(bcv, this.outputLang);
+                        const verseData = await fetchVerseWithExtras(bcv, this.outputLang);
                         modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
                     })(); });
                 } else { td.setText(displayVal); }
