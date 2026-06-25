@@ -4,6 +4,8 @@
 
 ### Added
 
+- Implemented study notes pane and cross-references/footnotes tooltip
+
 ### Changed
 
 ### Fixed
