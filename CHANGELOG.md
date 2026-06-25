@@ -11,7 +11,7 @@
 ### Removed
 
 ____
-## [2.0.1] - 2026-06-25
+## [2.0.2] - 2026-06-25
 
 ### Added
 
@@ -62,7 +62,7 @@ ____
 - Initial Obidian Community release
 
 ____
-[2.0.1]:https://github.com/erykjj/traverture/releases/tag/2.0.1
+[2.0.2]:https://github.com/erykjj/traverture/releases/tag/2.0.2
 [1.2.1]:https://github.com/erykjj/traverture/releases/tag/1.2.1
 [1.2.0]:https://github.com/erykjj/traverture/releases/tag/1.2.0
 [1.1.0]:https://github.com/erykjj/traverture/releases/tag/1.1.0
