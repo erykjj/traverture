@@ -631,7 +631,7 @@ ${text}`);
     activeDocument.querySelector(".traverture-marker-popover")?.remove();
     const popover = activeDocument.createElement("div");
     popover.className = "traverture-marker-popover";
-    popover.innerHTML = content;
+    popover.textContent = content;
     popover.addEventListener("click", (e) => e.stopPropagation());
     popover.addEventListener("mousedown", (e) => e.stopPropagation());
     const rect = anchor.getBoundingClientRect();
@@ -660,26 +660,22 @@ ${text}`);
     paneCopyBtn.addEventListener("click", () => {
       let text = "";
       for (const c of commentaries) {
+        const note = activeDocument.createElement("div");
+        note.className = "traverture-modal-commentary-note";
         const bookNum = parseInt(c.source.substring(0, 2));
         const bookName = ObsidianEngine.get_book_name(bookNum, outputLang, "full", false);
         const ch = parseInt(c.source.substring(2, 5));
         const vs = parseInt(c.source.substring(5, 8));
-        const citation = `${bookName} ${ch}:${vs}`;
-        const div = activeDocument.createElement("div");
-        div.innerHTML = c.content;
-        div.querySelectorAll("a").forEach((a) => a.replaceWith(a.textContent || ""));
-        const paras = div.querySelectorAll("p");
-        let noteText = "";
-        if (paras.length > 0) {
-          noteText = Array.from(paras).map((p) => (p.textContent || "").replace(/\s+/g, " ").trim()).join("\n\n");
-        } else {
-          noteText = (div.textContent || "").replace(/\s+/g, " ").trim();
+        const citation = activeDocument.createElement("div");
+        citation.className = "traverture-modal-commentary-citation";
+        citation.textContent = `${bookName} ${ch}:${vs}`;
+        note.appendChild(citation);
+        const parsed = new DOMParser().parseFromString(c.content, "text/html");
+        parsed.body.querySelectorAll("a").forEach((a) => a.replaceWith(a.textContent || ""));
+        for (const child of Array.from(parsed.body.childNodes)) {
+          note.appendChild(child.cloneNode(true));
         }
-        text += `${citation}
-
-${noteText}
-
-`;
+        paneContent.appendChild(note);
       }
       void navigator.clipboard.writeText(text.trim());
       (0, import_obsidian2.setIcon)(paneCopyBtn, "check");
@@ -713,9 +709,8 @@ ${noteText}
     return pane;
   }
   stripHtml(html) {
-    const div = activeDocument.createElement("div");
-    div.innerHTML = html;
-    return (div.textContent || "").replace(/\s+/g, " ").trim();
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    return (parsed.body.textContent || "").replace(/\s+/g, " ").trim();
   }
   createHeaderButton(text) {
     const btn = activeDocument.createElement("button");
@@ -1287,15 +1282,17 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     });
     el.innerHTML = html;
     el.querySelectorAll(".traverture-ref-link").forEach((link) => {
-      link.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const bcv = link.getAttribute("data-bcv");
-        const refText = link.getAttribute("data-ref") || link.textContent || "";
-        const modal = new VerseModal();
-        modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-        const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
-        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+      link.addEventListener("click", (e) => {
+        void (async () => {
+          e.preventDefault();
+          e.stopPropagation();
+          const bcv = link.getAttribute("data-bcv");
+          const refText = link.getAttribute("data-ref") || link.textContent || "";
+          const modal = new VerseModal();
+          modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+          const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
+          modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+        })();
       });
     });
   }
