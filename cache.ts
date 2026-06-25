@@ -30,15 +30,60 @@ export function clearVerseCache(): void {
     verseCache.clear();
 }
 
-function cleanVerseHtml(rawHtml: string): string {
-    let cleaned = rawHtml
+export async function fetchVerseWithExtras(range: string, langCode: string): Promise<VerseData | null> {
+    const cacheKey = `${langCode}:${range}:extras`;
+    const cached = getCachedVerse(cacheKey);
+    if (cached) return cached;
+
+    const suffix = getLangSuffix(langCode);
+    const rangeParts = range.split('-');
+    const apiRange = rangeParts.map(p => {
+        const book = p.substring(0, 2).replace(/^0+/, '');
+        return book + p.substring(2);
+    }).join('-');
+    const url = `https://www.jw.org/${suffix}json/html/${apiRange}`;
+
+    try {
+        const response = await requestUrl({ url });
+        const data = response.json;
+        const verseData = data.ranges?.[apiRange];
+        if (verseData) {
+            const result: VerseData = {
+                html: cleanVerseHtml(verseData.html, true),
+                citation: (verseData.citation || '').replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' '),
+                footnotes: verseData.footnotes || [],
+                crossReferences: verseData.crossReferences || [],
+                commentaries: verseData.commentaries?.filter((c: any) => c.content) || [],
+            };
+            setCachedVerse(cacheKey, result);
+            return result;
+        }
+    } catch (e) {
+        console.error(`tra.VER:ture: Error fetching verse "${apiRange}":`, e);
+    }
+    return null;
+}
+
+function cleanVerseHtml(rawHtml: string, keepMarkers: boolean = false): string {
+    let cleaned = rawHtml;
+    
+    if (keepMarkers) {
+        cleaned = cleaned.replace(/<a class="footnoteLink"[^>]*id="footnotesource(\d+)"[^>]*>\*<\/a>/g, 
+            '<sup class="traverture-footnote-marker" data-fn-id="$1">*</sup>');
+        cleaned = cleaned.replace(/<a class="xrefLink jsBibleLink"[^>]*id="xreflink(\d+)"[^>]*>\+<\/a>/g,
+            '<sup class="traverture-xref-marker" data-xref-id="$1">+</sup>');
+    }
+
+    cleaned = cleaned
         .replace(/<a[^>]*>/g, '')
         .replace(/<\/a>/g, '')
-        .replace(/\+/g, '')
-        .replace(/\*/g, '')
         .replace(/\r\n/g, '')
         .replace(/\u00A0/g, ' ')
         .replace(/\u202F/g, ' ');
+
+    if (!keepMarkers) {
+        cleaned = cleaned.replace(/\+/g, '').replace(/\*/g, '');
+    }
 
     cleaned = cleaned.replace(/class="style-b first"/g, 'class=""');
     cleaned = cleaned.replace(/class="style-b"/g, 'class=""');
