@@ -1,6 +1,6 @@
 import { fetchVerse } from './cache';
 import { VerseModal } from './modal';
-import { ViewPlugin, Decoration, WidgetType } from '@codemirror/view';
+import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 
 const REF_PATTERN = /\{\{(.+?)\}\}/g;
