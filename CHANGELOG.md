@@ -11,7 +11,7 @@
 ### Removed
 
 ____
-## [1.2.0] - 2026-06-24
+## [1.2.1] - 2026-06-24
 ### Added
 
 - Added **right-click in View mode** (Parse selection/document)
@@ -47,6 +47,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[1.2.1]:https://github.com/erykjj/traverture/releases/tag/1.2.1
 [1.2.0]:https://github.com/erykjj/traverture/releases/tag/1.2.0
 [1.1.0]:https://github.com/erykjj/traverture/releases/tag/1.1.0
 [1.0.6]:https://github.com/erykjj/traverture/releases/tag/1.0.6
