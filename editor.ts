@@ -1,4 +1,4 @@
-import { fetchVerse } from './cache';
+import { fetchVerseWithExtras } from './cache';
 import { VerseModal } from './modal';
 import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
@@ -80,7 +80,7 @@ export function createTravertureEditorPlugin(plugin: any) {
 
                             const modal = new VerseModal();
                             modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, plugin.settings.outputLanguage, refText);
-                            void fetchVerse(bcv, plugin.settings.outputLanguage).then(verseData => {
+                            void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage).then(verseData => {
                                 modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, plugin.settings.outputLanguage, refText);
                             });
                             return;
