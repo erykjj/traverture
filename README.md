@@ -2,7 +2,7 @@
 
 > **traverture** (n.): The act of traversing text to find, convert, and reformat scripture references – a turning across formats, translations, and styles. From Latin *trans-* ("across") + *vertere* ("to turn") + *-ura* (action/result).
 
-A scripture reference parser and formatter for Obsidian. Create interactive links with verse previews, or parse entire documents into a searchable, sortable sidebar table.
+A scripture reference parser, formatter, and viewer for Obsidian. Create interactive links with verse previews, or parse entire documents into a searchable, sortable sidebar table.
 
 ## Security and Privacy
 
@@ -12,14 +12,14 @@ If you are concerned about the "Scorecard" review or the "Caution" warning on th
 
 ## Features
 
-- **Inline reference parsing** – Wrap any text containing scripture references in `{{ }}` to create clickable links (in View mode). Surrounding text is preserved. Multiple references within a single block are all detected.
+- **Inline reference parsing** – Wrap any text containing scripture references in `{{ }}` to create clickable links. Surrounding text is preserved. Multiple references within a single block are all detected.
 
   ```text
   {{this is John 17:17 and Ps 1:1-3 end of test}}
   ```
   Produces two clickable links: `John 17:17` and `Ps 1:1-3`
 
-- **Verse preview modal** – Click any reference to open a modal with the full scripture text[^1] and buttons to copy the text, or open in *JW Library*[^2] or [*JW.ORG*](https://jw.org).
+- **Verse preview modal** – Click any reference to open a modal with the full scripture text[^1] (with cross-reference and footnote tooltips), a study-note pane (where available) and buttons to copy the text, or open in *JW Library*[^2] or [*JW.ORG*](https://jw.org).
 
 - **Sidebar table** – Parse a selection or entire document into a searchable, sortable table with columns for Original, Full, Standard, and Official name formats, BCV codes, and chapter and verse numbers. Features include:
   - Accent-insensitive search/filter
