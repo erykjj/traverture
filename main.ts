@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf, Notice, Menu } from 'obsidian';
+import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView } from 'obsidian';
 // @ts-ignore
 import wasmBinary from './engine_bg.wasm';
 // @ts-ignore
@@ -216,6 +216,36 @@ export default class TraverturePlugin extends Plugin {
                 });
             });
         }));
+
+        this.registerDomEvent(activeDocument, 'contextmenu', (evt: MouseEvent) => {
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (!view || view.getMode() !== 'preview') return;
+
+            const selection = activeDocument.getSelection()?.toString() || '';
+
+            evt.preventDefault();
+            evt.stopPropagation();
+
+            const menu = new Menu();
+            menu.addItem((item: any) => {
+                item.setTitle('tra.VER:ture').setIcon('book-open');
+                const submenu = item.setSubmenu();
+
+                if (selection) {
+                    submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
+                        await this.showSidebarWithResults(await this.parseReferences(selection));
+                    }));
+                }
+
+                submenu.addItem((subItem: any) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
+                    const file = view.file;
+                    if (!file) return;
+                    const content = await this.app.vault.read(file);
+                    await this.showSidebarWithResults(await this.parseReferences(content));
+                }));
+            });
+            menu.showAtMouseEvent(evt);
+        });
 
         // Mobile traverture menu
         this.addRibbonIcon('scroll', 'tra.VER:ture', () => {
