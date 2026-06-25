@@ -6,6 +6,7 @@
 
 ### Changed
 
+- Added right-click in View mode (Parse selection/document)
 - Allow unchecking all but last column
 - Renames "LIST" to "REFS" - to quickly enable only the 4 columns with references
 
