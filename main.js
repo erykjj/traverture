@@ -735,21 +735,60 @@ ${noteText}
 var import_view = require("@codemirror/view");
 var import_state = require("@codemirror/state");
 var REF_PATTERN = /\{\{(.+?)\}\}/g;
-function buildDecorations(view) {
+function buildDecorations(view, plugin) {
   const builder = new import_state.RangeSetBuilder();
   const cursor = view.state.selection.main;
   for (const { from, to } of view.visibleRanges) {
     const text = view.state.doc.sliceString(from, to);
     let match;
     while ((match = REF_PATTERN.exec(text)) !== null) {
-      const start = from + match.index;
-      const end = start + match[0].length;
-      if (cursor.from <= end && cursor.to >= start) continue;
-      const innerStart = start + 2;
-      const innerEnd = end - 2;
-      builder.add(start, innerStart, import_view.Decoration.replace({}));
-      builder.add(innerStart, innerEnd, import_view.Decoration.mark({ class: "cm-traverture-ref" }));
-      builder.add(innerEnd, end, import_view.Decoration.replace({}));
+      const blockStart = from + match.index;
+      const blockEnd = blockStart + match[0].length;
+      const innerStart = blockStart + 2;
+      const innerEnd = blockEnd - 2;
+      if (cursor.from <= blockEnd && cursor.to >= blockStart) continue;
+      const decos = [];
+      decos.push({ from: blockStart, to: innerStart, deco: import_view.Decoration.replace({}) });
+      decos.push({ from: innerEnd, to: blockEnd, deco: import_view.Decoration.replace({}) });
+      const innerText = match[1];
+      const parsed = plugin.engine?.parse(
+        plugin.settings.sourceLanguage,
+        plugin.settings.outputLanguage,
+        "full",
+        false,
+        innerText
+      );
+      let hasRefs = false;
+      if (parsed) {
+        const data = JSON.parse(parsed);
+        const refKeys = Object.keys(data);
+        if (refKeys.length > 0) {
+          const sorted = refKeys.sort((a, b) => b.length - a.length);
+          const placed = [];
+          for (const refKey of sorted) {
+            const escaped = refKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const refRegex = new RegExp(escaped, "g");
+            let refMatch;
+            while ((refMatch = refRegex.exec(innerText)) !== null) {
+              const refStart = innerStart + refMatch.index;
+              const refEnd = refStart + refKey.length;
+              const overlaps = placed.some((p) => refStart < p.to && refEnd > p.from);
+              if (!overlaps) {
+                decos.push({ from: refStart, to: refEnd, deco: import_view.Decoration.mark({ class: "cm-traverture-ref" }) });
+                placed.push({ from: refStart, to: refEnd });
+                hasRefs = true;
+              }
+            }
+          }
+        }
+      }
+      if (!hasRefs) {
+        decos.push({ from: innerStart, to: innerEnd, deco: import_view.Decoration.mark({ class: "cm-traverture-ref" }) });
+      }
+      decos.sort((a, b) => a.from - b.from);
+      for (const d of decos) {
+        builder.add(d.from, d.to, d.deco);
+      }
     }
   }
   return builder.finish();
@@ -758,11 +797,11 @@ function createTravertureEditorPlugin(plugin) {
   return import_view.ViewPlugin.fromClass(
     class {
       constructor(view) {
-        this.decorations = buildDecorations(view);
+        this.decorations = buildDecorations(view, plugin);
       }
       update(update) {
         if (update.docChanged || update.selectionSet || update.viewportChanged) {
-          this.decorations = buildDecorations(update.view);
+          this.decorations = buildDecorations(update.view, plugin);
         }
       }
     },
@@ -775,29 +814,46 @@ function createTravertureEditorPlugin(plugin) {
           const line = view.state.doc.lineAt(pos);
           let match;
           while ((match = REF_PATTERN.exec(line.text)) !== null) {
-            const from = line.from + match.index;
-            const to = from + match[0].length;
-            if (pos >= from && pos <= to) {
-              e.preventDefault();
-              e.stopPropagation();
-              const refText = match[1].trim();
+            const blockStart = line.from + match.index;
+            const blockEnd = blockStart + match[0].length;
+            const innerStart = blockStart + 2;
+            if (pos >= blockStart && pos <= blockEnd) {
+              const innerText = match[1];
+              const clickOffset = pos - innerStart;
               const parsed = plugin.engine?.parse(
                 plugin.settings.sourceLanguage,
                 plugin.settings.outputLanguage,
                 "full",
                 false,
-                refText
+                innerText
               );
               if (!parsed) return;
               const data = JSON.parse(parsed);
-              const keys = Object.keys(data);
-              if (keys.length === 0) return;
-              const firstRange = data[keys[0]][0];
+              const refKeys = Object.keys(data);
+              if (refKeys.length === 0) return;
+              const sorted = refKeys.sort((a, b) => b.length - a.length);
+              let clickedRef = refKeys[0];
+              for (const refKey of sorted) {
+                const escaped = refKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const refRegex = new RegExp(escaped, "g");
+                let refMatch;
+                while ((refMatch = refRegex.exec(innerText)) !== null) {
+                  const refStart = refMatch.index;
+                  const refEnd = refStart + refKey.length;
+                  if (clickOffset >= refStart && clickOffset <= refEnd) {
+                    clickedRef = refKey;
+                    break;
+                  }
+                }
+              }
+              e.preventDefault();
+              e.stopPropagation();
+              const firstRange = data[clickedRef][0];
               const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
               const modal = new VerseModal();
-              modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, plugin.settings.outputLanguage, refText);
+              modal.show({ html: `<p><em>Loading...</em></p>`, citation: clickedRef }, bcv, plugin.settings.outputLanguage, clickedRef);
               void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage).then((verseData) => {
-                modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, plugin.settings.outputLanguage, refText);
+                modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: clickedRef }, bcv, plugin.settings.outputLanguage, clickedRef);
               });
               return;
             }
@@ -1203,6 +1259,46 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     }
     return results;
   }
+  processElement(el) {
+    let html = el.innerHTML;
+    if (!/\{\{(.+?)\}\}/g.test(html)) return;
+    html = html.replace(/\{\{(.+?)\}\}/g, (_fullMatch, inner) => {
+      if (!this.engine) return _fullMatch;
+      const refText = inner.replace(/\*\*/g, "").replace(/\*/g, "");
+      const marked = this.engine.parse_with_markers(refText);
+      let result = marked.replace(/\{\{(.+?)\}\}/g, (_m, ref) => {
+        const parsed = this.engine.parse(
+          this.settings.sourceLanguage,
+          this.settings.outputLanguage,
+          "full",
+          false,
+          ref
+        );
+        const data = JSON.parse(parsed);
+        const keys = Object.keys(data);
+        if (keys.length > 0) {
+          const firstRange = data[keys[0]][0];
+          const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
+          return `<a class="traverture-ref-link" data-bcv="${bcv}" data-ref="${ref}">${ref}</a>`;
+        }
+        return ref;
+      });
+      return result;
+    });
+    el.innerHTML = html;
+    el.querySelectorAll(".traverture-ref-link").forEach((link) => {
+      link.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const bcv = link.getAttribute("data-bcv");
+        const refText = link.getAttribute("data-ref") || link.textContent || "";
+        const modal = new VerseModal();
+        modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+        const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
+        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+      });
+    });
+  }
   tagReferences(editor, text, isWholeDoc = false) {
     if (!text.trim()) {
       new import_obsidian5.Notice("No text to tag.");
@@ -1259,64 +1355,7 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     } });
     this.registerEditorExtension(createTravertureEditorPlugin(this));
     this.registerMarkdownPostProcessor((element, _context) => {
-      const walker = activeDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT, { acceptNode: (node2) => node2.nodeValue && /\{\{(.+?)\}\}/.test(node2.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
-      const textNodes = [];
-      let node = walker.nextNode();
-      while (node) {
-        textNodes.push(node);
-        node = walker.nextNode();
-      }
-      for (const textNode of textNodes) {
-        const text = textNode.nodeValue || "", regex = /\{\{(.+?)\}\}/g;
-        let lastIndex = 0, match;
-        const fragment = activeDocument.createDocumentFragment();
-        while ((match = regex.exec(text)) !== null) {
-          if (match.index > lastIndex) fragment.appendChild(activeDocument.createTextNode(text.substring(lastIndex, match.index)));
-          const refText = match[1].trim();
-          if (this.engine) {
-            const marked = this.engine.parse_with_markers(refText), markerRegex = /\{\{(.+?)\}\}/g;
-            let markerLastIndex = 0, markerMatch;
-            const innerFragment = activeDocument.createDocumentFragment();
-            while ((markerMatch = markerRegex.exec(marked)) !== null) {
-              if (markerMatch.index > markerLastIndex) innerFragment.appendChild(activeDocument.createTextNode(marked.substring(markerLastIndex, markerMatch.index)));
-              const innerRef = markerMatch[1].trim();
-              const parsed = this.engine.parse(this.settings.sourceLanguage, this.settings.outputLanguage, "full", false, innerRef);
-              const data = JSON.parse(parsed), keys = Object.keys(data);
-              if (keys.length > 0) {
-                const firstRange = data[keys[0]][0];
-                const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
-                const link = activeDocument.createElement("a");
-                link.className = "traverture-ref-link";
-                link.textContent = keys[0];
-                link.setAttribute("data-bcv", bcv);
-                link.setAttribute("data-ref", link.textContent || keys[0]);
-                link.addEventListener("click", (e) => {
-                  void (async () => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const linkText = link.getAttribute("data-ref") || link.textContent || "";
-                    const modal = new VerseModal();
-                    modal.show({ html: `<p><em>Loading...</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
-                    const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
-                    modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: linkText }, bcv, this.settings.outputLanguage, linkText);
-                  })();
-                });
-                innerFragment.appendChild(link);
-              } else {
-                innerFragment.appendChild(activeDocument.createTextNode(markerMatch[0]));
-              }
-              markerLastIndex = markerMatch.index + markerMatch[0].length;
-            }
-            if (markerLastIndex < marked.length) innerFragment.appendChild(activeDocument.createTextNode(marked.substring(markerLastIndex)));
-            fragment.appendChild(innerFragment);
-          } else {
-            fragment.appendChild(activeDocument.createTextNode(match[0]));
-          }
-          lastIndex = match.index + match[0].length;
-        }
-        if (lastIndex < text.length) fragment.appendChild(activeDocument.createTextNode(text.substring(lastIndex)));
-        textNode.parentNode?.replaceChild(fragment, textNode);
-      }
+      this.processElement(element);
     });
     this.registerDomEvent(activeDocument, "click", (evt) => {
       const target = evt.target;
