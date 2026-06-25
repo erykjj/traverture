@@ -408,6 +408,16 @@
   text-align: center;
 }
 
+/* --- Editor (Live Preview) Reference Links --- */
+.cm-traverture-ref {
+  color: #4a6da7;
+  cursor: pointer;
+  font-weight: inherit;
+}
+.cm-traverture-ref:hover {
+  text-decoration: underline;
+}
+
 @container (max-width: 600px) {
   .traverture-sidebar-top-row { flex-wrap: wrap; }
   .traverture-sidebar-spacer { display: none; }
