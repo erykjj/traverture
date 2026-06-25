@@ -5,7 +5,7 @@ import { RangeSetBuilder } from '@codemirror/state';
 
 const REF_PATTERN = /\{\{(.+?)\}\}/g;
 
-function buildDecorations(view: any) {
+function buildDecorations(view: any, plugin: any) {
     const builder: any = new RangeSetBuilder();
     const cursor = view.state.selection.main;
 
@@ -13,17 +13,64 @@ function buildDecorations(view: any) {
         const text = view.state.doc.sliceString(from, to);
         let match;
         while ((match = REF_PATTERN.exec(text)) !== null) {
-            const start = from + match.index;
-            const end = start + match[0].length;
+            const blockStart = from + match.index;
+            const blockEnd = blockStart + match[0].length;
+            const innerStart = blockStart + 2;
+            const innerEnd = blockEnd - 2;
 
-            if (cursor.from <= end && cursor.to >= start) continue;
+            if (cursor.from <= blockEnd && cursor.to >= blockStart) continue;
 
-            const innerStart = start + 2;
-            const innerEnd = end - 2;
+            const decos: Array<{ from: number; to: number; deco: any }> = [];
 
-            builder.add(start, innerStart, Decoration.replace({}));
-            builder.add(innerStart, innerEnd, Decoration.mark({ class: 'cm-traverture-ref' }));
-            builder.add(innerEnd, end, Decoration.replace({}));
+            decos.push({ from: blockStart, to: innerStart, deco: Decoration.replace({}) });
+            decos.push({ from: innerEnd, to: blockEnd, deco: Decoration.replace({}) });
+
+            const innerText = match[1];
+            const parsed = plugin.engine?.parse(
+                plugin.settings.sourceLanguage,
+                plugin.settings.outputLanguage,
+                'full',
+                false,
+                innerText
+            );
+
+            let hasRefs = false;
+            if (parsed) {
+                const data = JSON.parse(parsed);
+                const refKeys = Object.keys(data);
+
+                if (refKeys.length > 0) {
+                    const sorted = refKeys.sort((a: string, b: string) => b.length - a.length);
+                    const placed: Array<{ from: number; to: number }> = [];
+
+                    for (const refKey of sorted) {
+                        const escaped = refKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const refRegex = new RegExp(escaped, 'g');
+                        let refMatch;
+
+                        while ((refMatch = refRegex.exec(innerText)) !== null) {
+                            const refStart = innerStart + refMatch.index;
+                            const refEnd = refStart + refKey.length;
+                            
+                            const overlaps = placed.some(p => refStart < p.to && refEnd > p.from);
+                            if (!overlaps) {
+                                decos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
+                                placed.push({ from: refStart, to: refEnd });
+                                hasRefs = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!hasRefs) {
+                decos.push({ from: innerStart, to: innerEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
+            }
+
+            decos.sort((a, b) => a.from - b.from);
+            for (const d of decos) {
+                builder.add(d.from, d.to, d.deco);
+            }
         }
     }
 
@@ -36,12 +83,12 @@ export function createTravertureEditorPlugin(plugin: any) {
             decorations: any;
 
             constructor(view: any) {
-                this.decorations = buildDecorations(view);
+                this.decorations = buildDecorations(view, plugin);
             }
 
             update(update: any) {
                 if (update.docChanged || update.selectionSet || update.viewportChanged) {
-                    this.decorations = buildDecorations(update.view);
+                    this.decorations = buildDecorations(update.view, plugin);
                 }
             }
         },
@@ -55,33 +102,54 @@ export function createTravertureEditorPlugin(plugin: any) {
                     const line = view.state.doc.lineAt(pos);
                     let match;
                     while ((match = REF_PATTERN.exec(line.text)) !== null) {
-                        const from = line.from + match.index;
-                        const to = from + match[0].length;
-                        if (pos >= from && pos <= to) {
-                            e.preventDefault();
-                            e.stopPropagation();
+                        const blockStart = line.from + match.index;
+                        const blockEnd = blockStart + match[0].length;
+                        const innerStart = blockStart + 2;
 
-                            const refText = match[1].trim();
+                        if (pos >= blockStart && pos <= blockEnd) {
+                            const innerText = match[1];
+                            const clickOffset = pos - innerStart;
+
                             const parsed = plugin.engine?.parse(
                                 plugin.settings.sourceLanguage,
                                 plugin.settings.outputLanguage,
                                 'full',
                                 false,
-                                refText
+                                innerText
                             );
+
                             if (!parsed) return;
-
                             const data = JSON.parse(parsed);
-                            const keys = Object.keys(data);
-                            if (keys.length === 0) return;
+                            const refKeys = Object.keys(data);
+                            if (refKeys.length === 0) return;
 
-                            const firstRange = (data[keys[0]] as string[][])[0];
+                            const sorted = refKeys.sort((a: string, b: string) => b.length - a.length);
+                            let clickedRef = refKeys[0];
+
+                            for (const refKey of sorted) {
+                                const escaped = refKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                const refRegex = new RegExp(escaped, 'g');
+                                let refMatch;
+                                while ((refMatch = refRegex.exec(innerText)) !== null) {
+                                    const refStart = refMatch.index;
+                                    const refEnd = refStart + refKey.length;
+                                    if (clickOffset >= refStart && clickOffset <= refEnd) {
+                                        clickedRef = refKey;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            const firstRange = (data[clickedRef] as string[][])[0];
                             const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
 
                             const modal = new VerseModal();
-                            modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, plugin.settings.outputLanguage, refText);
+                            modal.show({ html: `<p><em>Loading...</em></p>`, citation: clickedRef }, bcv, plugin.settings.outputLanguage, clickedRef);
                             void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage).then(verseData => {
-                                modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, plugin.settings.outputLanguage, refText);
+                                modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: clickedRef }, bcv, plugin.settings.outputLanguage, clickedRef);
                             });
                             return;
                         }
