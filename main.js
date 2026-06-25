@@ -426,9 +426,6 @@ function getCachedVerse(key) {
 function setCachedVerse(key, data) {
   verseCache.set(key, { data, ts: Date.now() });
 }
-function clearVerseCache() {
-  verseCache.clear();
-}
 async function fetchVerseWithExtras(range, langCode) {
   const cacheKey = `${langCode}:${range}:extras`;
   const cached = getCachedVerse(cacheKey);
@@ -839,10 +836,6 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
         this.plugin.createEngine();
       });
     });
-    new import_obsidian3.Setting(containerEl).setName("Verse cache").setDesc("Fetched verses are cached in memory for 60 minutes").addButton((button) => button.setButtonText("Clear cache").onClick(() => {
-      clearVerseCache();
-      new import_obsidian3.Notice("Verse cache cleared.");
-    }));
   }
 };
 
