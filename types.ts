@@ -1,11 +1,13 @@
 export interface TravertureSettings {
     sourceLanguage: string;
     outputLanguage: string;
+    autoDetect: boolean;
 }
 
 export const DEFAULT_SETTINGS: TravertureSettings = {
     sourceLanguage: 'en',
     outputLanguage: 'en',
+    autoDetect: true,
 };
 
 export interface LanguageInfo {
