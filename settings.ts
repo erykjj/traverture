@@ -33,5 +33,15 @@ export class TravertureSettingTab extends PluginSettingTab {
                 dropdown.setValue(this.plugin.settings.outputLanguage)
                     .onChange(async (value) => { this.plugin.settings.outputLanguage = value; await this.plugin.saveSettings(); this.plugin.createEngine(); });
             });
+
+        new Setting(containerEl)
+            .setName('Auto-detect references')
+            .setDesc('Automatically detect scripture references in View mode without {{ }} markers.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.autoDetect)
+                .onChange(async (value) => {
+                    this.plugin.settings.autoDetect = value;
+                    await this.plugin.saveSettings();
+                }));
     }
 }
