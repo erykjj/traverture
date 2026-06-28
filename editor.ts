@@ -4,13 +4,16 @@ import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 
 const REF_PATTERN = /\{\{(.+?)\}\}/g;
+const MARKER_PATTERN = /⟪(.+?)⟫/g;
 
 function buildDecorations(view: any, plugin: any) {
-    const builder: any = new RangeSetBuilder();
+    const allDecos: Array<{ from: number; to: number; deco: any }> = [];
     const cursor = view.state.selection.main;
 
     for (const { from, to } of view.visibleRanges) {
         const text = view.state.doc.sliceString(from, to);
+        const decorated: Array<{ from: number; to: number }> = [];
+
         let match;
         while ((match = REF_PATTERN.exec(text)) !== null) {
             const blockStart = from + match.index;
@@ -20,61 +23,103 @@ function buildDecorations(view: any, plugin: any) {
 
             if (cursor.from <= blockEnd && cursor.to >= blockStart) continue;
 
-            const decos: Array<{ from: number; to: number; deco: any }> = [];
-
-            decos.push({ from: blockStart, to: innerStart, deco: Decoration.replace({}) });
-            decos.push({ from: innerEnd, to: blockEnd, deco: Decoration.replace({}) });
+            allDecos.push({ from: blockStart, to: innerStart, deco: Decoration.replace({}) });
+            allDecos.push({ from: innerEnd, to: blockEnd, deco: Decoration.replace({}) });
+            decorated.push({ from: blockStart, to: innerStart });
+            decorated.push({ from: innerEnd, to: blockEnd });
 
             const innerText = match[1];
+            const cleanMatch = match[0].replace(/\*\*/g, '').replace(/\*/g, '');
+            const engineInput = cleanMatch.replace('{{', '⟪').replace('}}', '⟫');
             const parsed = plugin.engine?.parse(
                 plugin.settings.sourceLanguage,
                 plugin.settings.outputLanguage,
                 'full',
                 false,
-                innerText
+                engineInput
             );
 
-            let hasRefs = false;
             if (parsed) {
-                const data = JSON.parse(parsed);
-                const refKeys = Object.keys(data);
-
-                if (refKeys.length > 0) {
-                    const sorted = refKeys.sort((a: string, b: string) => b.length - a.length);
-                    const placed: Array<{ from: number; to: number }> = [];
-
-                    for (const refKey of sorted) {
-                        const escaped = refKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const refRegex = new RegExp(escaped, 'g');
-                        let refMatch;
-
-                        while ((refMatch = refRegex.exec(innerText)) !== null) {
-                            const refStart = innerStart + refMatch.index;
-                            const refEnd = refStart + refKey.length;
-                            
-                            const overlaps = placed.some(p => refStart < p.to && refEnd > p.from);
-                            if (!overlaps) {
-                                decos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
-                                placed.push({ from: refStart, to: refEnd });
-                                hasRefs = true;
-                            }
+                const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+                const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+                
+                for (const [clauseText, _ranges] of sorted) {
+                    const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const refRegex = new RegExp(escaped, 'g');
+                    let refMatch;
+                    while ((refMatch = refRegex.exec(innerText)) !== null) {
+                        const refStart = innerStart + refMatch.index;
+                        const refEnd = refStart + clauseText.length;
+                        
+                        const overlaps = decorated.some(p => refStart < p.to && refEnd > p.from);
+                        if (!overlaps) {
+                            allDecos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
+                            decorated.push({ from: refStart, to: refEnd });
                         }
                     }
                 }
             }
+        }
 
-            if (!hasRefs) {
-                decos.push({ from: innerStart, to: innerEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
+        if (plugin.settings.autoDetect) {
+            const decoratedRanges = [...decorated].sort((a, b) => a.from - b.from);
+            let pos = from;
+
+            for (const d of decoratedRanges) {
+                if (pos < d.from) {
+                    const segment = view.state.doc.sliceString(pos, d.from);
+                    processSegment(pos, segment, plugin, allDecos, decorated);
+                }
+                pos = Math.max(pos, d.to);
             }
-
-            decos.sort((a, b) => a.from - b.from);
-            for (const d of decos) {
-                builder.add(d.from, d.to, d.deco);
+            if (pos < to) {
+                const segment = view.state.doc.sliceString(pos, to);
+                processSegment(pos, segment, plugin, allDecos, decorated);
             }
         }
     }
 
+    allDecos.sort((a, b) => a.from - b.from);
+    const builder: any = new RangeSetBuilder();
+    for (const d of allDecos) {
+        builder.add(d.from, d.to, d.deco);
+    }
     return builder.finish();
+}
+
+function processSegment(basePos: number, segment: string, plugin: any, allDecos: Array<{ from: number; to: number; deco: any }>, decorated: Array<{ from: number; to: number }>) {
+    const cleanSegment = segment.replace(/\*\*/g, '').replace(/\*/g, '');
+    const parsed = plugin.engine?.parse(
+        plugin.settings.sourceLanguage,
+        plugin.settings.outputLanguage,
+        'full',
+        false,
+        cleanSegment
+    );
+    if (!parsed) return;
+
+    const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+    if (clauses.length === 0) return;
+
+    const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+
+    for (const [clauseText, _ranges] of sorted) {
+        let searchFrom = 0;
+        while (true) {
+            const idx = segment.indexOf(clauseText, searchFrom);
+            if (idx === -1) break;
+
+            const refStart = basePos + idx;
+            const refEnd = refStart + clauseText.length;
+
+            const overlaps = decorated.some(p => refStart < p.to && refEnd > p.from);
+            if (!overlaps) {
+                allDecos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
+                decorated.push({ from: refStart, to: refEnd });
+            }
+            searchFrom = idx + clauseText.length;
+        }
+    }
 }
 
 export function createTravertureEditorPlugin(plugin: any) {
@@ -100,62 +145,68 @@ export function createTravertureEditorPlugin(plugin: any) {
                     if (pos === null) return;
 
                     const line = view.state.doc.lineAt(pos);
-                    let match;
-                    while ((match = REF_PATTERN.exec(line.text)) !== null) {
-                        const blockStart = line.from + match.index;
-                        const blockEnd = blockStart + match[0].length;
-                        const innerStart = blockStart + 2;
+                    const lineText = line.text;
+                    const lineFrom = line.from;
+                    const engineInput = lineText.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
+                    const parsed = plugin.engine?.parse(
+                        plugin.settings.sourceLanguage,
+                        plugin.settings.outputLanguage,
+                        'full',
+                        false,
+                        engineInput
+                    );
+                    if (!parsed) return;
 
-                        if (pos >= blockStart && pos <= blockEnd) {
-                            const innerText = match[1];
-                            const clickOffset = pos - innerStart;
+                    const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+                    if (clauses.length === 0) return;
 
-                            const parsed = plugin.engine?.parse(
-                                plugin.settings.sourceLanguage,
-                                plugin.settings.outputLanguage,
-                                'full',
-                                false,
-                                innerText
-                            );
+                    for (const clause of clauses) {
+                        const [clauseText, _ranges] = clause;
+                        let searchFrom = 0;
+                        while (true) {
+                            const idx = lineText.indexOf(clauseText, searchFrom);
+                            if (idx === -1) break;
+                            
+                            const refStart = lineFrom + idx;
+                            const refEnd = refStart + clauseText.length;
 
-                            if (!parsed) return;
-                            const data = JSON.parse(parsed);
-                            const refKeys = Object.keys(data);
-                            if (refKeys.length === 0) return;
-
-                            const sorted = refKeys.sort((a: string, b: string) => b.length - a.length);
-                            let clickedRef = refKeys[0];
-
-                            for (const refKey of sorted) {
-                                const escaped = refKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                                const refRegex = new RegExp(escaped, 'g');
-                                let refMatch;
-                                while ((refMatch = refRegex.exec(innerText)) !== null) {
-                                    const refStart = refMatch.index;
-                                    const refEnd = refStart + refKey.length;
-                                    if (clickOffset >= refStart && clickOffset <= refEnd) {
-                                        clickedRef = refKey;
-                                        break;
-                                    }
-                                }
+                            if (pos >= refStart && pos <= refEnd) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                showModal(plugin, clause, clauses);
+                                return;
                             }
-
-                            e.preventDefault();
-                            e.stopPropagation();
-
-                            const firstRange = (data[clickedRef] as string[][])[0];
-                            const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
-
-                            const modal = new VerseModal();
-                            modal.show({ html: `<p><em>Loading...</em></p>`, citation: clickedRef }, bcv, plugin.settings.outputLanguage, clickedRef);
-                            void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage).then(verseData => {
-                                modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: clickedRef }, bcv, plugin.settings.outputLanguage, clickedRef);
-                            });
-                            return;
+                            searchFrom = idx + clauseText.length;
                         }
                     }
                 }
             }
         }
     );
+}
+
+function showModal(plugin: any, clause: [string, string[][]], clauses: Array<[string, string[][]]>) {
+    const [clauseText, ranges] = clause;
+    const range = ranges[0];
+    const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
+
+    let displayText = clauseText;
+    if (/^\d/.test(clauseText)) {
+        const idx = clauses.indexOf(clause);
+        for (let i = idx - 1; i >= 0; i--) {
+            if (!/^\d/.test(clauses[i][0])) {
+                const bookMatch = clauses[i][0].match(/^(.+?)\s+\d/);
+                if (bookMatch) {
+                    displayText = `${bookMatch[1]} ${clauseText}`;
+                    break;
+                }
+            }
+        }
+    }
+
+    const modal = new VerseModal();
+    modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
+    void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage).then(verseData => {
+        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
+    });
 }
