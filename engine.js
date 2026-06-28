@@ -110,6 +110,21 @@ export class ObsidianEngine {
         }
     }
     /**
+     * @returns {string}
+     */
+    static get_version() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.obsidianengine_get_version();
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * @param {string} source_lang
      * @param {string} output_lang
      * @param {string} name_format
