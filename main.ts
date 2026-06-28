@@ -28,7 +28,7 @@ export default class TraverturePlugin extends Plugin {
         if (!this.engine) return results;
 
         const marked = this.engine.parse_with_markers(text);
-        const markerRegex = /\{\{(.+?)\}\}/g;
+        const markerRegex = /⟪(.+?)⟫/g;
         let match;
         const orderedRefs: string[] = [];
         while ((match = markerRegex.exec(marked)) !== null) orderedRefs.push(match[1].trim());
@@ -66,32 +66,66 @@ export default class TraverturePlugin extends Plugin {
 
     processElement(el: HTMLElement) {
         let html = el.innerHTML;
-        if (!/\{\{(.+?)\}\}/g.test(html)) return;
-
-        html = html.replace(/\{\{(.+?)\}\}/g, (_fullMatch: string, inner: string) => {
-            if (!this.engine) return _fullMatch;
-            const refText = inner.replace(/\*\*/g, '').replace(/\*/g, '');
-            const marked = this.engine.parse_with_markers(refText);
-
-            let result = marked.replace(/\{\{(.+?)\}\}/g, (_m: string, ref: string) => {
+        if (/\{\{(.+?)\}\}/g.test(html)) {
+            html = html.replace(/\{\{(.+?)\}\}/g, (_fullMatch: string, inner: string) => {
+                if (!this.engine) return _fullMatch;
+                
+                const cleanMatch = _fullMatch.replace(/\*\*/g, '').replace(/\*/g, '');
+                const engineInput = cleanMatch.replace('{{', '⟪').replace('}}', '⟫');
                 const parsed = this.engine.parse(
                     this.settings.sourceLanguage,
                     this.settings.outputLanguage,
                     'full',
                     false,
-                    ref
+                    engineInput
                 );
-                const data = JSON.parse(parsed);
-                const keys = Object.keys(data);
-                if (keys.length > 0) {
-                    const firstRange = (data[keys[0]] as string[][])[0];
-                    const bcv = firstRange[0] === firstRange[1] ? firstRange[0] : `${firstRange[0]}-${firstRange[1]}`;
-                    return `<a class="traverture-ref-link" data-bcv="${bcv}" data-ref="${ref}">${ref}</a>`;
-                }
-                return ref;
+                const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+                if (clauses.length === 0) return inner;
+                return this.insertLinks(inner, clauses);
             });
-            return result;
-        });
+        }
+
+        if (this.settings.autoDetect && this.engine) {
+            const tempDiv = activeDocument.createElement('div');
+            tempDiv.innerHTML = html;
+
+            const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
+                acceptNode: (node) => {
+                    const parent = node.parentElement;
+                    if (parent?.tagName === 'A' && parent.classList.contains('traverture-ref-link')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+
+            const textNodes: Text[] = [];
+            let node = walker.nextNode();
+            while (node) { textNodes.push(node as Text); node = walker.nextNode(); }
+
+            for (const textNode of textNodes) {
+                const text = textNode.nodeValue || '';
+                const parsed = this.engine.parse(
+                    this.settings.sourceLanguage,
+                    this.settings.outputLanguage,
+                    'full',
+                    false,
+                    text
+                );
+                const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+                if (clauses.length === 0) continue;
+
+                const linked = this.insertLinks(text, clauses);
+                if (linked !== text) {
+                    const fragment = activeDocument.createDocumentFragment();
+                    const span = activeDocument.createElement('span');
+                    span.innerHTML = linked;
+                    while (span.firstChild) fragment.appendChild(span.firstChild);
+                    textNode.parentNode?.replaceChild(fragment, textNode);
+                }
+            }
+            html = tempDiv.innerHTML;
+        }
 
         const parsed = new DOMParser().parseFromString(html, 'text/html');
         while (el.firstChild) el.removeChild(el.firstChild);
@@ -110,6 +144,61 @@ export default class TraverturePlugin extends Plugin {
                 modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
             })(); });
         });
+    }
+
+    private insertLinks(text: string, clauses: Array<[string, string[][]]>): string {
+        if (clauses.length === 0) return text;
+
+        const positions: Array<{ start: number; end: number; clause: [string, string[][]]; displayText: string; bcv: string }> = [];
+        let bookName = '';
+
+        const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+
+        for (let i = 0; i < sorted.length; i++) {
+            const [clauseText, ranges] = sorted[i];
+            const origIndex = clauses.indexOf(sorted[i]);
+
+            if (origIndex === 0) {
+                const match = clauseText.match(/^(.+?)\s+\d/);
+                if (match) bookName = match[1];
+            }
+
+            let displayText = clauseText;
+            if (/^\d/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
+                displayText = `${bookName} ${clauseText}`;
+            }
+
+            if (ranges.length === 0) continue;
+            const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
+
+            let searchFrom = 0;
+            let found = false;
+            while (!found) {
+                const idx = text.indexOf(clauseText, searchFrom);
+                if (idx === -1) break;
+
+                const overlaps = positions.some(p => idx < p.end && idx + clauseText.length > p.start);
+                if (!overlaps) {
+                    positions.push({ start: idx, end: idx + clauseText.length, clause: sorted[i], displayText, bcv });
+                    found = true;
+                }
+                searchFrom = idx + 1;
+            }
+        }
+
+        if (positions.length === 0) return text;
+        positions.sort((a, b) => a.start - b.start);
+        let result = '';
+        let pos = 0;
+
+        for (const p of positions) {
+            result += text.substring(pos, p.start);
+            const link = `<a class="traverture-ref-link" data-bcv="${p.bcv}" data-ref="${p.displayText}">${text.substring(p.start, p.end)}</a>`;
+            result += link;
+            pos = p.end;
+        }
+        result += text.substring(pos);
+        return result;
     }
 
     tagReferences(editor: any, text: string, isWholeDoc: boolean = false) {
