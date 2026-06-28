@@ -1282,41 +1282,47 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
   async parseReferences(text) {
     const results = [];
     if (!this.engine) return results;
-    const marked = this.engine.parse_with_markers(text);
+    const engineText = text.replace(/\{\{(.+?)\}\}/g, "\u27EA$1\u27EB");
+    const marked = this.engine.parse_with_markers(engineText);
     const markerRegex = /⟪(.+?)⟫/g;
     let match;
-    const orderedRefs = [];
-    while ((match = markerRegex.exec(marked)) !== null) orderedRefs.push(match[1].trim());
-    if (orderedRefs.length === 0) return results;
-    const parsed = this.engine.parse(this.settings.sourceLanguage, this.settings.outputLanguage, "full", false, text);
-    if (!parsed) return results;
-    const data = JSON.parse(parsed);
     const engFull = new ObsidianEngine("en", "en", "full", false);
     const engStd = new ObsidianEngine("en", "en", "standard", false);
     const engOff = new ObsidianEngine("en", "en", "official", false);
-    for (const scripture of orderedRefs) {
-      const bcvRanges = data[scripture];
-      if (!bcvRanges) continue;
-      const ranges = bcvRanges;
-      for (let i = 0; i < ranges.length; i++) {
-        const singleRange = [ranges[i]], rangeJson = JSON.stringify(singleRange);
-        const fullDecoded = JSON.parse(engFull.decode_scriptures(rangeJson));
-        const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
-        const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
-        const startBcv = ranges[i][0], endBcv = ranges[i][1];
-        results.push({
-          scripture,
-          fullRef: fullDecoded[0] || scripture,
-          standardRef: stdDecoded[0] || "",
-          officialRef: offDecoded[0] || "",
-          startBcv,
-          endBcv,
-          startCh: parseInt(startBcv.substring(2, 5)),
-          endCh: parseInt(endBcv.substring(2, 5)),
-          startVerse: parseInt(startBcv.substring(5, 8)),
-          endVerse: parseInt(endBcv.substring(5, 8)),
-          bookNum: parseInt(startBcv.substring(0, 2))
-        });
+    while ((match = markerRegex.exec(marked)) !== null) {
+      const originalRef = match[1];
+      const parsed = this.engine.parse(
+        this.settings.sourceLanguage,
+        this.settings.outputLanguage,
+        "full",
+        false,
+        `\u27EA${originalRef}\u27EB`
+      );
+      if (!parsed) continue;
+      const clauses = JSON.parse(parsed);
+      if (clauses.length === 0) continue;
+      for (const [_clauseText, ranges] of clauses) {
+        for (const range of ranges) {
+          const singleRange = [[range[0], range[1]]];
+          const rangeJson = JSON.stringify(singleRange);
+          const fullDecoded = JSON.parse(engFull.decode_scriptures(rangeJson));
+          const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
+          const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
+          const startBcv = range[0], endBcv = range[1];
+          results.push({
+            scripture: originalRef,
+            fullRef: fullDecoded[0] || originalRef,
+            standardRef: stdDecoded[0] || "",
+            officialRef: offDecoded[0] || "",
+            startBcv,
+            endBcv,
+            startCh: parseInt(startBcv.substring(2, 5)),
+            endCh: parseInt(endBcv.substring(2, 5)),
+            startVerse: parseInt(startBcv.substring(5, 8)),
+            endVerse: parseInt(endBcv.substring(5, 8)),
+            bookNum: parseInt(startBcv.substring(0, 2))
+          });
+        }
       }
     }
     return results;
