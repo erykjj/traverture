@@ -79,12 +79,14 @@ export default class TraverturePlugin extends Plugin {
 
     processElement(el: HTMLElement) {
         let html = el.innerHTML;
+
+        // Process {{ }} blocks (forced parsing)
         if (/\{\{(.+?)\}\}/g.test(html)) {
             html = html.replace(/\{\{(.+?)\}\}/g, (_fullMatch: string, inner: string) => {
                 if (!this.engine) return _fullMatch;
                 
-                const cleanMatch = _fullMatch.replace(/\*\*/g, '').replace(/\*/g, '');
-                const engineInput = cleanMatch.replace('{{', '⟪').replace('}}', '⟫');
+                const refText = inner.replace(/\*\*/g, '').replace(/\*/g, '');
+                const engineInput = '⟪' + refText + '⟫';
                 const parsed = this.engine.parse(
                     this.settings.sourceLanguage,
                     this.settings.outputLanguage,
@@ -92,12 +94,46 @@ export default class TraverturePlugin extends Plugin {
                     false,
                     engineInput
                 );
-                const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+                const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
                 if (clauses.length === 0) return inner;
-                return this.insertLinks(inner, clauses);
+
+                let result = inner;
+                let bookName = '';
+                const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+                
+                for (let i = 0; i < sorted.length; i++) {
+                    const [clauseText, _startPos, _endPos, ranges] = sorted[i];
+                    const origIndex = clauses.indexOf(sorted[i]);
+                    
+                    if (origIndex === 0) {
+                        const match = clauseText.match(/^(.+?)\s+\d/);
+                        if (match) bookName = match[1];
+                    }
+                    
+                    let displayText = clauseText;
+                    if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
+                        displayText = `${bookName} ${clauseText}`;
+                    }
+                    
+                    for (const range of ranges) {
+                        const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
+                        const link = `<a class="traverture-ref-link" data-bcv="${bcv}" data-ref="${displayText}">${clauseText}</a>`;
+                        const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        
+                        if (/^\d+$/.test(clauseText)) {
+                            const regex = new RegExp(`(^|[\\s,;])${escaped}(?=[\\s,;]|$)`, 'g');
+                            result = result.replace(regex, `$1${link}`);
+                        } else {
+                            result = result.replace(new RegExp(escaped), link);
+                        }
+                        break;
+                    }
+                }
+                return result;
             });
         }
 
+        // Auto-detect references in remaining text
         if (this.settings.autoDetect && this.engine) {
             const tempDiv = activeDocument.createElement('div');
             tempDiv.innerHTML = html;
@@ -125,7 +161,7 @@ export default class TraverturePlugin extends Plugin {
                     false,
                     text
                 );
-                const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+                const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
                 if (clauses.length === 0) continue;
 
                 const linked = this.insertLinks(text, clauses);
@@ -140,12 +176,14 @@ export default class TraverturePlugin extends Plugin {
             html = tempDiv.innerHTML;
         }
 
+        // Replace element content
         const parsed = new DOMParser().parseFromString(html, 'text/html');
         while (el.firstChild) el.removeChild(el.firstChild);
         for (const child of Array.from(parsed.body.childNodes)) {
             el.appendChild(child.cloneNode(true));
         }
 
+        // Re-attach click handlers
         el.querySelectorAll('.traverture-ref-link').forEach(link => {
             link.addEventListener('click', (e) => { void (async () => {
                 e.preventDefault(); e.stopPropagation();
@@ -159,58 +197,47 @@ export default class TraverturePlugin extends Plugin {
         });
     }
 
-    private insertLinks(text: string, clauses: Array<[string, string[][]]>): string {
+    private insertLinks(text: string, clauses: Array<[string, number, number, string[][]]>): string {
         if (clauses.length === 0) return text;
-
-        const positions: Array<{ start: number; end: number; clause: [string, string[][]]; displayText: string; bcv: string }> = [];
+        
+        const positions: Array<{ start: number; end: number; displayText: string; bcv: string; clauseText: string }> = [];
         let bookName = '';
-
-        const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
-
-        for (let i = 0; i < sorted.length; i++) {
-            const [clauseText, ranges] = sorted[i];
-            const origIndex = clauses.indexOf(sorted[i]);
-
-            if (origIndex === 0) {
+        
+        for (let i = 0; i < clauses.length; i++) {
+            const [clauseText, startPos, endPos, ranges] = clauses[i];
+            
+            if (i === 0 || !/^\d/.test(clauseText)) {
                 const match = clauseText.match(/^(.+?)\s+\d/);
                 if (match) bookName = match[1];
             }
-
+            
             let displayText = clauseText;
-            if (/^\d/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
+            if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
                 displayText = `${bookName} ${clauseText}`;
             }
-
+            
             if (ranges.length === 0) continue;
             const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
-
-            let searchFrom = 0;
-            let found = false;
-            while (!found) {
-                const idx = text.indexOf(clauseText, searchFrom);
-                if (idx === -1) break;
-
-                const overlaps = positions.some(p => idx < p.end && idx + clauseText.length > p.start);
-                if (!overlaps) {
-                    positions.push({ start: idx, end: idx + clauseText.length, clause: sorted[i], displayText, bcv });
-                    found = true;
-                }
-                searchFrom = idx + 1;
-            }
+            
+            positions.push({ start: startPos, end: endPos, displayText, bcv, clauseText });
         }
-
+        
         if (positions.length === 0) return text;
+        
         positions.sort((a, b) => a.start - b.start);
+        
         let result = '';
         let pos = 0;
-
+        
         for (const p of positions) {
+            if (p.start < pos) continue; // Skip overlapping positions
             result += text.substring(pos, p.start);
             const link = `<a class="traverture-ref-link" data-bcv="${p.bcv}" data-ref="${p.displayText}">${text.substring(p.start, p.end)}</a>`;
             result += link;
             pos = p.end;
         }
         result += text.substring(pos);
+        
         return result;
     }
 

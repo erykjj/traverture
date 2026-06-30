@@ -40,7 +40,7 @@ function buildDecorations(view: any, plugin: any) {
             );
 
             if (parsed) {
-                const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+                const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
                 const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
                 
                 for (const [clauseText, _ranges] of sorted) {
@@ -88,36 +88,26 @@ function buildDecorations(view: any, plugin: any) {
 }
 
 function processSegment(basePos: number, segment: string, plugin: any, allDecos: Array<{ from: number; to: number; deco: any }>, decorated: Array<{ from: number; to: number }>) {
-    const cleanSegment = segment.replace(/\*\*/g, '').replace(/\*/g, '');
     const parsed = plugin.engine?.parse(
         plugin.settings.sourceLanguage,
         plugin.settings.outputLanguage,
         'full',
         false,
-        cleanSegment
+        segment
     );
     if (!parsed) return;
 
-    const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+    const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
     if (clauses.length === 0) return;
 
-    const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+    for (const [_clauseText, startPos, endPos, _ranges] of clauses) {
+        const refStart = basePos + startPos;
+        const refEnd = basePos + endPos;
 
-    for (const [clauseText, _ranges] of sorted) {
-        let searchFrom = 0;
-        while (true) {
-            const idx = segment.indexOf(clauseText, searchFrom);
-            if (idx === -1) break;
-
-            const refStart = basePos + idx;
-            const refEnd = refStart + clauseText.length;
-
-            const overlaps = decorated.some(p => refStart < p.to && refEnd > p.from);
-            if (!overlaps) {
-                allDecos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
-                decorated.push({ from: refStart, to: refEnd });
-            }
-            searchFrom = idx + clauseText.length;
+        const overlaps = decorated.some(p => refStart < p.to && refEnd > p.from);
+        if (!overlaps) {
+            allDecos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
+            decorated.push({ from: refStart, to: refEnd });
         }
     }
 }
@@ -157,26 +147,19 @@ export function createTravertureEditorPlugin(plugin: any) {
                     );
                     if (!parsed) return;
 
-                    const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+                    const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
                     if (clauses.length === 0) return;
 
                     for (const clause of clauses) {
-                        const [clauseText, _ranges] = clause;
-                        let searchFrom = 0;
-                        while (true) {
-                            const idx = lineText.indexOf(clauseText, searchFrom);
-                            if (idx === -1) break;
-                            
-                            const refStart = lineFrom + idx;
-                            const refEnd = refStart + clauseText.length;
+                        const [_clauseText, startPos, endPos, _ranges] = clause;
+                        const refStart = lineFrom + startPos;
+                        const refEnd = lineFrom + endPos;
 
-                            if (pos >= refStart && pos <= refEnd) {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                showModal(plugin, clause, clauses);
-                                return;
-                            }
-                            searchFrom = idx + clauseText.length;
+                        if (pos >= refStart && pos <= refEnd) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            showModal(plugin, clause, clauses);
+                            return;
                         }
                     }
                 }
@@ -185,13 +168,13 @@ export function createTravertureEditorPlugin(plugin: any) {
     );
 }
 
-function showModal(plugin: any, clause: [string, string[][]], clauses: Array<[string, string[][]]>) {
-    const [clauseText, ranges] = clause;
+function showModal(plugin: any, clause: [string, number, number, string[][]], clauses: Array<[string, number, number, string[][]]>) {
+    const [clauseText, _startPos, _endPos, ranges] = clause;
     const range = ranges[0];
     const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
 
     let displayText = clauseText;
-    if (/^\d/.test(clauseText)) {
+    if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText)) {
         const idx = clauses.indexOf(clause);
         for (let i = idx - 1; i >= 0; i--) {
             if (!/^\d/.test(clauses[i][0])) {
