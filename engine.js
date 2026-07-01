@@ -1,15 +1,15 @@
 /* @ts-self-types="./engine.d.ts" */
 
-export class ObsidianEngine {
+export class TravertureEngine {
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
-        ObsidianEngineFinalization.unregister(this);
+        TravertureEngineFinalization.unregister(this);
         return ptr;
     }
     free() {
         const ptr = this.__destroy_into_raw();
-        wasm.__wbg_obsidianengine_free(ptr, 0);
+        wasm.__wbg_travertureengine_free(ptr, 0);
     }
     /**
      * @param {string} encoded_json
@@ -21,7 +21,7 @@ export class ObsidianEngine {
         try {
             const ptr0 = passStringToWasm0(encoded_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len0 = WASM_VECTOR_LEN;
-            const ret = wasm.obsidianengine_decode_scriptures(this.__wbg_ptr, ptr0, len0);
+            const ret = wasm.travertureengine_decode_scriptures(this.__wbg_ptr, ptr0, len0);
             deferred2_0 = ret[0];
             deferred2_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -37,7 +37,7 @@ export class ObsidianEngine {
         let deferred1_0;
         let deferred1_1;
         try {
-            const ret = wasm.obsidianengine_get_available_languages();
+            const ret = wasm.travertureengine_get_available_languages();
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -63,7 +63,7 @@ export class ObsidianEngine {
             const len0 = WASM_VECTOR_LEN;
             const ptr1 = passStringToWasm0(format, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len1 = WASM_VECTOR_LEN;
-            const ret = wasm.obsidianengine_get_book_name(book_number, ptr0, len0, ptr1, len1, capitalize);
+            const ret = wasm.travertureengine_get_book_name(book_number, ptr0, len0, ptr1, len1, capitalize);
             deferred3_0 = ret[0];
             deferred3_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -82,7 +82,7 @@ export class ObsidianEngine {
         try {
             const ptr0 = passStringToWasm0(lang_code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len0 = WASM_VECTOR_LEN;
-            const ret = wasm.obsidianengine_get_lang_suffix(ptr0, len0);
+            const ret = wasm.travertureengine_get_lang_suffix(ptr0, len0);
             deferred2_0 = ret[0];
             deferred2_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -101,7 +101,7 @@ export class ObsidianEngine {
         try {
             const ptr0 = passStringToWasm0(lang_code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len0 = WASM_VECTOR_LEN;
-            const ret = wasm.obsidianengine_get_lang_symbol(ptr0, len0);
+            const ret = wasm.travertureengine_get_lang_symbol(ptr0, len0);
             deferred2_0 = ret[0];
             deferred2_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -116,7 +116,7 @@ export class ObsidianEngine {
         let deferred1_0;
         let deferred1_1;
         try {
-            const ret = wasm.obsidianengine_get_version();
+            const ret = wasm.travertureengine_get_version();
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -137,12 +137,12 @@ export class ObsidianEngine {
         const len1 = WASM_VECTOR_LEN;
         const ptr2 = passStringToWasm0(name_format, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len2 = WASM_VECTOR_LEN;
-        const ret = wasm.obsidianengine_new(ptr0, len0, ptr1, len1, ptr2, len2, capitalize);
+        const ret = wasm.travertureengine_new(ptr0, len0, ptr1, len1, ptr2, len2, capitalize);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
         this.__wbg_ptr = ret[0];
-        ObsidianEngineFinalization.register(this, this.__wbg_ptr, this);
+        TravertureEngineFinalization.register(this, this.__wbg_ptr, this);
         return this;
     }
     /**
@@ -165,7 +165,7 @@ export class ObsidianEngine {
             const len2 = WASM_VECTOR_LEN;
             const ptr3 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len3 = WASM_VECTOR_LEN;
-            const ret = wasm.obsidianengine_parse(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, capitalize, ptr3, len3);
+            const ret = wasm.travertureengine_parse(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, capitalize, ptr3, len3);
             deferred5_0 = ret[0];
             deferred5_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -183,7 +183,7 @@ export class ObsidianEngine {
         try {
             const ptr0 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len0 = WASM_VECTOR_LEN;
-            const ret = wasm.obsidianengine_parse_with_markers(this.__wbg_ptr, ptr0, len0);
+            const ret = wasm.travertureengine_parse_with_markers(this.__wbg_ptr, ptr0, len0);
             deferred2_0 = ret[0];
             deferred2_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -192,11 +192,11 @@ export class ObsidianEngine {
         }
     }
 }
-if (Symbol.dispose) ObsidianEngine.prototype[Symbol.dispose] = ObsidianEngine.prototype.free;
+if (Symbol.dispose) TravertureEngine.prototype[Symbol.dispose] = TravertureEngine.prototype.free;
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
-        __wbg___wbindgen_throw_ea4887a5f8f9a9db: function(arg0, arg1) {
+        __wbg___wbindgen_throw_344f42d3211c4765: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
@@ -220,9 +220,9 @@ function __wbg_get_imports() {
     };
 }
 
-const ObsidianEngineFinalization = (typeof FinalizationRegistry === 'undefined')
+const TravertureEngineFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_obsidianengine_free(ptr, 1));
+    : new FinalizationRegistry(ptr => wasm.__wbg_travertureengine_free(ptr, 1));
 
 function getStringFromWasm0(ptr, len) {
     return decodeText(ptr >>> 0, len);
