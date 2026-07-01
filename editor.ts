@@ -30,7 +30,7 @@ function buildDecorations(view: any, plugin: any) {
 
             const innerText = match[1];
             const cleanMatch = match[0].replace(/\*\*/g, '').replace(/\*/g, '');
-            const engineInput = cleanMatch.replace('{{', '⟪').replace('}}', '⟫');
+            const engineInput = cleanMatch.replace('{{', '⟪⟪').replace('}}', '⟫⟫');
             const parsed = plugin.engine?.parse(
                 plugin.settings.sourceLanguage,
                 plugin.settings.outputLanguage,
@@ -152,6 +152,7 @@ export function createTravertureEditorPlugin(plugin: any) {
 
                     for (const clause of clauses) {
                         const [_clauseText, startPos, endPos, _ranges] = clause;
+
                         const refStart = lineFrom + startPos;
                         const refEnd = lineFrom + endPos;
 
