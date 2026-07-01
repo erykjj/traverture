@@ -80,9 +80,9 @@ export class TravertureSidebarView extends ItemView {
     }
 
     private getDisplayRef(ref: SidebarRef, format: 'full' | 'standard' | 'official'): string {
-        const bookName = wasmModule.ObsidianEngine.get_book_name(ref.bookNum, this.outputLang, format, this.capitalize);
+        const bookName = wasmModule.TravertureEngine.get_book_name(ref.bookNum, this.outputLang, format, this.capitalize);
         if (!bookName) return ref.fullRef;
-        const engBookName = wasmModule.ObsidianEngine.get_book_name(ref.bookNum, 'en', 'full', false);
+        const engBookName = wasmModule.TravertureEngine.get_book_name(ref.bookNum, 'en', 'full', false);
         if (engBookName && ref.fullRef.startsWith(engBookName)) {
             const rest = ref.fullRef.substring(engBookName.length); // " 3" or " 1:3"
             return `${bookName}${rest}`;
