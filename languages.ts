@@ -7,7 +7,7 @@ let cachedLanguages: LanguageInfo[] | null = null;
 export function getAvailableLanguages(): LanguageInfo[] {
     if (!cachedLanguages) {
         try {
-            const json = wasmModule.ObsidianEngine.get_available_languages();
+            const json = wasmModule.TravertureEngine.get_available_languages();
             cachedLanguages = JSON.parse(json);
         } catch (e) {
             console.error('tra.VER:ture: Failed to get languages from WASM:', e);
@@ -19,7 +19,7 @@ export function getAvailableLanguages(): LanguageInfo[] {
 
 export function getLangSuffix(langCode: string): string {
     try {
-        return wasmModule.ObsidianEngine.get_lang_suffix(langCode);
+        return wasmModule.TravertureEngine.get_lang_suffix(langCode);
     } catch {
         return 'en/library/bible/study-bible/books/';
     }
