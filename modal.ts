@@ -13,7 +13,7 @@ export class VerseModal {
 
         const languages = getAvailableLanguages();
         const langObj = languages.find(l => l.code === outputLang);
-        const langSymbol = langObj ? wasmModule.ObsidianEngine.get_lang_symbol(outputLang) : 'E';
+        const langSymbol = langObj ? wasmModule.TravertureEngine.get_lang_symbol(outputLang) : 'E';
         this.currentTitle = titleOverride || verseData.citation;
 
         const modal = activeDocument.createElement('div');
@@ -192,7 +192,7 @@ export class VerseModal {
                 note.className = 'traverture-modal-commentary-note';
 
                 const bookNum = parseInt(c.source.substring(0, 2));
-                const bookName = wasmModule.ObsidianEngine.get_book_name(bookNum, outputLang, 'full', false);
+                const bookName = wasmModule.TravertureEngine.get_book_name(bookNum, outputLang, 'full', false);
                 const ch = parseInt(c.source.substring(2, 5));
                 const vs = parseInt(c.source.substring(5, 8));
                 const citation = activeDocument.createElement('div');
@@ -222,7 +222,7 @@ export class VerseModal {
             note.className = 'traverture-modal-commentary-note';
 
             const bookNum = parseInt(c.source.substring(0, 2));
-            const bookName = wasmModule.ObsidianEngine.get_book_name(bookNum, outputLang, 'full', false);
+            const bookName = wasmModule.TravertureEngine.get_book_name(bookNum, outputLang, 'full', false);
             const ch = parseInt(c.source.substring(2, 5));
             const vs = parseInt(c.source.substring(5, 8));
             const citation = activeDocument.createElement('div');
