@@ -19,7 +19,7 @@ export default class TraverturePlugin extends Plugin {
 
     createEngine() {
         try {
-            this.engine = new wasmModule.ObsidianEngine(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false);
+            this.engine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false);
         } catch (e) { console.error('tra.VER:ture: Failed to create engine:', e); }
     }
 
@@ -27,14 +27,14 @@ export default class TraverturePlugin extends Plugin {
         const results: SidebarRef[] = [];
         if (!this.engine) return results;
 
-        const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
+        const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪⟪$1⟫⟫');
         const marked = this.engine.parse_with_markers(engineText);
         const markerRegex = /⟪(.+?)⟫/g;
         let match;
 
-        const engFull = new wasmModule.ObsidianEngine('en', 'en', 'full', false);
-        const engStd = new wasmModule.ObsidianEngine('en', 'en', 'standard', false);
-        const engOff = new wasmModule.ObsidianEngine('en', 'en', 'official', false);
+        const engFull = new wasmModule.TravertureEngine('en', 'en', 'full', false);
+        const engStd = new wasmModule.TravertureEngine('en', 'en', 'standard', false);
+        const engOff = new wasmModule.TravertureEngine('en', 'en', 'official', false);
 
         while ((match = markerRegex.exec(marked)) !== null) {
             const originalRef = match[1];
@@ -86,7 +86,7 @@ export default class TraverturePlugin extends Plugin {
                 if (!this.engine) return _fullMatch;
                 
                 const refText = inner.replace(/\*\*/g, '').replace(/\*/g, '');
-                const engineInput = '⟪' + refText + '⟫';
+                const engineInput = '⟪⟪' + refText + '⟫⟫';
                 const parsed = this.engine.parse(
                     this.settings.sourceLanguage,
                     this.settings.outputLanguage,
@@ -223,21 +223,19 @@ export default class TraverturePlugin extends Plugin {
         }
         
         if (positions.length === 0) return text;
-        
         positions.sort((a, b) => a.start - b.start);
         
         let result = '';
         let pos = 0;
-        
+
         for (const p of positions) {
-            if (p.start < pos) continue; // Skip overlapping positions
+            if (p.start < pos) continue;
             result += text.substring(pos, p.start);
             const link = `<a class="traverture-ref-link" data-bcv="${p.bcv}" data-ref="${p.displayText}">${text.substring(p.start, p.end)}</a>`;
             result += link;
             pos = p.end;
         }
         result += text.substring(pos);
-        
         return result;
     }
 
@@ -461,7 +459,7 @@ export default class TraverturePlugin extends Plugin {
         if (!parsed) return;
         const data = JSON.parse(parsed); let processed = text;
         for (const [ref, bcvRanges] of Object.entries(data)) {
-            const fmtEngine = new wasmModule.ObsidianEngine('en', 'en', format, false);
+            const fmtEngine = new wasmModule.TravertureEngine('en', 'en', format, false);
             processed = processed.replace(ref, JSON.parse(fmtEngine.decode_scriptures(JSON.stringify(bcvRanges))).join('; '));
         }
         if (wholeDoc) { editor.setValue(processed); }
