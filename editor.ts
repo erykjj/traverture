@@ -131,6 +131,7 @@ export function createTravertureEditorPlugin(plugin: any) {
             decorations: (v: any) => v.decorations,
             eventHandlers: {
                 mousedown: (e: MouseEvent, view: any) => {
+                    if (e.button !== 0) return;
                     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
                     if (pos === null) return;
 
