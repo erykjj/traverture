@@ -194,6 +194,7 @@ export default class TraverturePlugin extends Plugin {
         // Re-attach click handlers
         el.querySelectorAll('.traverture-ref-link').forEach(link => {
             link.addEventListener('click', (e) => { void (async () => {
+                if ((e as MouseEvent).button !== 0) return;
                 e.preventDefault(); e.stopPropagation();
                 const bcv = link.getAttribute('data-bcv')!;
                 const refText = link.getAttribute('data-ref') || link.textContent || '';
@@ -321,7 +322,6 @@ export default class TraverturePlugin extends Plugin {
                                 await this.insertCitation(editor, selection, true);
                             }));
                         });
-                    submenu.addItem((subItem: any) => subItem.setTitle('Tag selection').setIcon('hash').onClick(() => { this.tagReferences(editor, selection); }));
                     submenu.addItem((subItem: any) => {
                         subItem.setTitle('Reformat selection').setIcon('pencil');
                         const reformatMenu = subItem.setSubmenu();
@@ -333,7 +333,6 @@ export default class TraverturePlugin extends Plugin {
                 }
 
                 submenu.addItem((subItem: any) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(editor.getValue())); }));
-                submenu.addItem((subItem: any) => subItem.setTitle('Tag document').setIcon('hash').onClick(() => { this.tagReferences(editor, editor.getValue(), true); }));
                 submenu.addItem((subItem: any) => {
                     subItem.setTitle('Reformat document').setIcon('pencil');
                     const reformatMenu = subItem.setSubmenu();
@@ -395,9 +394,6 @@ export default class TraverturePlugin extends Plugin {
                         if (editor && sel) await this.insertCitation(editor, sel, true);
                     }));
                 });
-                menu.addItem((item: any) => item.setTitle('Tag selection').setIcon('hash').onClick(() => {
-                    this.tagReferences(editor!, sel);
-                }));
                 menu.addItem((item: any) => {
                     item.setTitle('Reformat selection').setIcon('pencil');
                     const submenu = item.setSubmenu();
@@ -411,10 +407,6 @@ export default class TraverturePlugin extends Plugin {
             menu.addItem((item: any) => item.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
                 if (!file) { new Notice('No file open.'); return; }
                 await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
-            }));
-
-            menu.addItem((item: any) => item.setTitle('Tag document').setIcon('hash').onClick(() => {
-                if (editor) this.tagReferences(editor, editor.getValue(), true);
             }));
 
             menu.addItem((item: any) => {
@@ -449,11 +441,20 @@ export default class TraverturePlugin extends Plugin {
     reformatReferences(editor: any, text: string, format: string, wholeDoc: boolean = false) {
         const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.outputLanguage, format, false, text);
         if (!parsed) return;
-        const data = JSON.parse(parsed); let processed = text;
-        for (const [ref, bcvRanges] of Object.entries(data)) {
+
+        const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+        if (clauses.length === 0) return;
+
+        let processed = text;
+        const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+
+        for (const [clauseText, _startPos, _endPos, _ranges] of sorted) {
             const fmtEngine = new wasmModule.TravertureEngine('en', 'en', format, false);
-            processed = processed.replace(ref, JSON.parse(fmtEngine.decode_scriptures(JSON.stringify(bcvRanges))).join('; '));
+            const ranges = _ranges.map(r => [r[0], r[1]]);
+            const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify(ranges)));
+            processed = processed.replace(clauseText, decoded.join('; '));
         }
+
         if (wholeDoc) { editor.setValue(processed); }
         else { editor.replaceSelection(processed); }
     }
