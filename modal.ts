@@ -7,9 +7,12 @@ import { VerseData } from './types';
 export class VerseModal {
     private modalEl: HTMLElement | null = null;
     private currentTitle: string = '';
+    private hidden: boolean = false;
 
     show(verseData: VerseData, bcv: string, outputLang: string, titleOverride?: string) {
+        if (this.hidden) return;
         this.hide();
+        this.hidden = false;
 
         const languages = getAvailableLanguages();
         const langObj = languages.find(l => l.code === outputLang);
@@ -255,6 +258,11 @@ export class VerseModal {
     }
 
     hide() {
+        this.hidden = true;
         if (this.modalEl) { this.modalEl.remove(); this.modalEl = null; }
+    }
+
+    isVisible(): boolean {
+        return this.modalEl !== null && this.modalEl.parentNode !== null;
     }
 }
