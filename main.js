@@ -838,7 +838,10 @@ function createTravertureEditorPlugin(plugin) {
         this.decorations = buildDecorations(view, plugin);
       }
       update(update) {
-        if (update.docChanged || update.selectionSet || update.viewportChanged) {
+        if (update.selectionSet) {
+          this.decorations = buildDecorations(update.view, plugin);
+        }
+        if (update.docChanged) {
           this.decorations = buildDecorations(update.view, plugin);
         }
       }
@@ -1452,31 +1455,6 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     result += text.substring(pos);
     return result;
   }
-  // tagReferences(editor: any, text: string, isWholeDoc: boolean = false) {
-  //     if (!text.trim()) { new Notice('No text to tag.'); return; }
-  //     const parsed = this.engine?.parse(
-  //         this.settings.sourceLanguage,
-  //         this.settings.sourceLanguage,
-  //         'full',
-  //         false,
-  //         text
-  //     );
-  //     if (!parsed) { new Notice('No scripture references found.'); return; }
-  //     const data = JSON.parse(parsed);
-  //     if (Object.keys(data).length === 0) { new Notice('No scripture references found.'); return; }
-  //     const refs = Object.keys(data).sort((a, b) => b.length - a.length);
-  //     let result = text;
-  //     for (const ref of refs) {
-  //         const escapedRef = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  //         const regex = new RegExp(`(?<!\\{\\{)${escapedRef}(?!\\}\\})`, 'g');
-  //         result = result.replace(regex, `{{${ref}}}`);
-  //     }
-  //     if (isWholeDoc) {
-  //         editor.setValue(result);
-  //     } else {
-  //         editor.replaceSelection(result);
-  //     }
-  // }
   async onload() {
     await this.loadSettings();
     try {
