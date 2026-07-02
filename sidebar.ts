@@ -253,6 +253,7 @@ export class TravertureSidebarView extends ItemView {
                     link.setAttribute('data-bcv', bcv);
                     link.setAttribute('data-ref', displayVal);
                     link.addEventListener('click', (e) => { void (async () => {
+                        if (e.button !== 0) return;
                         e.preventDefault(); e.stopPropagation();
                         const modal = new VerseModal();
                         modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
