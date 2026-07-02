@@ -175,13 +175,26 @@ function showModal(plugin: any, clause: [string, number, number, string[][]], cl
     const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
 
     let displayText = clauseText;
-    if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText)) {
+    if (/^\d/.test(clauseText) && !clauseText.includes(':')) {
         const idx = clauses.indexOf(clause);
+        for (let i = idx - 1; i >= 0; i--) {
+            const prevText = clauses[i][0];
+            const chapMatch = prevText.match(/(\d+):/);
+            if (chapMatch) {
+                displayText = `${chapMatch[1]}:${clauseText}`;
+                break;
+            }
+        }
+    }
+
+    if (/^\d/.test(displayText) && !/^\d+\s*[a-zA-Z]/.test(displayText)) {
+        const idx = clauses.indexOf(clause);
+
         for (let i = idx - 1; i >= 0; i--) {
             if (!/^\d/.test(clauses[i][0])) {
                 const bookMatch = clauses[i][0].match(/^(.+?)\s+\d/);
                 if (bookMatch) {
-                    displayText = `${bookMatch[1]} ${clauseText}`;
+                    displayText = `${bookMatch[1]} ${displayText}`;
                     break;
                 }
             }
