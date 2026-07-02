@@ -45,6 +45,21 @@ export class TravertureSettingTab extends PluginSettingTab {
             });
 
         new Setting(containerEl)
+            .setName('Modal title format')
+            .setDesc('How scripture references are displayed in the modal title')
+            .addDropdown(dropdown => {
+                dropdown.addOption('full', 'Full (1 Corinthians)');
+                dropdown.addOption('standard', 'Standard (1 Cor.)');
+                dropdown.addOption('official', 'Official (1Co)');
+                dropdown
+                    .setValue(this.plugin.settings.titleFormat)
+                    .onChange(async (value) => {
+                        this.plugin.settings.titleFormat = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
             .setName('Auto-detect references')
             .setDesc('Automatically detect scripture references in View mode without {{ }} markers.')
             .addToggle(toggle => toggle
