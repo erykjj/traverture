@@ -5,6 +5,7 @@ import wasmBinary from './engine_bg.wasm';
 import * as wasmModule from './engine.js';
 import { fetchVerseWithExtras } from './cache';
 import { createTravertureEditorPlugin } from './editor';
+import { getAvailableLanguages } from './languages';
 import { VerseModal } from './modal';
 import { TravertureSettingTab } from './settings';
 import { TravertureSidebarView } from './sidebar';
@@ -279,16 +280,12 @@ export default class TraverturePlugin extends Plugin {
 
                 if (selection) {
                     submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(selection)); }));
-                        submenu.addItem((subItem: any) => {
-                            subItem.setTitle('Insert citation').setIcon('quote-glyph');
-                            const citeMenu = subItem.setSubmenu();
-                            citeMenu.addItem((citeItem: any) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
-                                await this.insertCitation(editor, selection, false);
-                            }));
-                            citeMenu.addItem((citeItem: any) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
-                                await this.insertCitation(editor, selection, true);
-                            }));
-                        });
+                    submenu.addItem((subItem: any) => {
+                        subItem.setTitle('Insert citation').setIcon('quote-glyph');
+                        const citeMenu = subItem.setSubmenu();
+                        citeMenu.addItem((citeItem: any) => citeItem.setTitle('Reference: "verse"').onClick(async () => { await this.insertCitation(editor, selection, false); }));
+                        citeMenu.addItem((citeItem: any) => citeItem.setTitle('"verse" (Reference)').onClick(async () => { await this.insertCitation(editor, selection, true); }));
+                    });
                     submenu.addItem((subItem: any) => {
                         subItem.setTitle('Reformat selection').setIcon('pencil');
                         const reformatMenu = subItem.setSubmenu();
@@ -306,6 +303,44 @@ export default class TraverturePlugin extends Plugin {
                     reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'full', true)));
                     reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'standard', true)));
                     reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'official', true)));
+                });
+
+                submenu.addSeparator();
+
+                // Source language
+                submenu.addItem((subItem: any) => {
+                    subItem.setTitle('Source language').setIcon('book-open');
+                    const langMenu = subItem.setSubmenu();
+                    const languages = getAvailableLanguages();
+                    for (const lang of languages) {
+                        langMenu.addItem((langItem: any) => langItem
+                            .setTitle(`${lang.vernacularName} (${lang.code})`)
+                            .setChecked(lang.code === this.settings.sourceLanguage)
+                            .onClick(async () => {
+                                this.settings.sourceLanguage = lang.code;
+                                await this.saveSettings();
+                                this.createEngine();
+                                new Notice(`Source language: ${lang.vernacularName}`);
+                            }));
+                    }
+                });
+
+                // Output language
+                submenu.addItem((subItem: any) => {
+                    subItem.setTitle('Output language').setIcon('languages');
+                    const langMenu = subItem.setSubmenu();
+                    const languages = getAvailableLanguages();
+                    for (const lang of languages) {
+                        langMenu.addItem((langItem: any) => langItem
+                            .setTitle(`${lang.vernacularName} (${lang.code})`)
+                            .setChecked(lang.code === this.settings.outputLanguage)
+                            .onClick(async () => {
+                                this.settings.outputLanguage = lang.code;
+                                await this.saveSettings();
+                                this.createEngine();
+                                new Notice(`Output language: ${lang.vernacularName}`);
+                            }));
+                    }
                 });
             });
         }));
@@ -388,6 +423,44 @@ export default class TraverturePlugin extends Plugin {
                 submenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => {
                     if (editor) this.reformatReferences(editor, editor.getValue(), 'official', true);
                 }));
+            });
+
+            menu.addSeparator();
+
+            // Source language
+            menu.addItem((item: any) => {
+                item.setTitle('Source language').setIcon('book-open');
+                const langMenu = item.setSubmenu();
+                const languages = getAvailableLanguages();
+                for (const lang of languages) {
+                    langMenu.addItem((langItem: any) => langItem
+                        .setTitle(`${lang.vernacularName} (${lang.code})`)
+                        .setChecked(lang.code === this.settings.sourceLanguage)
+                        .onClick(async () => {
+                            this.settings.sourceLanguage = lang.code;
+                            await this.saveSettings();
+                            this.createEngine();
+                            new Notice(`Source language: ${lang.vernacularName}`);
+                        }));
+                }
+            });
+
+            // Output language
+            menu.addItem((item: any) => {
+                item.setTitle('Output language').setIcon('languages');
+                const langMenu = item.setSubmenu();
+                const languages = getAvailableLanguages();
+                for (const lang of languages) {
+                    langMenu.addItem((langItem: any) => langItem
+                        .setTitle(`${lang.vernacularName} (${lang.code})`)
+                        .setChecked(lang.code === this.settings.outputLanguage)
+                        .onClick(async () => {
+                            this.settings.outputLanguage = lang.code;
+                            await this.saveSettings();
+                            this.createEngine();
+                            new Notice(`Output language: ${lang.vernacularName}`);
+                        }));
+                }
             });
 
             menu.showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
