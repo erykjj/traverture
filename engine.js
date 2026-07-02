@@ -30,7 +30,7 @@ export class TravertureEngine {
         }
     }
     /**
-     * Returns a JSON array of {code, vernacularName, englishName} for all available scripture languages
+     * Returns a sorted JSON array of {code, vernacularName, englishName} for all available scripture languages
      * @returns {string}
      */
     static get_available_languages() {
@@ -69,25 +69,6 @@ export class TravertureEngine {
             return getStringFromWasm0(ret[0], ret[1]);
         } finally {
             wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
-        }
-    }
-    /**
-     * Returns the suffix for a given language code
-     * @param {string} lang_code
-     * @returns {string}
-     */
-    static get_lang_suffix(lang_code) {
-        let deferred2_0;
-        let deferred2_1;
-        try {
-            const ptr0 = passStringToWasm0(lang_code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-            const len0 = WASM_VECTOR_LEN;
-            const ret = wasm.travertureengine_get_lang_suffix(ptr0, len0);
-            deferred2_0 = ret[0];
-            deferred2_1 = ret[1];
-            return getStringFromWasm0(ret[0], ret[1]);
-        } finally {
-            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
         }
     }
     /**
