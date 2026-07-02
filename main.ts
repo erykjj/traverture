@@ -28,50 +28,58 @@ export default class TraverturePlugin extends Plugin {
         if (!this.engine) return results;
 
         const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪⟪$1⟫⟫');
-        const marked = this.engine.parse_with_markers(engineText);
-        const markerRegex = /⟪(.+?)⟫/g;
-        let match;
+        const parsed = this.engine.parse(
+            this.settings.sourceLanguage,
+            this.settings.outputLanguage,
+            'full',
+            false,
+            engineText
+        );
+        if (!parsed) return results;
+
+        const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+        if (clauses.length === 0) return results;
+
+        let currentOriginal = '';
+        let lastBookNum = -1;
 
         const engFull = new wasmModule.TravertureEngine('en', 'en', 'full', false);
         const engStd = new wasmModule.TravertureEngine('en', 'en', 'standard', false);
         const engOff = new wasmModule.TravertureEngine('en', 'en', 'official', false);
 
-        while ((match = markerRegex.exec(marked)) !== null) {
-            const originalRef = match[1];
-            const parsed = this.engine.parse(
-                this.settings.sourceLanguage,
-                this.settings.outputLanguage,
-                'full',
-                false,
-                `⟪${originalRef}⟫`
-            );
-            if (!parsed) continue;
+        for (const [_clauseText, _startPos, _endPos, ranges] of clauses) {
+            if (ranges.length === 0) continue;
+            const bookNum = parseInt(ranges[0][0].substring(0, 2));
 
-            const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
-            if (clauses.length === 0) continue;
+            if (bookNum !== lastBookNum) {
+                currentOriginal = _clauseText;
+                lastBookNum = bookNum;
+            } else if (currentOriginal && /^\d/.test(_clauseText)) {
+                currentOriginal += `; ${_clauseText}`;
+            } else {
+                currentOriginal = _clauseText;
+            }
 
-            for (const [_clauseText, _startPos, _endPos, ranges] of clauses) {
-                for (const range of ranges) {
-                    const singleRange = [[range[0], range[1]]];
-                    const rangeJson = JSON.stringify(singleRange);
-                    const fullDecoded = JSON.parse(engFull.decode_scriptures(rangeJson));
-                    const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
-                    const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
-                    const startBcv = range[0], endBcv = range[1];
+            for (const range of ranges) {
+                const singleRange = [[range[0], range[1]]];
+                const rangeJson = JSON.stringify(singleRange);
+                const fullDecoded = JSON.parse(engFull.decode_scriptures(rangeJson));
+                const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
+                const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
+                const startBcv = range[0], endBcv = range[1];
 
-                    results.push({
-                        scripture: originalRef,
-                        fullRef: fullDecoded[0] || originalRef,
-                        standardRef: stdDecoded[0] || '',
-                        officialRef: offDecoded[0] || '',
-                        startBcv, endBcv,
-                        startCh: parseInt(startBcv.substring(2, 5)),
-                        endCh: parseInt(endBcv.substring(2, 5)),
-                        startVerse: parseInt(startBcv.substring(5, 8)),
-                        endVerse: parseInt(endBcv.substring(5, 8)),
-                        bookNum: parseInt(startBcv.substring(0, 2)),
-                    });
-                }
+                results.push({
+                    scripture: currentOriginal,
+                    fullRef: fullDecoded[0] || currentOriginal,
+                    standardRef: stdDecoded[0] || '',
+                    officialRef: offDecoded[0] || '',
+                    startBcv, endBcv,
+                    startCh: parseInt(startBcv.substring(2, 5)),
+                    endCh: parseInt(endBcv.substring(2, 5)),
+                    startVerse: parseInt(startBcv.substring(5, 8)),
+                    endVerse: parseInt(endBcv.substring(5, 8)),
+                    bookNum,
+                });
             }
         }
         return results;
