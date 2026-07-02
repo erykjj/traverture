@@ -199,7 +199,9 @@ export default class TraverturePlugin extends Plugin {
                 if ((e as MouseEvent).button !== 0) return;
                 e.preventDefault(); e.stopPropagation();
                 const bcv = link.getAttribute('data-bcv')!;
-                const refText = link.getAttribute('data-ref') || link.textContent || '';
+                const fmtEngine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.titleFormat, false);
+                const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[bcv, bcv]])));
+                const refText = decoded[0] || link.textContent || '';
                 const modal = new VerseModal();
                 modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
                 const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
