@@ -838,10 +838,7 @@ function createTravertureEditorPlugin(plugin) {
         this.decorations = buildDecorations(view, plugin);
       }
       update(update) {
-        if (update.selectionSet) {
-          this.decorations = buildDecorations(update.view, plugin);
-        }
-        if (update.docChanged) {
+        if (update.docChanged || update.selectionSet || update.viewportChanged) {
           this.decorations = buildDecorations(update.view, plugin);
         }
       }
@@ -1517,6 +1514,33 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
           reformatMenu.addItem((fmtItem) => fmtItem.setTitle("Standard (1 Cor.)").onClick(() => this.reformatReferences(editor, editor.getValue(), "standard", true)));
           reformatMenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => this.reformatReferences(editor, editor.getValue(), "official", true)));
         });
+        submenu.addSeparator();
+        submenu.addItem((subItem) => {
+          subItem.setTitle("Source language").setIcon("book-open");
+          const langMenu = subItem.setSubmenu();
+          const languages = getAvailableLanguages();
+          for (const lang of languages) {
+            langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.sourceLanguage).onClick(async () => {
+              this.settings.sourceLanguage = lang.code;
+              await this.saveSettings();
+              this.createEngine();
+              new import_obsidian5.Notice(`Source language: ${lang.vernacularName}`);
+            }));
+          }
+        });
+        submenu.addItem((subItem) => {
+          subItem.setTitle("Output language").setIcon("languages");
+          const langMenu = subItem.setSubmenu();
+          const languages = getAvailableLanguages();
+          for (const lang of languages) {
+            langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.outputLanguage).onClick(async () => {
+              this.settings.outputLanguage = lang.code;
+              await this.saveSettings();
+              this.createEngine();
+              new import_obsidian5.Notice(`Output language: ${lang.vernacularName}`);
+            }));
+          }
+        });
       });
     }));
     this.registerDomEvent(activeDocument, "contextmenu", (evt) => {
@@ -1590,6 +1614,33 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
         submenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => {
           if (editor) this.reformatReferences(editor, editor.getValue(), "official", true);
         }));
+      });
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle("Source language").setIcon("book-open");
+        const langMenu = item.setSubmenu();
+        const languages = getAvailableLanguages();
+        for (const lang of languages) {
+          langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.sourceLanguage).onClick(async () => {
+            this.settings.sourceLanguage = lang.code;
+            await this.saveSettings();
+            this.createEngine();
+            new import_obsidian5.Notice(`Source language: ${lang.vernacularName}`);
+          }));
+        }
+      });
+      menu.addItem((item) => {
+        item.setTitle("Output language").setIcon("languages");
+        const langMenu = item.setSubmenu();
+        const languages = getAvailableLanguages();
+        for (const lang of languages) {
+          langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.outputLanguage).onClick(async () => {
+            this.settings.outputLanguage = lang.code;
+            await this.saveSettings();
+            this.createEngine();
+            new import_obsidian5.Notice(`Output language: ${lang.vernacularName}`);
+          }));
+        }
       });
       menu.showAtMouseEvent({ clientX: 100, clientY: 100 });
     });
