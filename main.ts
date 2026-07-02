@@ -47,10 +47,10 @@ export default class TraverturePlugin extends Plugin {
             );
             if (!parsed) continue;
 
-            const clauses: Array<[string, string[][]]> = JSON.parse(parsed);
+            const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
             if (clauses.length === 0) continue;
 
-            for (const [_clauseText, ranges] of clauses) {
+            for (const [_clauseText, _startPos, _endPos, ranges] of clauses) {
                 for (const range of ranges) {
                     const singleRange = [[range[0], range[1]]];
                     const rangeJson = JSON.stringify(singleRange);
@@ -293,22 +293,6 @@ export default class TraverturePlugin extends Plugin {
 
         this.registerMarkdownPostProcessor((element, _context) => {
             this.processElement(element);
-        });
-
-        this.registerDomEvent(activeDocument, 'click', (evt: MouseEvent) => {
-            const target = evt.target as HTMLElement;
-            if (target.classList.contains('traverture-ref-link') && target.getAttribute('data-bcv')) {
-                evt.preventDefault(); evt.stopPropagation();
-                const bcv = target.getAttribute('data-bcv')!;
-                const refText = target.getAttribute('data-ref') || target.textContent || '';
-                const modal = new VerseModal();
-                // @ts-ignore
-                modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-                void fetchVerseWithExtras(bcv, this.settings.outputLanguage).then(verseData => {
-                    // @ts-ignore
-                    modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-                });
-            }
         });
 
         this.registerEvent(this.app.workspace.on('editor-menu', (menu, editor, _view) => {
