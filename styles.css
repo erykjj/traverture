@@ -513,6 +513,24 @@
   user-select: text;
 }
 
+.traverture-version-info {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: normal;
+}
+.traverture-settings-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.traverture-settings-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
 @container (max-width: 600px) {
   .traverture-sidebar-top-row { flex-wrap: wrap; }
   .traverture-sidebar-spacer { display: none; }
