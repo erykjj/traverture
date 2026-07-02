@@ -26,19 +26,13 @@ export default class TraverturePlugin extends Plugin {
     private parseGuard = false;
 
     safeParse(text: string): string | null {
-        if (this.parseGuard) return null;
-        this.parseGuard = true;
-        try {
-            return this.engine.parse(
-                this.settings.sourceLanguage,
-                this.settings.outputLanguage,
-                'full',
-                false,
-                text
-            );
-        } finally {
-            this.parseGuard = false;
-        }
+        return this.engine.parse(
+            this.settings.sourceLanguage,
+            this.settings.outputLanguage,
+            'full',
+            false,
+            text
+        );
     }
 
     async parseReferences(text: string): Promise<SidebarRef[]> {
@@ -443,20 +437,33 @@ export default class TraverturePlugin extends Plugin {
     }
 
     reformatReferences(editor: any, text: string, format: string, wholeDoc: boolean = false) {
-        const parsed = this.safeParse(text);
+        const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false, text);
         if (!parsed) return;
 
         const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
         if (clauses.length === 0) return;
 
         let processed = text;
-        const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+        const replaced = new Set<string>();
 
-        for (const [clauseText, _startPos, _endPos, _ranges] of sorted) {
-            const fmtEngine = new wasmModule.TravertureEngine('en', 'en', format, false);
-            const ranges = _ranges.map(r => [r[0], r[1]]);
-            const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify(ranges)));
-            processed = processed.replace(clauseText, decoded.join('; '));
+        for (const [clauseText, _startPos, _endPos, ranges] of clauses) {
+            if (ranges.length === 0) continue;
+            if (/^\d/.test(clauseText)) continue;
+
+            const bookMatch = clauseText.match(/^(.+?)\s+\d/);
+            if (!bookMatch) continue;
+            const bookName = bookMatch[1];
+
+            if (replaced.has(bookName)) continue;
+            replaced.add(bookName);
+
+            const bookNum = parseInt(ranges[0][0].substring(0, 2));
+            const newBookName = wasmModule.TravertureEngine.get_book_name(bookNum, this.settings.sourceLanguage, format, false);
+
+            if (newBookName && newBookName !== bookName) {
+                const escaped = bookName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                processed = processed.replace(new RegExp(escaped, 'g'), newBookName);
+            }
         }
 
         if (wholeDoc) { editor.setValue(processed); }
