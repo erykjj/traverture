@@ -1,6 +1,8 @@
 import { PluginSettingTab, Setting } from 'obsidian';
 import { getAvailableLanguages } from './languages';
 import TraverturePlugin from './main';
+// @ts-ignore
+import * as wasmModule from './engine.js';
 
 export class TravertureSettingTab extends PluginSettingTab {
     plugin: TraverturePlugin;
@@ -13,7 +15,15 @@ export class TravertureSettingTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
-        new Setting(containerEl).setName('tra.VER:ture').setHeading();
+
+        const headerEl = containerEl.createDiv({ cls: 'traverture-settings-header' });
+        headerEl.createSpan({ text: 'tra.VER:ture', cls: 'traverture-settings-title' });
+        const engineVersion = wasmModule.TravertureEngine.get_version();
+        headerEl.createSpan({ 
+            text: `v${this.plugin.manifest.version} – ${engineVersion}`,
+            cls: 'traverture-version-info'
+        });
+
         const languages = getAvailableLanguages();
 
         new Setting(containerEl)
