@@ -23,18 +23,30 @@ export default class TraverturePlugin extends Plugin {
         } catch (e) { console.error('tra.VER:ture: Failed to create engine:', e); }
     }
 
+    private parseGuard = false;
+
+    safeParse(text: string): string | null {
+        if (this.parseGuard) return null;
+        this.parseGuard = true;
+        try {
+            return this.engine.parse(
+                this.settings.sourceLanguage,
+                this.settings.outputLanguage,
+                'full',
+                false,
+                text
+            );
+        } finally {
+            this.parseGuard = false;
+        }
+    }
+
     async parseReferences(text: string): Promise<SidebarRef[]> {
         const results: SidebarRef[] = [];
         if (!this.engine) return results;
 
         const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪⟪$1⟫⟫');
-        const parsed = this.engine.parse(
-            this.settings.sourceLanguage,
-            this.settings.outputLanguage,
-            'full',
-            false,
-            engineText
-        );
+        const parsed = this.safeParse(engineText);
         if (!parsed) return results;
 
         const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
@@ -95,13 +107,8 @@ export default class TraverturePlugin extends Plugin {
                 
                 const refText = inner.replace(/\*\*/g, '').replace(/\*/g, '');
                 const engineInput = '⟪⟪' + refText + '⟫⟫';
-                const parsed = this.engine.parse(
-                    this.settings.sourceLanguage,
-                    this.settings.outputLanguage,
-                    'full',
-                    false,
-                    engineInput
-                );
+                const parsed = this.safeParse(engineInput);
+                if (!parsed) return inner;
                 const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
                 if (clauses.length === 0) return inner;
 
@@ -162,13 +169,8 @@ export default class TraverturePlugin extends Plugin {
 
             for (const textNode of textNodes) {
                 const text = textNode.nodeValue || '';
-                const parsed = this.engine.parse(
-                    this.settings.sourceLanguage,
-                    this.settings.outputLanguage,
-                    'full',
-                    false,
-                    text
-                );
+                const parsed = this.safeParse(text);
+                if (!parsed) continue;
                 const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
                 if (clauses.length === 0) continue;
 
@@ -248,36 +250,36 @@ export default class TraverturePlugin extends Plugin {
         return result;
     }
 
-    tagReferences(editor: any, text: string, isWholeDoc: boolean = false) {
-        if (!text.trim()) { new Notice('No text to tag.'); return; }
+    // tagReferences(editor: any, text: string, isWholeDoc: boolean = false) {
+    //     if (!text.trim()) { new Notice('No text to tag.'); return; }
 
-        const parsed = this.engine?.parse(
-            this.settings.sourceLanguage,
-            this.settings.sourceLanguage,
-            'full',
-            false,
-            text
-        );
-        if (!parsed) { new Notice('No scripture references found.'); return; }
+    //     const parsed = this.engine?.parse(
+    //         this.settings.sourceLanguage,
+    //         this.settings.sourceLanguage,
+    //         'full',
+    //         false,
+    //         text
+    //     );
+    //     if (!parsed) { new Notice('No scripture references found.'); return; }
 
-        const data = JSON.parse(parsed);
-        if (Object.keys(data).length === 0) { new Notice('No scripture references found.'); return; }
+    //     const data = JSON.parse(parsed);
+    //     if (Object.keys(data).length === 0) { new Notice('No scripture references found.'); return; }
 
-        const refs = Object.keys(data).sort((a, b) => b.length - a.length);
-        let result = text;
+    //     const refs = Object.keys(data).sort((a, b) => b.length - a.length);
+    //     let result = text;
 
-        for (const ref of refs) {
-            const escapedRef = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(`(?<!\\{\\{)${escapedRef}(?!\\}\\})`, 'g');
-            result = result.replace(regex, `{{${ref}}}`);
-        }
+    //     for (const ref of refs) {
+    //         const escapedRef = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    //         const regex = new RegExp(`(?<!\\{\\{)${escapedRef}(?!\\}\\})`, 'g');
+    //         result = result.replace(regex, `{{${ref}}}`);
+    //     }
 
-        if (isWholeDoc) {
-            editor.setValue(result);
-        } else {
-            editor.replaceSelection(result);
-        }
-    }
+    //     if (isWholeDoc) {
+    //         editor.setValue(result);
+    //     } else {
+    //         editor.replaceSelection(result);
+    //     }
+    // }
 
     async onload() {
         await this.loadSettings();
@@ -439,7 +441,7 @@ export default class TraverturePlugin extends Plugin {
     }
 
     reformatReferences(editor: any, text: string, format: string, wholeDoc: boolean = false) {
-        const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.outputLanguage, format, false, text);
+        const parsed = this.safeParse(text);
         if (!parsed) return;
 
         const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
@@ -461,35 +463,73 @@ export default class TraverturePlugin extends Plugin {
 
     async insertCitation(editor: any, text: string, withRef: boolean) {
         const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, 'full', false, text);
-        if (!parsed || Object.keys(JSON.parse(parsed)).length === 0) { new Notice('No scripture references found.'); return; }
-        const data = JSON.parse(parsed); let result = text; const fetchedSet = new Set<string>();
-        for (const [originalRef, bcvRanges] of Object.entries(data)) {
-            const ranges = bcvRanges as string[][]; if (ranges.length === 0) continue;
-            const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
-            const cacheKey = `${this.settings.sourceLanguage}:${bcv}`;
-            let verseText = '';
-            if (!fetchedSet.has(cacheKey)) {
-                const verseData = await fetchVerseWithExtras(bcv, this.settings.sourceLanguage);
-                if (verseData) {
-                    let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
-                    const tempDiv = activeDocument.createElement('div');
-                    const parsed = new DOMParser().parseFromString(html, 'text/html');
-                    for (const child of Array.from(parsed.body.childNodes)) {
-                        tempDiv.appendChild(child.cloneNode(true));
-                    }
-                    if (withRef) {
-                        tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
-                    } else {
-                        tempDiv.querySelectorAll('.chapterNum').forEach(el => {
-                            const textNode = el.querySelector('a') || el;
-                            if (textNode) textNode.textContent = '1 ';
-                        });
-                    }
-                    verseText = (tempDiv.textContent || '').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
-                }
-                fetchedSet.add(cacheKey);
+        if (!parsed) { new Notice('No scripture references found.'); return; }
+        
+        const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+        if (clauses.length === 0) { new Notice('No scripture references found.'); return; }
+        
+        const groups: Array<{ original: string; bcvs: string[] }> = [];
+        let lastBookNum = -1;
+        let groupStart = 0;
+        let groupEnd = 0;
+        let currentBcvs: string[] = [];
+        
+        for (const [_clauseText, startPos, endPos, ranges] of clauses) {
+            if (ranges.length === 0) continue;
+            const bookNum = parseInt(ranges[0][0].substring(0, 2));
+            
+            if (bookNum !== lastBookNum) {
+                if (currentBcvs.length > 0) groups.push({ original: text.substring(groupStart, groupEnd), bcvs: currentBcvs });
+                groupStart = startPos;
+                lastBookNum = bookNum;
+                currentBcvs = [];
             }
-            result = result.replace(originalRef, withRef ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`);
+            groupEnd = endPos;
+            
+            for (const range of ranges) {
+                currentBcvs.push(range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`);
+            }
+        }
+        if (currentBcvs.length > 0) groups.push({ original: text.substring(groupStart, groupEnd), bcvs: currentBcvs });
+        
+        let result = text;
+        const fetchedCache = new Map<string, string>();
+        
+        for (const group of groups) {
+            let allText = '';
+            for (const bcv of group.bcvs) {
+                const cacheKey = `${this.settings.outputLanguage}:${bcv}`;
+                let verseText = fetchedCache.get(cacheKey);
+                if (verseText === undefined) {
+                    const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
+                    if (verseData) {
+                        let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
+                        const tempDiv = activeDocument.createElement('div');
+                        const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
+                        for (const child of Array.from(parsedHtml.body.childNodes)) {
+                            tempDiv.appendChild(child.cloneNode(true));
+                        }
+                        if (withRef) {
+                            tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
+                        } else {
+                            tempDiv.querySelectorAll('.chapterNum').forEach(el => {
+                                const textNode = el.querySelector('a') || el;
+                                if (textNode) textNode.textContent = '1 ';
+                            });
+                        }
+                        verseText = (tempDiv.textContent || '').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+                        fetchedCache.set(cacheKey, verseText);
+                    } else {
+                        fetchedCache.set(cacheKey, '');
+                    }
+                }
+                if (verseText) allText += (allText ? ' ' : '') + verseText;
+            }
+            
+            if (allText) {
+                const escaped = group.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                result = result.replace(new RegExp(escaped), withRef ? `"${allText}" (${group.original})` : `${group.original}: "${allText}"`);
+            }
         }
         editor.replaceSelection(result);
     }
