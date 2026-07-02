@@ -31,13 +31,8 @@ function buildDecorations(view: any, plugin: any) {
             const innerText = match[1];
             const cleanMatch = match[0].replace(/\*\*/g, '').replace(/\*/g, '');
             const engineInput = cleanMatch.replace('{{', '⟪⟪').replace('}}', '⟫⟫');
-            const parsed = plugin.engine?.parse(
-                plugin.settings.sourceLanguage,
-                plugin.settings.outputLanguage,
-                'full',
-                false,
-                engineInput
-            );
+            const parsed = plugin.safeParse?.(engineInput);
+            if (!parsed) continue;
 
             if (parsed) {
                 const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
@@ -88,13 +83,7 @@ function buildDecorations(view: any, plugin: any) {
 }
 
 function processSegment(basePos: number, segment: string, plugin: any, allDecos: Array<{ from: number; to: number; deco: any }>, decorated: Array<{ from: number; to: number }>) {
-    const parsed = plugin.engine?.parse(
-        plugin.settings.sourceLanguage,
-        plugin.settings.outputLanguage,
-        'full',
-        false,
-        segment
-    );
+    const parsed = plugin.safeParse?.(segment);
     if (!parsed) return;
 
     const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
@@ -139,13 +128,7 @@ export function createTravertureEditorPlugin(plugin: any) {
                     const lineText = line.text;
                     const lineFrom = line.from;
                     const engineInput = lineText.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
-                    const parsed = plugin.engine?.parse(
-                        plugin.settings.sourceLanguage,
-                        plugin.settings.outputLanguage,
-                        'full',
-                        false,
-                        engineInput
-                    );
+                    const parsed = plugin.safeParse?.(engineInput);
                     if (!parsed) return;
 
                     const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
