@@ -678,22 +678,25 @@ ${text}`);
     paneCopyBtn.addEventListener("click", () => {
       let text = "";
       for (const c of commentaries) {
-        const note = activeDocument.createElement("div");
-        note.className = "traverture-modal-commentary-note";
         const bookNum = parseInt(c.source.substring(0, 2));
         const bookName = TravertureEngine.get_book_name(bookNum, outputLang, "full", false);
         const ch = parseInt(c.source.substring(2, 5));
         const vs = parseInt(c.source.substring(5, 8));
-        const citation = activeDocument.createElement("div");
-        citation.className = "traverture-modal-commentary-citation";
-        citation.textContent = `${bookName} ${ch}:${vs}`;
-        note.appendChild(citation);
-        const parsed = new DOMParser().parseFromString(c.content, "text/html");
-        parsed.body.querySelectorAll("a").forEach((a) => a.replaceWith(a.textContent || ""));
-        for (const child of Array.from(parsed.body.childNodes)) {
-          note.appendChild(child.cloneNode(true));
+        const tempDiv = activeDocument.createElement("div");
+        tempDiv.innerHTML = c.content;
+        tempDiv.querySelectorAll("a").forEach((a) => a.replaceWith(a.textContent || ""));
+        const paras = tempDiv.querySelectorAll("p");
+        let noteText = "";
+        if (paras.length > 0) {
+          noteText = Array.from(paras).map((p) => (p.textContent || "").replace(/[ \t]+/g, " ").trim()).join("\n\n");
+        } else {
+          noteText = (tempDiv.textContent || "").replace(/[ \t]+/g, " ").trim();
         }
-        paneContent.appendChild(note);
+        text += `${bookName} ${ch}:${vs}
+
+${noteText}
+
+`;
       }
       void navigator.clipboard.writeText(text.trim());
       (0, import_obsidian2.setIcon)(paneCopyBtn, "check");
@@ -755,6 +758,7 @@ var REF_PATTERN = /\{\{(.+?)\}\}/g;
 function buildDecorations(view, plugin) {
   const allDecos = [];
   const cursor = view.state.selection.main;
+  const bcvs = [];
   for (const { from, to } of view.visibleRanges) {
     const text = view.state.doc.sliceString(from, to);
     const decorated = [];
@@ -774,21 +778,23 @@ function buildDecorations(view, plugin) {
       const engineInput = cleanMatch.replace("{{", "\u27EA\u27EA").replace("}}", "\u27EB\u27EB");
       const parsed = plugin.safeParse?.(engineInput);
       if (!parsed) continue;
-      if (parsed) {
-        const clauses = JSON.parse(parsed);
-        const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
-        for (const [clauseText, _ranges] of sorted) {
-          const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          const refRegex = new RegExp(escaped, "g");
-          let refMatch;
-          while ((refMatch = refRegex.exec(innerText)) !== null) {
-            const refStart = innerStart + refMatch.index;
-            const refEnd = refStart + clauseText.length;
-            const overlaps = decorated.some((p) => refStart < p.to && refEnd > p.from);
-            if (!overlaps) {
-              allDecos.push({ from: refStart, to: refEnd, deco: import_view.Decoration.mark({ class: "cm-traverture-ref" }) });
-              decorated.push({ from: refStart, to: refEnd });
-            }
+      const clauses = JSON.parse(parsed);
+      const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+      for (const clause of sorted) {
+        const [clauseText, _startPos, _endPos, ranges] = clause;
+        if (ranges.length === 0) continue;
+        const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
+        const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const refRegex = new RegExp(escaped, "g");
+        let refMatch;
+        while ((refMatch = refRegex.exec(innerText)) !== null) {
+          const refStart = innerStart + refMatch.index;
+          const refEnd = refStart + clauseText.length;
+          const overlaps = decorated.some((p) => refStart < p.to && refEnd > p.from);
+          if (!overlaps) {
+            allDecos.push({ from: refStart, to: refEnd, deco: import_view.Decoration.mark({ class: "cm-traverture-ref" }) });
+            decorated.push({ from: refStart, to: refEnd });
+            bcvs.push({ from: refStart, to: refEnd, bcv });
           }
         }
       }
@@ -799,13 +805,13 @@ function buildDecorations(view, plugin) {
       for (const d of decoratedRanges) {
         if (pos < d.from) {
           const segment = view.state.doc.sliceString(pos, d.from);
-          processSegment(pos, segment, plugin, allDecos, decorated);
+          processSegment(pos, segment, plugin, allDecos, decorated, bcvs);
         }
         pos = Math.max(pos, d.to);
       }
       if (pos < to) {
         const segment = view.state.doc.sliceString(pos, to);
-        processSegment(pos, segment, plugin, allDecos, decorated);
+        processSegment(pos, segment, plugin, allDecos, decorated, bcvs);
       }
     }
   }
@@ -814,24 +820,30 @@ function buildDecorations(view, plugin) {
   for (const d of allDecos) {
     builder.add(d.from, d.to, d.deco);
   }
+  plugin._editBcvs = bcvs;
   return builder.finish();
 }
-function processSegment(basePos, segment, plugin, allDecos, decorated) {
+function processSegment(basePos, segment, plugin, allDecos, decorated, bcvs) {
   const parsed = plugin.safeParse?.(segment);
   if (!parsed) return;
   const clauses = JSON.parse(parsed);
   if (clauses.length === 0) return;
-  for (const [_clauseText, startPos, endPos, _ranges] of clauses) {
+  for (const clause of clauses) {
+    const [_clauseText, startPos, endPos, ranges] = clause;
+    if (ranges.length === 0) continue;
+    const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
     const refStart = basePos + startPos;
     const refEnd = basePos + endPos;
     const overlaps = decorated.some((p) => refStart < p.to && refEnd > p.from);
     if (!overlaps) {
       allDecos.push({ from: refStart, to: refEnd, deco: import_view.Decoration.mark({ class: "cm-traverture-ref" }) });
       decorated.push({ from: refStart, to: refEnd });
+      bcvs.push({ from: refStart, to: refEnd, bcv });
     }
   }
 }
 function createTravertureEditorPlugin(plugin) {
+  plugin._editBcvs = [];
   return import_view.ViewPlugin.fromClass(
     class {
       constructor(view) {
@@ -846,41 +858,28 @@ function createTravertureEditorPlugin(plugin) {
     {
       decorations: (v) => v.decorations,
       eventHandlers: {
-        mousedown: (e, view) => {
+        mousedown: (e, _view) => {
           if (e.button !== 0) return;
-          const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+          const pos = _view.posAtCoords({ x: e.clientX, y: e.clientY });
           if (pos === null) return;
-          const line = view.state.doc.lineAt(pos);
-          const lineText = line.text;
-          const lineFrom = line.from;
-          const engineInput = lineText.replace(/\{\{(.+?)\}\}/g, "\u27EA$1\u27EB");
-          const parsed = plugin.safeParse?.(engineInput);
-          if (!parsed) return;
-          const clauses = JSON.parse(parsed);
-          if (clauses.length === 0) return;
-          for (const clause of clauses) {
-            const [_clauseText, startPos, endPos, _ranges] = clause;
-            const refStart = lineFrom + startPos;
-            const refEnd = lineFrom + endPos;
-            if (pos >= refStart && pos <= refEnd) {
-              e.preventDefault();
-              e.stopPropagation();
-              showModal(plugin, clause, clauses);
-              return;
-            }
+          const entry = plugin._editBcvs?.find((b) => pos >= b.from && pos <= b.to);
+          if (entry) {
+            e.preventDefault();
+            e.stopPropagation();
+            showModal(plugin, entry.bcv);
           }
         }
       }
     }
   );
 }
-function showModal(plugin, clause, _clauses) {
-  const [_clauseText, _startPos, _endPos, ranges] = clause;
-  const range = ranges[0];
-  const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
+function showModal(plugin, bcv) {
+  const parts = bcv.split("-");
+  const startBcv = parts[0];
+  const endBcv = parts.length > 1 ? parts[1] : parts[0];
   const fmtEngine = new plugin.engine.constructor(plugin.settings.sourceLanguage, plugin.settings.outputLanguage, plugin.settings.titleFormat, false);
-  const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[range[0], range[1]]])));
-  const displayText = decoded[0] || _clauseText;
+  const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[startBcv, endBcv]])));
+  const displayText = decoded[0] || bcv;
   const modal = new VerseModal();
   modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
   void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage).then((verseData) => {
@@ -1462,16 +1461,6 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     }
     this.addSettingTab(new TravertureSettingTab(this.app, this));
     this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
-    this.addCommand({ id: "parse-document-references", name: "tra.VER:ture: Parse document", callback: async () => {
-      const file = this.app.workspace.getActiveFile();
-      if (!file) return;
-      await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
-    } });
-    this.addCommand({ id: "parse-selection-references", name: "tra.VER:ture: Parse selection", editorCallback: async (editor) => {
-      const selection = editor.getSelection();
-      if (!selection) return;
-      await this.showSidebarWithResults(await this.parseReferences(selection));
-    } });
     this.registerEditorExtension(createTravertureEditorPlugin(this));
     this.registerMarkdownPostProcessor((element, _context) => {
       this.processElement(element);
@@ -1568,82 +1557,46 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       menu.showAtMouseEvent(evt);
     });
     this.addRibbonIcon("scroll", "tra.VER:ture", () => {
-      const file = this.app.workspace.getActiveFile();
-      const editor = this.app.workspace.activeEditor?.editor;
-      const sel = editor?.getSelection();
-      const menu = new import_obsidian5.Menu();
-      if (sel) {
-        menu.addItem((item) => item.setTitle("Parse selection").setIcon("sidebar-right").onClick(async () => {
-          await this.showSidebarWithResults(await this.parseReferences(sel));
-        }));
-        menu.addItem((item) => {
-          item.setTitle("Insert citation").setIcon("quote-glyph");
-          const citeMenu = item.setSubmenu();
-          citeMenu.addItem((citeItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
-            if (editor && sel) await this.insertCitation(editor, sel, false);
-          }));
-          citeMenu.addItem((citeItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
-            if (editor && sel) await this.insertCitation(editor, sel, true);
-          }));
-        });
-        menu.addItem((item) => {
-          item.setTitle("Reformat selection").setIcon("pencil");
-          const submenu = item.setSubmenu();
-          submenu.addItem((fmtItem) => fmtItem.setTitle("Full (1 Corinthians)").onClick(() => this.reformatReferences(editor, sel, "full")));
-          submenu.addItem((fmtItem) => fmtItem.setTitle("Standard (1 Cor.)").onClick(() => this.reformatReferences(editor, sel, "standard")));
-          submenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => this.reformatReferences(editor, sel, "official")));
-        });
-        menu.addSeparator();
-      }
-      menu.addItem((item) => item.setTitle("Parse document").setIcon("sidebar-right").onClick(async () => {
-        if (!file) {
-          new import_obsidian5.Notice("No file open.");
-          return;
-        }
-        await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
-      }));
-      menu.addItem((item) => {
-        item.setTitle("Reformat document").setIcon("pencil");
-        const submenu = item.setSubmenu();
-        submenu.addItem((fmtItem) => fmtItem.setTitle("Full (1 Corinthians)").onClick(() => {
-          if (editor) this.reformatReferences(editor, editor.getValue(), "full", true);
-        }));
-        submenu.addItem((fmtItem) => fmtItem.setTitle("Standard (1 Cor.)").onClick(() => {
-          if (editor) this.reformatReferences(editor, editor.getValue(), "standard", true);
-        }));
-        submenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => {
-          if (editor) this.reformatReferences(editor, editor.getValue(), "official", true);
-        }));
-      });
-      menu.addSeparator();
-      menu.addItem((item) => {
-        item.setTitle("Source language").setIcon("book-open");
-        const langMenu = item.setSubmenu();
-        const languages = getAvailableLanguages();
-        for (const lang of languages) {
-          langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.sourceLanguage).onClick(async () => {
-            this.settings.sourceLanguage = lang.code;
-            await this.saveSettings();
-            this.createEngine();
-            new import_obsidian5.Notice(`Source language: ${lang.vernacularName}`);
-          }));
-        }
-      });
-      menu.addItem((item) => {
-        item.setTitle("Output language").setIcon("languages");
-        const langMenu = item.setSubmenu();
-        const languages = getAvailableLanguages();
-        for (const lang of languages) {
-          langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.outputLanguage).onClick(async () => {
-            this.settings.outputLanguage = lang.code;
-            await this.saveSettings();
-            this.createEngine();
-            new import_obsidian5.Notice(`Output language: ${lang.vernacularName}`);
-          }));
-        }
-      });
-      menu.showAtMouseEvent({ clientX: 100, clientY: 100 });
+      this.showTravertureMenu().showAtMouseEvent({ clientX: 100, clientY: 100 });
     });
+    this.addCommand({ id: "traverture-open-menu", name: "tra.VER:ture: Open menu", icon: "scroll", editorCallback: () => {
+      this.showTravertureMenu().showAtMouseEvent({ clientX: 100, clientY: 100 });
+    } });
+    this.addCommand({ id: "parse-document-references", name: "tra.VER:ture: Parse document", icon: "file-text", callback: async () => {
+      const file = this.app.workspace.getActiveFile();
+      if (!file) return;
+      await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+    } });
+    this.addCommand({ id: "parse-selection-references", name: "tra.VER:ture: Parse selection", icon: "sidebar-right", editorCallback: async (editor) => {
+      const selection = editor.getSelection();
+      if (!selection) return;
+      await this.showSidebarWithResults(await this.parseReferences(selection));
+    } });
+    this.addCommand({ id: "traverture-insert-citation-ref", name: "tra.VER:ture: Insert citation (Reference)", icon: "quote-glyph", editorCallback: async (editor) => {
+      const selection = editor.getSelection();
+      if (!selection) return;
+      await this.insertCitation(editor, selection, false);
+    } });
+    this.addCommand({ id: "traverture-insert-citation-verse", name: "tra.VER:ture: Insert citation (verse)", icon: "quote-glyph", editorCallback: async (editor) => {
+      const selection = editor.getSelection();
+      if (!selection) return;
+      await this.insertCitation(editor, selection, true);
+    } });
+    this.addCommand({ id: "traverture-reformat-full", name: "tra.VER:ture: Reformat (Full)", icon: "pencil", editorCallback: (editor) => {
+      const selection = editor.getSelection();
+      if (!selection) return;
+      this.reformatReferences(editor, selection, "full");
+    } });
+    this.addCommand({ id: "traverture-reformat-standard", name: "tra.VER:ture: Reformat (Standard)", icon: "pencil", editorCallback: (editor) => {
+      const selection = editor.getSelection();
+      if (!selection) return;
+      this.reformatReferences(editor, selection, "standard");
+    } });
+    this.addCommand({ id: "traverture-reformat-official", name: "tra.VER:ture: Reformat (Official)", icon: "pencil", editorCallback: (editor) => {
+      const selection = editor.getSelection();
+      if (!selection) return;
+      this.reformatReferences(editor, selection, "official");
+    } });
   }
   async showSidebarWithResults(refs) {
     const { workspace } = this.app;
@@ -1666,22 +1619,17 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     if (!parsed) return;
     const clauses = JSON.parse(parsed);
     if (clauses.length === 0) return;
+    const fmtEngine = new TravertureEngine(this.settings.sourceLanguage, this.settings.sourceLanguage, format, false);
     let processed = text;
-    const replaced = /* @__PURE__ */ new Set();
-    for (const [clauseText, _startPos, _endPos, ranges] of clauses) {
+    for (let i = clauses.length - 1; i >= 0; i--) {
+      const [_clauseText, startPos, endPos, ranges] = clauses[i];
       if (ranges.length === 0) continue;
-      if (/^\d/.test(clauseText)) continue;
-      const bookMatch = clauseText.match(/^(.+?)\s+\d/);
-      if (!bookMatch) continue;
-      const bookName = bookMatch[1];
-      if (replaced.has(bookName)) continue;
-      replaced.add(bookName);
-      const bookNum = parseInt(ranges[0][0].substring(0, 2));
-      const newBookName = TravertureEngine.get_book_name(bookNum, this.settings.sourceLanguage, format, false);
-      if (newBookName && newBookName !== bookName) {
-        const escaped = bookName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        processed = processed.replace(new RegExp(escaped, "g"), newBookName);
-      }
+      const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([ranges[0]])));
+      const formattedRef = decoded[0] || "";
+      if (!formattedRef) continue;
+      const before = processed.substring(0, startPos);
+      const after = processed.substring(endPos);
+      processed = before + formattedRef + after;
     }
     if (wholeDoc) {
       editor.setValue(processed);
@@ -1758,6 +1706,83 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       }
     }
     editor.replaceSelection(result);
+  }
+  showTravertureMenu() {
+    const file = this.app.workspace.getActiveFile();
+    const editor = this.app.workspace.activeEditor?.editor;
+    const sel = editor?.getSelection();
+    const menu = new import_obsidian5.Menu();
+    if (sel) {
+      menu.addItem((item) => item.setTitle("Parse selection").setIcon("sidebar-right").onClick(async () => {
+        await this.showSidebarWithResults(await this.parseReferences(sel));
+      }));
+      menu.addItem((item) => {
+        item.setTitle("Insert citation").setIcon("quote-glyph");
+        const citeMenu = item.setSubmenu();
+        citeMenu.addItem((citeItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
+          if (editor && sel) await this.insertCitation(editor, sel, false);
+        }));
+        citeMenu.addItem((citeItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
+          if (editor && sel) await this.insertCitation(editor, sel, true);
+        }));
+      });
+      menu.addItem((item) => {
+        item.setTitle("Reformat selection").setIcon("pencil");
+        const submenu = item.setSubmenu();
+        submenu.addItem((fmtItem) => fmtItem.setTitle("Full (1 Corinthians)").onClick(() => this.reformatReferences(editor, sel, "full")));
+        submenu.addItem((fmtItem) => fmtItem.setTitle("Standard (1 Cor.)").onClick(() => this.reformatReferences(editor, sel, "standard")));
+        submenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => this.reformatReferences(editor, sel, "official")));
+      });
+      menu.addSeparator();
+    }
+    menu.addItem((item) => item.setTitle("Parse document").setIcon("sidebar-right").onClick(async () => {
+      if (!file) {
+        new import_obsidian5.Notice("No file open.");
+        return;
+      }
+      await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+    }));
+    menu.addItem((item) => {
+      item.setTitle("Reformat document").setIcon("pencil");
+      const submenu = item.setSubmenu();
+      submenu.addItem((fmtItem) => fmtItem.setTitle("Full (1 Corinthians)").onClick(() => {
+        if (editor) this.reformatReferences(editor, editor.getValue(), "full", true);
+      }));
+      submenu.addItem((fmtItem) => fmtItem.setTitle("Standard (1 Cor.)").onClick(() => {
+        if (editor) this.reformatReferences(editor, editor.getValue(), "standard", true);
+      }));
+      submenu.addItem((fmtItem) => fmtItem.setTitle("Official (1Co)").onClick(() => {
+        if (editor) this.reformatReferences(editor, editor.getValue(), "official", true);
+      }));
+    });
+    menu.addSeparator();
+    menu.addItem((item) => {
+      item.setTitle("Source language").setIcon("book-open");
+      const langMenu = item.setSubmenu();
+      const languages = getAvailableLanguages();
+      for (const lang of languages) {
+        langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.sourceLanguage).onClick(async () => {
+          this.settings.sourceLanguage = lang.code;
+          await this.saveSettings();
+          this.createEngine();
+          new import_obsidian5.Notice(`Source language: ${lang.vernacularName}`);
+        }));
+      }
+    });
+    menu.addItem((item) => {
+      item.setTitle("Output language").setIcon("languages");
+      const langMenu = item.setSubmenu();
+      const languages = getAvailableLanguages();
+      for (const lang of languages) {
+        langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.outputLanguage).onClick(async () => {
+          this.settings.outputLanguage = lang.code;
+          await this.saveSettings();
+          this.createEngine();
+          new import_obsidian5.Notice(`Output language: ${lang.vernacularName}`);
+        }));
+      }
+    });
+    return menu;
   }
   onunload() {
   }
