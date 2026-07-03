@@ -689,8 +689,11 @@ ${text}`);
         const ch = parseInt(c.source.substring(2, 5));
         const vs = parseInt(c.source.substring(5, 8));
         const tempDiv = activeDocument.createElement("div");
-        tempDiv.innerHTML = c.content;
-        tempDiv.querySelectorAll("a").forEach((a) => a.replaceWith(a.textContent || ""));
+        const parsedContent = new DOMParser().parseFromString(c.content, "text/html");
+        parsedContent.body.querySelectorAll("a").forEach((a) => a.replaceWith(a.textContent || ""));
+        for (const child of Array.from(parsedContent.body.childNodes)) {
+          tempDiv.appendChild(child.cloneNode(true));
+        }
         const paras = tempDiv.querySelectorAll("p");
         let noteText = "";
         if (paras.length > 0) {
@@ -794,7 +797,7 @@ function buildDecorations(view, plugin) {
       const clauses = JSON.parse(parsed);
       const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
       for (const clause of sorted) {
-        const [clauseText, _startPos, _endPos, ranges] = clause;
+        const [clauseText, , , ranges] = clause;
         if (ranges.length === 0) continue;
         const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
         const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -842,7 +845,7 @@ function processSegment(basePos, segment, plugin, allDecos, decorated, bcvs) {
   const clauses = JSON.parse(parsed);
   if (clauses.length === 0) return;
   for (const clause of clauses) {
-    const [_clauseText, startPos, endPos, ranges] = clause;
+    const [, startPos, endPos, ranges] = clause;
     if (ranges.length === 0) continue;
     const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
     const refStart = basePos + startPos;
@@ -1300,16 +1303,16 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     const engFull = new TravertureEngine("en", "en", "full", false);
     const engStd = new TravertureEngine("en", "en", "standard", false);
     const engOff = new TravertureEngine("en", "en", "official", false);
-    for (const [_clauseText, _startPos, _endPos, ranges] of clauses) {
+    for (const [clauseText, , , ranges] of clauses) {
       if (ranges.length === 0) continue;
       const bookNum = parseInt(ranges[0][0].substring(0, 2));
       if (bookNum !== lastBookNum) {
-        currentOriginal = _clauseText;
+        currentOriginal = clauseText;
         lastBookNum = bookNum;
-      } else if (currentOriginal && /^\d/.test(_clauseText)) {
-        currentOriginal += `; ${_clauseText}`;
+      } else if (currentOriginal && /^\d/.test(clauseText)) {
+        currentOriginal += `; ${clauseText}`;
       } else {
-        currentOriginal = _clauseText;
+        currentOriginal = clauseText;
       }
       for (const range of ranges) {
         const singleRange = [[range[0], range[1]]];
@@ -1378,7 +1381,10 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     }
     if (this.settings.autoDetect && this.engine) {
       const tempDiv = activeDocument.createElement("div");
-      tempDiv.innerHTML = html;
+      const parsedHtml = new DOMParser().parseFromString(html, "text/html");
+      for (const child of Array.from(parsedHtml.body.childNodes)) {
+        tempDiv.appendChild(child.cloneNode(true));
+      }
       const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
         acceptNode: (node2) => {
           const parent = node2.parentElement;
@@ -1404,7 +1410,10 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
         if (linked !== text) {
           const fragment = activeDocument.createDocumentFragment();
           const span = activeDocument.createElement("span");
-          span.innerHTML = linked;
+          const parsedLinked = new DOMParser().parseFromString(linked, "text/html");
+          for (const child of Array.from(parsedLinked.body.childNodes)) {
+            fragment.appendChild(child.cloneNode(true));
+          }
           while (span.firstChild) fragment.appendChild(span.firstChild);
           textNode.parentNode?.replaceChild(fragment, textNode);
         }
@@ -1575,7 +1584,7 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     this.addRibbonIcon("scroll", "tra.VER:ture", () => {
       this.showTravertureMenu().showAtMouseEvent({ clientX: 100, clientY: 100 });
     });
-    this.addCommand({ id: "traverture-open-menu", name: "tra.VER:ture: Open menu", icon: "scroll", editorCallback: () => {
+    this.addCommand({ id: "open-menu", name: "tra.VER:ture: Open menu", icon: "scroll", editorCallback: () => {
       this.showTravertureMenu().showAtMouseEvent({ clientX: 100, clientY: 100 });
     } });
     this.addCommand({ id: "parse-document-references", name: "tra.VER:ture: Parse document", icon: "file-text", callback: async () => {
@@ -1588,27 +1597,27 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       if (!selection) return;
       await this.showSidebarWithResults(await this.parseReferences(selection));
     } });
-    this.addCommand({ id: "traverture-insert-citation-ref", name: "tra.VER:ture: Insert citation (Reference)", icon: "quote-glyph", editorCallback: async (editor) => {
+    this.addCommand({ id: "insert-citation-ref", name: "tra.VER:ture: Insert citation (Reference)", icon: "quote-glyph", editorCallback: async (editor) => {
       const selection = editor.getSelection();
       if (!selection) return;
       await this.insertCitation(editor, selection, false);
     } });
-    this.addCommand({ id: "traverture-insert-citation-verse", name: "tra.VER:ture: Insert citation (verse)", icon: "quote-glyph", editorCallback: async (editor) => {
+    this.addCommand({ id: "insert-citation-verse", name: "tra.VER:ture: Insert citation (verse)", icon: "quote-glyph", editorCallback: async (editor) => {
       const selection = editor.getSelection();
       if (!selection) return;
       await this.insertCitation(editor, selection, true);
     } });
-    this.addCommand({ id: "traverture-reformat-full", name: "tra.VER:ture: Reformat (Full)", icon: "pencil", editorCallback: (editor) => {
+    this.addCommand({ id: "reformat-full", name: "tra.VER:ture: Reformat (Full)", icon: "pencil", editorCallback: (editor) => {
       const selection = editor.getSelection();
       if (!selection) return;
       this.reformatReferences(editor, selection, "full");
     } });
-    this.addCommand({ id: "traverture-reformat-standard", name: "tra.VER:ture: Reformat (Standard)", icon: "pencil", editorCallback: (editor) => {
+    this.addCommand({ id: "reformat-standard", name: "tra.VER:ture: Reformat (Standard)", icon: "pencil", editorCallback: (editor) => {
       const selection = editor.getSelection();
       if (!selection) return;
       this.reformatReferences(editor, selection, "standard");
     } });
-    this.addCommand({ id: "traverture-reformat-official", name: "tra.VER:ture: Reformat (Official)", icon: "pencil", editorCallback: (editor) => {
+    this.addCommand({ id: "reformat-official", name: "tra.VER:ture: Reformat (Official)", icon: "pencil", editorCallback: (editor) => {
       const selection = editor.getSelection();
       if (!selection) return;
       this.reformatReferences(editor, selection, "official");
@@ -1627,8 +1636,8 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       leaf = rightLeaf;
     }
     await leaf.loadIfDeferred();
-    workspace.revealLeaf(leaf);
-    leaf.view.displayResults(refs);
+    void workspace.revealLeaf(leaf);
+    void leaf.view.displayResults(refs);
   }
   reformatReferences(editor, text, format, wholeDoc = false) {
     const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.outputLanguage, "full", false, text);
@@ -1638,7 +1647,7 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     const fmtEngine = new TravertureEngine(this.settings.sourceLanguage, this.settings.sourceLanguage, format, false);
     let processed = text;
     for (let i = clauses.length - 1; i >= 0; i--) {
-      const [_clauseText, startPos, endPos, ranges] = clauses[i];
+      const [, startPos, endPos, ranges] = clauses[i];
       if (ranges.length === 0) continue;
       const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([ranges[0]])));
       const formattedRef = decoded[0] || "";
@@ -1669,7 +1678,7 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     let groupStart = 0;
     let groupEnd = 0;
     let currentBcvs = [];
-    for (const [_clauseText, startPos, endPos, ranges] of clauses) {
+    for (const [, startPos, endPos, ranges] of clauses) {
       if (ranges.length === 0) continue;
       const bookNum = parseInt(ranges[0][0].substring(0, 2));
       if (bookNum !== lastBookNum) {
