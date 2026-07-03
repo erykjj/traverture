@@ -441,7 +441,8 @@ function getCachedVerse(key) {
 function setCachedVerse(key, data) {
   verseCache.set(key, { data, ts: Date.now() });
 }
-async function fetchVerseWithExtras(range, langCode) {
+async function fetchVerseWithExtras(range, langCode, signal) {
+  if (signal?.aborted) return null;
   const cacheKey = `${langCode}:${range}:extras`;
   const cached = getCachedVerse(cacheKey);
   if (cached) return cached;
@@ -454,9 +455,11 @@ async function fetchVerseWithExtras(range, langCode) {
   const url = `https://www.jw.org/${suffix}json/html/${apiRange}`;
   try {
     const response = await (0, import_obsidian.requestUrl)({ url });
+    if (signal?.aborted) return null;
     const data = response.json;
     const verseData = data.ranges?.[apiRange];
     if (verseData) {
+      if (signal?.aborted) return null;
       const result = {
         html: cleanVerseHtml(verseData.html, true),
         citation: (verseData.citation || "").replace(/&nbsp;/g, " ").replace(/\u00A0/g, " "),
@@ -468,6 +471,7 @@ async function fetchVerseWithExtras(range, langCode) {
       return result;
     }
   } catch (e) {
+    if (signal?.aborted) return null;
     console.error(`tra.VER:ture: Error fetching verse "${apiRange}":`, e);
   }
   return null;
@@ -505,11 +509,13 @@ var VerseModal = class {
     this.modalEl = null;
     this.currentTitle = "";
     this.hidden = false;
+    this.abortController = null;
   }
   show(verseData, bcv, outputLang, titleOverride) {
     if (this.hidden) return;
     this.hide();
     this.hidden = false;
+    this.abortController = new AbortController();
     const languages = getAvailableLanguages();
     const langObj = languages.find((l) => l.code === outputLang);
     const langSymbol = langObj ? TravertureEngine.get_lang_symbol(outputLang) : "E";
@@ -740,6 +746,10 @@ ${noteText}
     return btn;
   }
   hide() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
     this.hidden = true;
     if (this.modalEl) {
       this.modalEl.remove();
@@ -747,7 +757,10 @@ ${noteText}
     }
   }
   isVisible() {
-    return this.modalEl !== null && this.modalEl.parentNode !== null;
+    return !this.hidden;
+  }
+  getSignal() {
+    return this.abortController?.signal;
   }
 };
 
@@ -882,7 +895,8 @@ function showModal(plugin, bcv) {
   const displayText = decoded[0] || bcv;
   const modal = new VerseModal();
   modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
-  void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage).then((verseData) => {
+  void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage, modal.getSignal()).then((verseData) => {
+    if (!modal.isVisible()) return;
     modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
   });
 }
@@ -1225,7 +1239,8 @@ ${body}`);
               e.stopPropagation();
               const modal = new VerseModal();
               modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
-              const verseData = await fetchVerseWithExtras(bcv, this.outputLang);
+              const verseData = await fetchVerseWithExtras(bcv, this.outputLang, modal.getSignal());
+              if (!modal.isVisible()) return;
               modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
             })();
           });
@@ -1413,7 +1428,8 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
           const refText = decoded[0] || link.textContent || "";
           const modal = new VerseModal();
           modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-          const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
+          const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage, modal.getSignal());
+          if (!modal.isVisible()) return;
           modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
         })();
       });
