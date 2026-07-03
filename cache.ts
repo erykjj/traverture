@@ -26,7 +26,9 @@ function setCachedVerse(key: string, data: VerseData): void {
     verseCache.set(key, { data, ts: Date.now() });
 }
 
-export async function fetchVerseWithExtras(range: string, langCode: string): Promise<VerseData | null> {
+export async function fetchVerseWithExtras(range: string, langCode: string, signal?: AbortSignal): Promise<VerseData | null> {
+    if (signal?.aborted) return null;
+
     const cacheKey = `${langCode}:${range}:extras`;
     const cached = getCachedVerse(cacheKey);
     if (cached) return cached;
@@ -41,9 +43,12 @@ export async function fetchVerseWithExtras(range: string, langCode: string): Pro
 
     try {
         const response = await requestUrl({ url });
+        if (signal?.aborted) return null;
+
         const data = response.json;
         const verseData = data.ranges?.[apiRange];
         if (verseData) {
+            if (signal?.aborted) return null;
             const result: VerseData = {
                 html: cleanVerseHtml(verseData.html, true),
                 citation: (verseData.citation || '').replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' '),
@@ -55,6 +60,7 @@ export async function fetchVerseWithExtras(range: string, langCode: string): Pro
             return result;
         }
     } catch (e) {
+        if (signal?.aborted) return null;
         console.error(`tra.VER:ture: Error fetching verse "${apiRange}":`, e);
     }
     return null;

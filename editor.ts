@@ -158,7 +158,8 @@ function showModal(plugin: any, bcv: string): void {
 
     const modal = new VerseModal();
     modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
-    void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage).then(verseData => {
+    void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage, modal.getSignal()).then(verseData => {
+        if (!modal.isVisible()) return;
         modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
     });
 }

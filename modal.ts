@@ -8,11 +8,13 @@ export class VerseModal {
     private modalEl: HTMLElement | null = null;
     private currentTitle: string = '';
     private hidden: boolean = false;
+    private abortController: AbortController | null = null;
 
     show(verseData: VerseData, bcv: string, outputLang: string, titleOverride?: string) {
         if (this.hidden) return;
         this.hide();
         this.hidden = false;
+        this.abortController = new AbortController();
 
         const languages = getAvailableLanguages();
         const langObj = languages.find(l => l.code === outputLang);
@@ -260,11 +262,19 @@ export class VerseModal {
     }
 
     hide() {
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+        }
         this.hidden = true;
         if (this.modalEl) { this.modalEl.remove(); this.modalEl = null; }
     }
 
     isVisible(): boolean {
-        return this.modalEl !== null && this.modalEl.parentNode !== null;
+        return !this.hidden;
+    }
+
+    getSignal(): AbortSignal | undefined {
+        return this.abortController?.signal;
     }
 }

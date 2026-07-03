@@ -199,7 +199,8 @@ export default class TraverturePlugin extends Plugin {
                 const refText = decoded[0] || link.textContent || '';
                 const modal = new VerseModal();
                 modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
-                const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
+                const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage, modal.getSignal());
+                if (!modal.isVisible()) return;
                 modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
             })(); });
         });
