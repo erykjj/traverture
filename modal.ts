@@ -199,8 +199,11 @@ export class VerseModal {
                 const vs = parseInt(c.source.substring(5, 8));
 
                 const tempDiv = activeDocument.createElement('div');
-                tempDiv.innerHTML = c.content;
-                tempDiv.querySelectorAll('a').forEach(a => a.replaceWith(a.textContent || ''));
+                const parsedContent = new DOMParser().parseFromString(c.content, 'text/html');
+                parsedContent.body.querySelectorAll('a').forEach(a => a.replaceWith(a.textContent || ''));
+                for (const child of Array.from(parsedContent.body.childNodes)) {
+                    tempDiv.appendChild(child.cloneNode(true));
+                }
 
                 const paras = tempDiv.querySelectorAll('p');
                 let noteText = '';

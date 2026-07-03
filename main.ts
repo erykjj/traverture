@@ -54,17 +54,17 @@ export default class TraverturePlugin extends Plugin {
         const engStd = new wasmModule.TravertureEngine('en', 'en', 'standard', false);
         const engOff = new wasmModule.TravertureEngine('en', 'en', 'official', false);
 
-        for (const [_clauseText, _startPos, _endPos, ranges] of clauses) {
+        for (const [clauseText, , , ranges] of clauses) {
             if (ranges.length === 0) continue;
             const bookNum = parseInt(ranges[0][0].substring(0, 2));
 
             if (bookNum !== lastBookNum) {
-                currentOriginal = _clauseText;
+                currentOriginal = clauseText;
                 lastBookNum = bookNum;
-            } else if (currentOriginal && /^\d/.test(_clauseText)) {
-                currentOriginal += `; ${_clauseText}`;
+            } else if (currentOriginal && /^\d/.test(clauseText)) {
+                currentOriginal += `; ${clauseText}`;
             } else {
-                currentOriginal = _clauseText;
+                currentOriginal = clauseText;
             }
 
             for (const range of ranges) {
@@ -146,8 +146,10 @@ export default class TraverturePlugin extends Plugin {
         // Auto-detect references in remaining text
         if (this.settings.autoDetect && this.engine) {
             const tempDiv = activeDocument.createElement('div');
-            tempDiv.innerHTML = html;
-
+            const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
+            for (const child of Array.from(parsedHtml.body.childNodes)) {
+                tempDiv.appendChild(child.cloneNode(true));
+            }
             const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
                 acceptNode: (node) => {
                     const parent = node.parentElement;
@@ -173,7 +175,10 @@ export default class TraverturePlugin extends Plugin {
                 if (linked !== text) {
                     const fragment = activeDocument.createDocumentFragment();
                     const span = activeDocument.createElement('span');
-                    span.innerHTML = linked;
+                    const parsedLinked = new DOMParser().parseFromString(linked, 'text/html');
+                    for (const child of Array.from(parsedLinked.body.childNodes)) {
+                        fragment.appendChild(child.cloneNode(true));
+                    }
                     while (span.firstChild) fragment.appendChild(span.firstChild);
                     textNode.parentNode?.replaceChild(fragment, textNode);
                 }
@@ -370,7 +375,7 @@ export default class TraverturePlugin extends Plugin {
             this.showTravertureMenu().showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
         });
 
-        this.addCommand({ id: 'traverture-open-menu', name: 'tra.VER:ture: Open menu', icon: 'scroll', editorCallback: () => {
+        this.addCommand({ id: 'open-menu', name: 'tra.VER:ture: Open menu', icon: 'scroll', editorCallback: () => {
             this.showTravertureMenu().showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
         }});
 
@@ -384,27 +389,27 @@ export default class TraverturePlugin extends Plugin {
             await this.showSidebarWithResults(await this.parseReferences(selection));
         }});
 
-        this.addCommand({ id: 'traverture-insert-citation-ref', name: 'tra.VER:ture: Insert citation (Reference)', icon: 'quote-glyph', editorCallback: async (editor: any) => {
+        this.addCommand({ id: 'insert-citation-ref', name: 'tra.VER:ture: Insert citation (Reference)', icon: 'quote-glyph', editorCallback: async (editor: any) => {
             const selection = editor.getSelection(); if (!selection) return;
             await this.insertCitation(editor, selection, false);
         }});
 
-        this.addCommand({ id: 'traverture-insert-citation-verse', name: 'tra.VER:ture: Insert citation (verse)', icon: 'quote-glyph', editorCallback: async (editor: any) => {
+        this.addCommand({ id: 'insert-citation-verse', name: 'tra.VER:ture: Insert citation (verse)', icon: 'quote-glyph', editorCallback: async (editor: any) => {
             const selection = editor.getSelection(); if (!selection) return;
             await this.insertCitation(editor, selection, true);
         }});
 
-        this.addCommand({ id: 'traverture-reformat-full', name: 'tra.VER:ture: Reformat (Full)', icon: 'pencil', editorCallback: (editor: any) => {
+        this.addCommand({ id: 'reformat-full', name: 'tra.VER:ture: Reformat (Full)', icon: 'pencil', editorCallback: (editor: any) => {
             const selection = editor.getSelection(); if (!selection) return;
             this.reformatReferences(editor, selection, 'full');
         }});
 
-        this.addCommand({ id: 'traverture-reformat-standard', name: 'tra.VER:ture: Reformat (Standard)', icon: 'pencil', editorCallback: (editor: any) => {
+        this.addCommand({ id: 'reformat-standard', name: 'tra.VER:ture: Reformat (Standard)', icon: 'pencil', editorCallback: (editor: any) => {
             const selection = editor.getSelection(); if (!selection) return;
             this.reformatReferences(editor, selection, 'standard');
         }});
 
-        this.addCommand({ id: 'traverture-reformat-official', name: 'tra.VER:ture: Reformat (Official)', icon: 'pencil', editorCallback: (editor: any) => {
+        this.addCommand({ id: 'reformat-official', name: 'tra.VER:ture: Reformat (Official)', icon: 'pencil', editorCallback: (editor: any) => {
             const selection = editor.getSelection(); if (!selection) return;
             this.reformatReferences(editor, selection, 'official');
         }});
@@ -417,8 +422,8 @@ export default class TraverturePlugin extends Plugin {
         if (leaves.length > 0) { leaf = leaves[0]; }
         else { const rightLeaf = workspace.getRightLeaf(false); if (!rightLeaf) return; await rightLeaf.setViewState({ type: VIEW_TYPE_TRAVERTURE_SIDEBAR, active: true }); leaf = rightLeaf; }
         await leaf.loadIfDeferred();
-        workspace.revealLeaf(leaf);
-        (leaf.view as TravertureSidebarView).displayResults(refs);
+        void workspace.revealLeaf(leaf);
+        void (leaf.view as TravertureSidebarView).displayResults(refs);
     }
 
     reformatReferences(editor: any, text: string, format: string, wholeDoc: boolean = false) {
@@ -432,7 +437,7 @@ export default class TraverturePlugin extends Plugin {
         let processed = text;
 
         for (let i = clauses.length - 1; i >= 0; i--) {
-            const [_clauseText, startPos, endPos, ranges] = clauses[i];
+            const [, startPos, endPos, ranges] = clauses[i];
             if (ranges.length === 0) continue;
 
             const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([ranges[0]])));
@@ -461,7 +466,7 @@ export default class TraverturePlugin extends Plugin {
         let groupEnd = 0;
         let currentBcvs: string[] = [];
         
-        for (const [_clauseText, startPos, endPos, ranges] of clauses) {
+        for (const [, startPos, endPos, ranges] of clauses) {
             if (ranges.length === 0) continue;
             const bookNum = parseInt(ranges[0][0].substring(0, 2));
             

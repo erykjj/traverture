@@ -38,7 +38,7 @@ function buildDecorations(view: any, plugin: any) {
             const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
             
             for (const clause of sorted) {
-                const [clauseText, _startPos, _endPos, ranges] = clause;
+                const [clauseText, , , ranges] = clause;
                 if (ranges.length === 0) continue;
                 const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
                 
@@ -94,7 +94,7 @@ function processSegment(basePos: number, segment: string, plugin: any, allDecos:
     if (clauses.length === 0) return;
 
     for (const clause of clauses) {
-        const [_clauseText, startPos, endPos, ranges] = clause;
+        const [, startPos, endPos, ranges] = clause;
         if (ranges.length === 0) continue;
         const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
         
@@ -132,7 +132,7 @@ export function createTravertureEditorPlugin(plugin: any) {
             eventHandlers: {
                 mousedown: (e: MouseEvent, _view: any) => {
                     if (e.button !== 0) return;
-                    const pos = (_view as any).posAtCoords({ x: e.clientX, y: e.clientY });
+                    const pos = _view.posAtCoords({ x: e.clientX, y: e.clientY });
                     if (pos === null) return;
 
                     const entry = plugin._editBcvs?.find((b: any) => pos >= b.from && pos <= b.to);
