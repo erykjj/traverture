@@ -14,7 +14,6 @@ function buildDecorations(view: any, plugin: any) {
         const text = view.state.doc.sliceString(from, to);
         const decorated: Array<{ from: number; to: number }> = [];
 
-        // Pass 1: {{ }} blocks
         let match;
         while ((match = REF_PATTERN.exec(text)) !== null) {
             const blockStart = from + match.index;
@@ -60,7 +59,6 @@ function buildDecorations(view: any, plugin: any) {
             }
         }
 
-        // Pass 2: Auto-detect
         if (plugin.settings.autoDetect) {
             const decoratedRanges = [...decorated].sort((a, b) => a.from - b.from);
             let pos = from;
