@@ -11,7 +11,7 @@
 ### Removed
 
 ____
-## [3.0.1] - 2026-07-03
+## [3.0.2] - 2026-07-03
 
 - **Major release**
   - Includes **auto-linking** in both Edit and View modes
@@ -69,7 +69,7 @@ ____
 - Initial Obidian Community release
 
 ____
-[3.0.1]:https://github.com/erykjj/traverture/releases/tag/3.0.1
+[3.0.2]:https://github.com/erykjj/traverture/releases/tag/3.0.2
 [2.0.2]:https://github.com/erykjj/traverture/releases/tag/2.0.2
 [1.2.1]:https://github.com/erykjj/traverture/releases/tag/1.2.1
 [1.2.0]:https://github.com/erykjj/traverture/releases/tag/1.2.0
