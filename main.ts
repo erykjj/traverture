@@ -256,16 +256,6 @@ export default class TraverturePlugin extends Plugin {
         this.addSettingTab(new TravertureSettingTab(this.app, this));
         this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
 
-        this.addCommand({ id: 'parse-document-references', name: 'tra.VER:ture: Parse document', callback: async () => {
-            const file = this.app.workspace.getActiveFile(); if (!file) return;
-            await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
-        }});
-
-        this.addCommand({ id: 'parse-selection-references', name: 'tra.VER:ture: Parse selection', editorCallback: async (editor: any) => {
-            const selection = editor.getSelection(); if (!selection) return;
-            await this.showSidebarWithResults(await this.parseReferences(selection));
-        }});
-
         this.registerEditorExtension(createTravertureEditorPlugin(this));
 
         this.registerMarkdownPostProcessor((element, _context) => {
@@ -375,96 +365,48 @@ export default class TraverturePlugin extends Plugin {
             menu.showAtMouseEvent(evt);
         });
 
-        // Mobile traverture menu
         this.addRibbonIcon('scroll', 'tra.VER:ture', () => {
-            const file = this.app.workspace.getActiveFile();
-            const editor = this.app.workspace.activeEditor?.editor;
-            const sel = editor?.getSelection();
-            const menu = new Menu();
-
-            if (sel) {
-                menu.addItem((item: any) => item.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
-                    await this.showSidebarWithResults(await this.parseReferences(sel));
-                }));
-                menu.addItem((item: any) => {
-                    item.setTitle('Insert citation').setIcon('quote-glyph');
-                    const citeMenu = item.setSubmenu();
-                    citeMenu.addItem((citeItem: any) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
-                        if (editor && sel) await this.insertCitation(editor, sel, false);
-                    }));
-                    citeMenu.addItem((citeItem: any) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
-                        if (editor && sel) await this.insertCitation(editor, sel, true);
-                    }));
-                });
-                menu.addItem((item: any) => {
-                    item.setTitle('Reformat selection').setIcon('pencil');
-                    const submenu = item.setSubmenu();
-                    submenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor!, sel, 'full')));
-                    submenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor!, sel, 'standard')));
-                    submenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor!, sel, 'official')));
-                });
-                menu.addSeparator();
-            }
-
-            menu.addItem((item: any) => item.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
-                if (!file) { new Notice('No file open.'); return; }
-                await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
-            }));
-
-            menu.addItem((item: any) => {
-                item.setTitle('Reformat document').setIcon('pencil');
-                const submenu = item.setSubmenu();
-                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => {
-                    if (editor) this.reformatReferences(editor, editor.getValue(), 'full', true);
-                }));
-                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => {
-                    if (editor) this.reformatReferences(editor, editor.getValue(), 'standard', true);
-                }));
-                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => {
-                    if (editor) this.reformatReferences(editor, editor.getValue(), 'official', true);
-                }));
-            });
-
-            menu.addSeparator();
-
-            // Source language
-            menu.addItem((item: any) => {
-                item.setTitle('Source language').setIcon('book-open');
-                const langMenu = item.setSubmenu();
-                const languages = getAvailableLanguages();
-                for (const lang of languages) {
-                    langMenu.addItem((langItem: any) => langItem
-                        .setTitle(`${lang.vernacularName} (${lang.code})`)
-                        .setChecked(lang.code === this.settings.sourceLanguage)
-                        .onClick(async () => {
-                            this.settings.sourceLanguage = lang.code;
-                            await this.saveSettings();
-                            this.createEngine();
-                            new Notice(`Source language: ${lang.vernacularName}`);
-                        }));
-                }
-            });
-
-            // Output language
-            menu.addItem((item: any) => {
-                item.setTitle('Output language').setIcon('languages');
-                const langMenu = item.setSubmenu();
-                const languages = getAvailableLanguages();
-                for (const lang of languages) {
-                    langMenu.addItem((langItem: any) => langItem
-                        .setTitle(`${lang.vernacularName} (${lang.code})`)
-                        .setChecked(lang.code === this.settings.outputLanguage)
-                        .onClick(async () => {
-                            this.settings.outputLanguage = lang.code;
-                            await this.saveSettings();
-                            this.createEngine();
-                            new Notice(`Output language: ${lang.vernacularName}`);
-                        }));
-                }
-            });
-
-            menu.showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
+            this.showTravertureMenu().showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
         });
+
+        this.addCommand({ id: 'traverture-open-menu', name: 'tra.VER:ture: Open menu', icon: 'scroll', editorCallback: () => {
+            this.showTravertureMenu().showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
+        }});
+
+        this.addCommand({ id: 'parse-document-references', name: 'tra.VER:ture: Parse document', icon: 'file-text', callback: async () => {
+            const file = this.app.workspace.getActiveFile(); if (!file) return;
+            await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+        }});
+
+        this.addCommand({ id: 'parse-selection-references', name: 'tra.VER:ture: Parse selection', icon: 'sidebar-right', editorCallback: async (editor: any) => {
+            const selection = editor.getSelection(); if (!selection) return;
+            await this.showSidebarWithResults(await this.parseReferences(selection));
+        }});
+
+        this.addCommand({ id: 'traverture-insert-citation-ref', name: 'tra.VER:ture: Insert citation (Reference)', icon: 'quote-glyph', editorCallback: async (editor: any) => {
+            const selection = editor.getSelection(); if (!selection) return;
+            await this.insertCitation(editor, selection, false);
+        }});
+
+        this.addCommand({ id: 'traverture-insert-citation-verse', name: 'tra.VER:ture: Insert citation (verse)', icon: 'quote-glyph', editorCallback: async (editor: any) => {
+            const selection = editor.getSelection(); if (!selection) return;
+            await this.insertCitation(editor, selection, true);
+        }});
+
+        this.addCommand({ id: 'traverture-reformat-full', name: 'tra.VER:ture: Reformat (Full)', icon: 'pencil', editorCallback: (editor: any) => {
+            const selection = editor.getSelection(); if (!selection) return;
+            this.reformatReferences(editor, selection, 'full');
+        }});
+
+        this.addCommand({ id: 'traverture-reformat-standard', name: 'tra.VER:ture: Reformat (Standard)', icon: 'pencil', editorCallback: (editor: any) => {
+            const selection = editor.getSelection(); if (!selection) return;
+            this.reformatReferences(editor, selection, 'standard');
+        }});
+
+        this.addCommand({ id: 'traverture-reformat-official', name: 'tra.VER:ture: Reformat (Official)', icon: 'pencil', editorCallback: (editor: any) => {
+            const selection = editor.getSelection(); if (!selection) return;
+            this.reformatReferences(editor, selection, 'official');
+        }});
     }
 
     async showSidebarWithResults(refs: SidebarRef[]) {
@@ -485,27 +427,20 @@ export default class TraverturePlugin extends Plugin {
         const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
         if (clauses.length === 0) return;
 
+        const fmtEngine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.sourceLanguage, format, false);
         let processed = text;
-        const replaced = new Set<string>();
 
-        for (const [clauseText, _startPos, _endPos, ranges] of clauses) {
+        for (let i = clauses.length - 1; i >= 0; i--) {
+            const [_clauseText, startPos, endPos, ranges] = clauses[i];
             if (ranges.length === 0) continue;
-            if (/^\d/.test(clauseText)) continue;
 
-            const bookMatch = clauseText.match(/^(.+?)\s+\d/);
-            if (!bookMatch) continue;
-            const bookName = bookMatch[1];
+            const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([ranges[0]])));
+            const formattedRef = decoded[0] || '';
+            if (!formattedRef) continue;
 
-            if (replaced.has(bookName)) continue;
-            replaced.add(bookName);
-
-            const bookNum = parseInt(ranges[0][0].substring(0, 2));
-            const newBookName = wasmModule.TravertureEngine.get_book_name(bookNum, this.settings.sourceLanguage, format, false);
-
-            if (newBookName && newBookName !== bookName) {
-                const escaped = bookName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                processed = processed.replace(new RegExp(escaped, 'g'), newBookName);
-            }
+            const before = processed.substring(0, startPos);
+            const after = processed.substring(endPos);
+            processed = before + formattedRef + after;
         }
 
         if (wholeDoc) { editor.setValue(processed); }
@@ -583,6 +518,94 @@ export default class TraverturePlugin extends Plugin {
             }
         }
         editor.replaceSelection(result);
+    }
+
+    showTravertureMenu() {
+        const file = this.app.workspace.getActiveFile();
+        const editor = this.app.workspace.activeEditor?.editor;
+        const sel = editor?.getSelection();
+        const menu = new Menu();
+
+        if (sel) {
+            menu.addItem((item: any) => item.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
+                await this.showSidebarWithResults(await this.parseReferences(sel));
+            }));
+            menu.addItem((item: any) => {
+                item.setTitle('Insert citation').setIcon('quote-glyph');
+                const citeMenu = item.setSubmenu();
+                citeMenu.addItem((citeItem: any) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
+                    if (editor && sel) await this.insertCitation(editor, sel, false);
+                }));
+                citeMenu.addItem((citeItem: any) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
+                    if (editor && sel) await this.insertCitation(editor, sel, true);
+                }));
+            });
+            menu.addItem((item: any) => {
+                item.setTitle('Reformat selection').setIcon('pencil');
+                const submenu = item.setSubmenu();
+                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor!, sel, 'full')));
+                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor!, sel, 'standard')));
+                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor!, sel, 'official')));
+            });
+            menu.addSeparator();
+        }
+
+        menu.addItem((item: any) => item.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
+            if (!file) { new Notice('No file open.'); return; }
+            await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+        }));
+        menu.addItem((item: any) => {
+            item.setTitle('Reformat document').setIcon('pencil');
+            const submenu = item.setSubmenu();
+            submenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => {
+                if (editor) this.reformatReferences(editor, editor.getValue(), 'full', true);
+            }));
+            submenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => {
+                if (editor) this.reformatReferences(editor, editor.getValue(), 'standard', true);
+            }));
+            submenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => {
+                if (editor) this.reformatReferences(editor, editor.getValue(), 'official', true);
+            }));
+        });
+        menu.addSeparator();
+
+        // Source language
+        menu.addItem((item: any) => {
+            item.setTitle('Source language').setIcon('book-open');
+            const langMenu = item.setSubmenu();
+            const languages = getAvailableLanguages();
+            for (const lang of languages) {
+                langMenu.addItem((langItem: any) => langItem
+                    .setTitle(`${lang.vernacularName} (${lang.code})`)
+                    .setChecked(lang.code === this.settings.sourceLanguage)
+                    .onClick(async () => {
+                        this.settings.sourceLanguage = lang.code;
+                        await this.saveSettings();
+                        this.createEngine();
+                        new Notice(`Source language: ${lang.vernacularName}`);
+                    }));
+            }
+        });
+
+        // Output language
+        menu.addItem((item: any) => {
+            item.setTitle('Output language').setIcon('languages');
+            const langMenu = item.setSubmenu();
+            const languages = getAvailableLanguages();
+            for (const lang of languages) {
+                langMenu.addItem((langItem: any) => langItem
+                    .setTitle(`${lang.vernacularName} (${lang.code})`)
+                    .setChecked(lang.code === this.settings.outputLanguage)
+                    .onClick(async () => {
+                        this.settings.outputLanguage = lang.code;
+                        await this.saveSettings();
+                        this.createEngine();
+                        new Notice(`Output language: ${lang.vernacularName}`);
+                    }));
+            }
+        });
+
+        return menu;
     }
 
     onunload() { }
