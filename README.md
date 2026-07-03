@@ -2,7 +2,7 @@
 
 > **traverture** (n.): The act of traversing text to find, convert, and reformat scripture references – a turning across formats, translations, and styles. From Latin *trans-* ("across") + *vertere* ("to turn") + *-ura* (action/result).
 
-A scripture reference parser, formatter, and viewer for Obsidian. Create interactive links with verse previews, or parse entire documents into a searchable, sortable sidebar table.
+A scripture reference parser, formatter, and viewer for Obsidian. Automatically creates interactive links with verse previews; allows parsing selection or entire documents into a searchable, sortable sidebar table.
 
 ## Security and Privacy
 
@@ -12,14 +12,9 @@ If you are concerned about the "Scorecard" review or the "Caution" warning on th
 
 ## Features
 
-- **Inline reference parsing** – Wrap any text containing scripture references in `{{ }}` to create clickable links. Surrounding text is preserved. Multiple references within a single block are all detected.
+- **Automatic reference detection** – Scripture references are automatically detected in both View and Edit modes. Works with most book name variants and common abbreviations (e.g., "2 Sam.", "II Samuel", "2Sa"). References can also be force-detected by wrapping them in `{{ }}` (e.g., `{{Song of Solomon 1:1}}`). See [Known Limitations](#known-limitations) for edge cases.
 
-  ```text
-  {{this is John 17:17 and Ps 1:1-3 end of test}}
-  ```
-  Produces two clickable links: `John 17:17` and `Ps 1:1-3`
-
-- **Verse preview modal** – Click any reference to open a modal with the full scripture text[^1] (with cross-reference and footnote tooltips), a study-note pane (where available) and buttons to copy the text, or open in *JW Library*[^2] or [*JW.ORG*](https://jw.org).
+- **Verse preview modal** – Click any reference to open a modal with the full scripture text[^1] (with cross-reference and footnote tooltips), a study-note pane (where available) and buttons to copy the text, or open in *JW Library*[^2] or [*JW.ORG*](https://jw.org)[^3].
 
 - **Sidebar table** – Parse a selection or entire document into a searchable, sortable table with columns for Original, Full, Standard, and Official name formats, BCV codes, and chapter and verse numbers. Features include:
   - Accent-insensitive search/filter
@@ -30,39 +25,35 @@ If you are concerned about the "Scorecard" review or the "Caution" warning on th
   - Option to filter out duplicate entries
   - Copy table (with current filter/sort, etc.) to clipboard (TSV format)
 
-- **Tag references** – Enclose all scripture references in a selection or document with `{{ }}` markers.
-
 - **Insert citation** – Replace a scripture reference with the full verse text[^1]. Two formats available:
   - `Reference: "verse"` – preserves verse numbers
   - `"verse" (Reference)` – plain text without verse numbers
 
-- **Reformat references** – Convert references between Full (1 Corinthians), Standard (1 Cor.), and Official (1Co) name formats. Works on selections or entire documents.
+- **Reformat references** – Convert references between Full (e.g., "1 Corinthians"), Standard (e.g., "1 Cor."), and Official (e.g., "1Co") name formats. Works on selections or entire documents.
 
 - **Multi-language support** – Parse references in any supported language, and display or fetch verse text in a different language.
   - Supported languages: Danish, Dutch, English, French, German, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Russian, Spanish, Swedish, Ukrainian
 
+- **Desktop and mobile support**
+
 ![preview](traverture.gif)
-
----
-
-## Usage
-
-### Desktop
-Right-click text selection or anywhere in the editor to access:
-- **Parse selection / Parse document** – Open the sidebar table
-- **Insert citation** – Choose `Reference: "verse"` or `"verse" (Reference)`
-- **Tag selection / Tag document** – Wrap references in `{{ }}`
-- **Reformat selection / Reformat document** – Convert between name formats
-
-### Mobile
-Tap the three-line hamburger menu and look for **tra.VER:ture** (scroll icon) to access all commands.
 
 ---
 
 ## Settings
 
 - **Source language** – Language of the scripture references in your notes
-- **Output language** – Language for displaying book names in the sidebar and fetching verse text for previews
+- **Output language** – Language for displaying book names and fetching verse text
+- **Modal title format** – How references are displayed in the verse preview title (Full, Standard, Official)
+- **Auto-detect references** – Toggle automatic detection without `{{ }}` markers
+
+---
+
+## Known Limitations
+
+- **Whole books** (like "James") are not detected unless preceded by a number (e.g., "1 John"). Use braces if detection is desired (e.g., `{{Obadiah}}`)
+- **"Song of Solomon"** and its variants are not auto-detected. Use `{{Song of Solomon 1:1}}` to force detection.
+- **Ambiguous references** like "1 John 5:3; 2 John 4" may parse incorrectly as "1 John 5:3; 2" (as in, 1 John chapter 2) and "John 4". Force detection with braces: `1 John 5:3; {{2 John 4}}`.
 
 ---
 
@@ -89,4 +80,6 @@ ______
 
 [^1]: Bible citation text is taken from [*New World Translation of the Holy Scriptures*](https://www.jw.org/en/library/bible/study-bible/books/) (*NWT*) (© Watch Tower Bible and Tract Society of Pennsylvania). In the future, other translations may be included.
 
-[^2]: [JW Library](https://www.jw.org/en/online-help/jw-library/) is a registered trademark of Watch Tower Bible and Tract Society of Pennsylvania.
+[^2]: [*JW Library*](https://www.jw.org/en/online-help/jw-library/) is a registered trademark of Watch Tower Bible and Tract Society of Pennsylvania.
+
+[^3]: *JW Library* may intercept these links by default.
