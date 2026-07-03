@@ -11,6 +11,13 @@
 ### Removed
 
 ____
+## [3.0.0] - 2026-07-03
+
+- **Major release**
+  - Includes **auto-linking** in both Edit and View modes
+    - `{{` `}}` delimeters are only used for *forced* detection of scriptures that would otherwise not be auto-detected (see README)
+  - Many fixes and improvements
+
 ## [2.0.2] - 2026-06-25
 
 ### Added
@@ -62,6 +69,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[3.0.0]:https://github.com/erykjj/traverture/releases/tag/3.0.0
 [2.0.2]:https://github.com/erykjj/traverture/releases/tag/2.0.2
 [1.2.1]:https://github.com/erykjj/traverture/releases/tag/1.2.1
 [1.2.0]:https://github.com/erykjj/traverture/releases/tag/1.2.0
