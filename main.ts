@@ -112,7 +112,7 @@ export default class TraverturePlugin extends Plugin {
                 const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
                 
                 for (let i = 0; i < sorted.length; i++) {
-                    const [clauseText, _startPos, _endPos, ranges] = sorted[i];
+                    const [clauseText, , , ranges] = sorted[i];
                     const origIndex = clauses.indexOf(sorted[i]);
                     
                     if (origIndex === 0) {
