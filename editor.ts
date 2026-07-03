@@ -4,16 +4,17 @@ import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 
 const REF_PATTERN = /\{\{(.+?)\}\}/g;
-const MARKER_PATTERN = /⟪(.+?)⟫/g;
 
 function buildDecorations(view: any, plugin: any) {
     const allDecos: Array<{ from: number; to: number; deco: any }> = [];
     const cursor = view.state.selection.main;
+    const bcvs: Array<{ from: number; to: number; bcv: string }> = [];
 
     for (const { from, to } of view.visibleRanges) {
         const text = view.state.doc.sliceString(from, to);
         const decorated: Array<{ from: number; to: number }> = [];
 
+        // Pass 1: {{ }} blocks
         let match;
         while ((match = REF_PATTERN.exec(text)) !== null) {
             const blockStart = from + match.index;
@@ -34,28 +35,32 @@ function buildDecorations(view: any, plugin: any) {
             const parsed = plugin.safeParse?.(engineInput);
             if (!parsed) continue;
 
-            if (parsed) {
-                const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
-                const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+            const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+            const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+            
+            for (const clause of sorted) {
+                const [clauseText, _startPos, _endPos, ranges] = clause;
+                if (ranges.length === 0) continue;
+                const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
                 
-                for (const [clauseText, _ranges] of sorted) {
-                    const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const refRegex = new RegExp(escaped, 'g');
-                    let refMatch;
-                    while ((refMatch = refRegex.exec(innerText)) !== null) {
-                        const refStart = innerStart + refMatch.index;
-                        const refEnd = refStart + clauseText.length;
-                        
-                        const overlaps = decorated.some(p => refStart < p.to && refEnd > p.from);
-                        if (!overlaps) {
-                            allDecos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
-                            decorated.push({ from: refStart, to: refEnd });
-                        }
+                const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const refRegex = new RegExp(escaped, 'g');
+                let refMatch;
+                while ((refMatch = refRegex.exec(innerText)) !== null) {
+                    const refStart = innerStart + refMatch.index;
+                    const refEnd = refStart + clauseText.length;
+                    
+                    const overlaps = decorated.some(p => refStart < p.to && refEnd > p.from);
+                    if (!overlaps) {
+                        allDecos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
+                        decorated.push({ from: refStart, to: refEnd });
+                        bcvs.push({ from: refStart, to: refEnd, bcv });
                     }
                 }
             }
         }
 
+        // Pass 2: Auto-detect
         if (plugin.settings.autoDetect) {
             const decoratedRanges = [...decorated].sort((a, b) => a.from - b.from);
             let pos = from;
@@ -63,13 +68,13 @@ function buildDecorations(view: any, plugin: any) {
             for (const d of decoratedRanges) {
                 if (pos < d.from) {
                     const segment = view.state.doc.sliceString(pos, d.from);
-                    processSegment(pos, segment, plugin, allDecos, decorated);
+                    processSegment(pos, segment, plugin, allDecos, decorated, bcvs);
                 }
                 pos = Math.max(pos, d.to);
             }
             if (pos < to) {
                 const segment = view.state.doc.sliceString(pos, to);
-                processSegment(pos, segment, plugin, allDecos, decorated);
+                processSegment(pos, segment, plugin, allDecos, decorated, bcvs);
             }
         }
     }
@@ -79,17 +84,22 @@ function buildDecorations(view: any, plugin: any) {
     for (const d of allDecos) {
         builder.add(d.from, d.to, d.deco);
     }
+    plugin._editBcvs = bcvs;
     return builder.finish();
 }
 
-function processSegment(basePos: number, segment: string, plugin: any, allDecos: Array<{ from: number; to: number; deco: any }>, decorated: Array<{ from: number; to: number }>) {
+function processSegment(basePos: number, segment: string, plugin: any, allDecos: Array<{ from: number; to: number; deco: any }>, decorated: Array<{ from: number; to: number }>, bcvs: Array<{ from: number; to: number; bcv: string }>) {
     const parsed = plugin.safeParse?.(segment);
     if (!parsed) return;
 
     const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
     if (clauses.length === 0) return;
 
-    for (const [_clauseText, startPos, endPos, _ranges] of clauses) {
+    for (const clause of clauses) {
+        const [_clauseText, startPos, endPos, ranges] = clause;
+        if (ranges.length === 0) continue;
+        const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
+        
         const refStart = basePos + startPos;
         const refEnd = basePos + endPos;
 
@@ -97,11 +107,14 @@ function processSegment(basePos: number, segment: string, plugin: any, allDecos:
         if (!overlaps) {
             allDecos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
             decorated.push({ from: refStart, to: refEnd });
+            bcvs.push({ from: refStart, to: refEnd, bcv });
         }
     }
 }
 
 export function createTravertureEditorPlugin(plugin: any) {
+    plugin._editBcvs = [];
+
     return ViewPlugin.fromClass(
         class {
             decorations: any;
@@ -119,33 +132,16 @@ export function createTravertureEditorPlugin(plugin: any) {
         {
             decorations: (v: any) => v.decorations,
             eventHandlers: {
-                mousedown: (e: MouseEvent, view: any) => {
+                mousedown: (e: MouseEvent, _view: any) => {
                     if (e.button !== 0) return;
-                    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+                    const pos = (_view as any).posAtCoords({ x: e.clientX, y: e.clientY });
                     if (pos === null) return;
 
-                    const line = view.state.doc.lineAt(pos);
-                    const lineText = line.text;
-                    const lineFrom = line.from;
-                    const engineInput = lineText.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
-                    const parsed = plugin.safeParse?.(engineInput);
-                    if (!parsed) return;
-
-                    const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
-                    if (clauses.length === 0) return;
-
-                    for (const clause of clauses) {
-                        const [_clauseText, startPos, endPos, _ranges] = clause;
-
-                        const refStart = lineFrom + startPos;
-                        const refEnd = lineFrom + endPos;
-
-                        if (pos >= refStart && pos <= refEnd) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            showModal(plugin, clause, clauses);
-                            return;
-                        }
+                    const entry = plugin._editBcvs?.find((b: any) => pos >= b.from && pos <= b.to);
+                    if (entry) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showModal(plugin, entry.bcv);
                     }
                 }
             }
@@ -153,14 +149,14 @@ export function createTravertureEditorPlugin(plugin: any) {
     );
 }
 
-function showModal(plugin: any, clause: [string, number, number, string[][]], _clauses: Array<[string, number, number, string[][]]>) {
-    const [_clauseText, _startPos, _endPos, ranges] = clause;
-    const range = ranges[0];
-    const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
-
+function showModal(plugin: any, bcv: string): void {
+    const parts = bcv.split('-');
+    const startBcv = parts[0];
+    const endBcv = parts.length > 1 ? parts[1] : parts[0];
+    
     const fmtEngine = new (plugin.engine.constructor)(plugin.settings.sourceLanguage, plugin.settings.outputLanguage, plugin.settings.titleFormat, false);
-    const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[range[0], range[1]]])));
-    const displayText = decoded[0] || _clauseText;
+    const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[startBcv, endBcv]])));
+    const displayText = decoded[0] || bcv;
 
     const modal = new VerseModal();
     modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
