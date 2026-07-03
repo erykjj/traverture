@@ -191,24 +191,26 @@ export class VerseModal {
         paneCopyBtn.addEventListener('click', () => {
             let text = '';
             for (const c of commentaries) {
-                const note = activeDocument.createElement('div');
-                note.className = 'traverture-modal-commentary-note';
-
                 const bookNum = parseInt(c.source.substring(0, 2));
                 const bookName = wasmModule.TravertureEngine.get_book_name(bookNum, outputLang, 'full', false);
                 const ch = parseInt(c.source.substring(2, 5));
                 const vs = parseInt(c.source.substring(5, 8));
-                const citation = activeDocument.createElement('div');
-                citation.className = 'traverture-modal-commentary-citation';
-                citation.textContent = `${bookName} ${ch}:${vs}`;
-                note.appendChild(citation);
 
-                const parsed = new DOMParser().parseFromString(c.content, 'text/html');
-                parsed.body.querySelectorAll('a').forEach(a => a.replaceWith(a.textContent || ''));
-                for (const child of Array.from(parsed.body.childNodes)) {
-                    note.appendChild(child.cloneNode(true));
+                const tempDiv = activeDocument.createElement('div');
+                tempDiv.innerHTML = c.content;
+                tempDiv.querySelectorAll('a').forEach(a => a.replaceWith(a.textContent || ''));
+
+                const paras = tempDiv.querySelectorAll('p');
+                let noteText = '';
+                if (paras.length > 0) {
+                    noteText = Array.from(paras)
+                        .map(p => (p.textContent || '').replace(/[ \t]+/g, ' ').trim())
+                        .join('\n\n');
+                } else {
+                    noteText = (tempDiv.textContent || '').replace(/[ \t]+/g, ' ').trim();
                 }
-                paneContent.appendChild(note);
+
+                text += `${bookName} ${ch}:${vs}\n\n${noteText}\n\n`;
             }
             void navigator.clipboard.writeText(text.trim());
             setIcon(paneCopyBtn, 'check');
