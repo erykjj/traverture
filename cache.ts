@@ -1,6 +1,8 @@
 import { requestUrl } from 'obsidian';
-import { VerseData } from './types';
+// @ts-ignore
+import * as wasmModule from './engine.js';
 import { getLangSuffix } from './languages';
+import { VerseData } from './types';
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -134,4 +136,78 @@ export async function fetchVerse(range: string, langCode: string): Promise<Verse
         console.error(`tra.VER:ture: Error fetching verse "${apiRange}":`, e);
     }
     return null;
+}
+
+interface AslTimecodes {
+    startTime: string;
+    endTime: string;
+}
+
+const aslMetaCache = new Map<string, AslTimecodes>();
+
+export async function fetchAslTimecodes(bookNum: number, chapter: number, startVerse: number, endVerse: number): Promise<string | null> {
+    const cacheKey = `asl:${bookNum}:${chapter}`;
+    const cached = aslMetaCache.get(cacheKey);
+    if (cached) {
+        return `${cached.startTime}-${cached.endTime}`;
+    }
+
+    try {
+        const url = wasmModule.TravertureEngine.get_asl_metadata_url(bookNum, chapter);
+        const response = await requestUrl({ url });
+        const data = response.json;
+        const fileFormats = data.files?.ASL;
+        if (!fileFormats) return null;
+
+        let markers;
+        for (const format of Object.values(fileFormats) as any[]) {
+            for (const file of format) {
+                if (file.markers?.markers) {
+                    markers = file.markers.markers;
+                    break;
+                }
+            }
+            if (markers) break;
+        }
+        if (!markers) return null;
+
+        const firstMarker = markers.find((m: any) => m.verseNumber === startVerse);
+        const lastMarker = markers.find((m: any) => m.verseNumber === endVerse);
+        if (!firstMarker || !lastMarker) return null;
+
+        const startSeconds = parseTimecode(firstMarker.startTime);
+        const endSeconds = parseTimecode(lastMarker.startTime) + parseTimecode(lastMarker.duration);
+        const startTime = formatTimecode(startSeconds);
+        const endTime = formatTimecode(endSeconds);
+
+        aslMetaCache.set(cacheKey, { startTime, endTime });
+        return `${startTime}-${endTime}`;
+    } catch (e) {
+        console.error('tra.VER:ture: Error fetching ASL metadata:', e);
+        return null;
+    }
+}
+
+function parseTimecode(tc: string): number {
+    const parts = tc.split(':');
+    return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2]);
+}
+
+function formatTimecode(seconds: number): string {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+export async function getAslTimecodes(bcv: string): Promise<string | undefined> {
+    const parts = bcv.split('-');
+    const startBcv = parts[0];
+    const endBcv = parts.length > 1 ? parts[1] : parts[0];
+    const bookNum = parseInt(startBcv.substring(0, 2));
+    const chapter = parseInt(startBcv.substring(2, 5));
+    const startVerse = parseInt(startBcv.substring(5, 8));
+    const endVerse = parseInt(endBcv.substring(5, 8));
+    const result = await fetchAslTimecodes(bookNum, chapter, startVerse, endVerse);
+    return result ?? undefined;
 }

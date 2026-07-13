@@ -1,8 +1,8 @@
 import { PluginSettingTab, Setting } from 'obsidian';
-import { getAvailableLanguages } from './languages';
-import TraverturePlugin from './main';
 // @ts-ignore
 import * as wasmModule from './engine.js';
+import { getAvailableLanguages } from './languages';
+import TraverturePlugin from './main';
 
 export class TravertureSettingTab extends PluginSettingTab {
     plugin: TraverturePlugin;

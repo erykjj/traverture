@@ -1,4 +1,4 @@
-import { fetchVerseWithExtras } from './cache';
+import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { VerseModal } from './modal';
 import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
@@ -147,7 +147,7 @@ export function createTravertureEditorPlugin(plugin: any) {
     );
 }
 
-function showModal(plugin: any, bcv: string): void {
+async function showModal(plugin: any, bcv: string): Promise<void> {
     const parts = bcv.split('-');
     const startBcv = parts[0];
     const endBcv = parts.length > 1 ? parts[1] : parts[0];
@@ -156,10 +156,14 @@ function showModal(plugin: any, bcv: string): void {
     const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[startBcv, endBcv]])));
     const displayText = decoded[0] || bcv;
 
+    const timecodes = plugin.settings.outputLanguage === 'ase' 
+        ? await getAslTimecodes(bcv) 
+        : undefined;
+
     const modal = new VerseModal();
-    modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
+    modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText, timecodes);
     void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage, modal.getSignal()).then(verseData => {
         if (!modal.isVisible()) return;
-        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText);
+        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText, timecodes);
     });
 }

@@ -10,7 +10,7 @@ export class VerseModal {
     private hidden: boolean = false;
     private abortController: AbortController | null = null;
 
-    show(verseData: VerseData, bcv: string, outputLang: string, titleOverride?: string) {
+    show(verseData: VerseData, bcv: string, outputLang: string, titleOverride?: string, timecodes?: string) {
         if (this.hidden) return;
         this.hide();
         this.hidden = false;
@@ -20,6 +20,13 @@ export class VerseModal {
         const langObj = languages.find(l => l.code === outputLang);
         const langSymbol = langObj ? wasmModule.TravertureEngine.get_lang_symbol(outputLang) : 'E';
         this.currentTitle = titleOverride || verseData.citation;
+
+        const jwlibUrl = timecodes 
+            ? `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}&ts=${timecodes}`
+            : `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`;
+        const jworgUrl = timecodes
+            ? `https://www.jw.org/finder?wtlocale=${langSymbol}&bible=${bcv}&ts=${timecodes}`
+            : `https://www.jw.org/finder?wtlocale=${langSymbol}&bible=${bcv}`;
 
         const modal = activeDocument.createElement('div');
         modal.className = 'traverture-modal';
@@ -39,12 +46,10 @@ export class VerseModal {
         const buttonGroup = activeDocument.createElement('div');
         buttonGroup.className = 'traverture-modal-buttons';
 
-        const jwlibUrl = `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`;
         const jwlibBtn = this.createHeaderButton('JW Library');
         jwlibBtn.addEventListener('click', () => { window.open(jwlibUrl, '_blank'); void navigator.clipboard.writeText(jwlibUrl); });
         buttonGroup.appendChild(jwlibBtn);
 
-        const jworgUrl = `https://www.jw.org/finder?wtlocale=${langSymbol}&bible=${bcv}`;
         const jworgBtn = this.createHeaderButton('JW.ORG');
         jworgBtn.addEventListener('click', () => { window.open(jworgUrl, '_blank'); void navigator.clipboard.writeText(jworgUrl); });
         buttonGroup.appendChild(jworgBtn);

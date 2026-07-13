@@ -3,7 +3,7 @@ import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView } from 'obsidian';
 import wasmBinary from './engine_bg.wasm';
 // @ts-ignore
 import * as wasmModule from './engine.js';
-import { fetchVerseWithExtras } from './cache';
+import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { createTravertureEditorPlugin } from './editor';
 import { getAvailableLanguages } from './languages';
 import { VerseModal } from './modal';
@@ -202,11 +202,14 @@ export default class TraverturePlugin extends Plugin {
                 const fmtEngine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.titleFormat, false);
                 const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[bcv, bcv]])));
                 const refText = decoded[0] || link.textContent || '';
+                const timecodes = this.settings.outputLanguage === 'ase' 
+                    ? await getAslTimecodes(bcv) 
+                    : undefined;
                 const modal = new VerseModal();
-                modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+                modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText, timecodes);
                 const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage, modal.getSignal());
                 if (!modal.isVisible()) return;
-                modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText);
+                modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText, timecodes);
             })(); });
         });
     }

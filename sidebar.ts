@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 // @ts-ignore
 import * as wasmModule from './engine.js';
-import { fetchVerseWithExtras } from './cache';
+import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { getAvailableLanguages } from './languages';
 import { VerseModal } from './modal';
 import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR } from './types';
@@ -159,7 +159,13 @@ export class TravertureSidebarView extends ItemView {
             opt.value = lang.code;
             if (lang.code === this.outputLang) opt.selected = true;
         }
-        langSelect.addEventListener('change', () => { this.outputLang = langSelect.value; this.render(); });
+        langSelect.addEventListener('change', () => { 
+            this.outputLang = langSelect.value;
+            this.plugin.settings.outputLanguage = langSelect.value;
+            this.plugin.saveSettings();
+            this.plugin.createEngine();
+            this.render();
+        });
 
         const capsLabel = topRow.createEl('label', { cls: 'traverture-sidebar-caps-label' });
         const capsCb = capsLabel.createEl('input', { type: 'checkbox' });
@@ -255,11 +261,14 @@ export class TravertureSidebarView extends ItemView {
                     link.addEventListener('click', (e) => { void (async () => {
                         if (e.button !== 0) return;
                         e.preventDefault(); e.stopPropagation();
+                        const timecodes = this.outputLang === 'ase' 
+                            ? await getAslTimecodes(bcv) 
+                            : undefined;
                         const modal = new VerseModal();
-                        modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
+                        modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal, timecodes);
                         const verseData = await fetchVerseWithExtras(bcv, this.outputLang, modal.getSignal());
                         if (!modal.isVisible()) return;
-                        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal);
+                        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal, timecodes);
                     })(); });
                 } else { td.setText(displayVal); }
             }
