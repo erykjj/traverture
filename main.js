@@ -534,7 +534,8 @@ async function fetchAslTimecodes(bookNum, chapter, startVerse, endVerse) {
     if (!fileFormats) return null;
     let markers;
     for (const format of Object.values(fileFormats)) {
-      for (const file of format) {
+      const files = format;
+      for (const file of files) {
         if (file.markers?.markers) {
           markers = file.markers.markers;
           break;
@@ -959,7 +960,7 @@ function createTravertureEditorPlugin(plugin) {
           if (entry) {
             e.preventDefault();
             e.stopPropagation();
-            showModal(plugin, entry.bcv);
+            void showModal(plugin, entry.bcv);
           }
         }
       }
@@ -1208,7 +1209,7 @@ var TravertureSidebarView = class extends import_obsidian4.ItemView {
     langSelect.addEventListener("change", () => {
       this.outputLang = langSelect.value;
       this.plugin.settings.outputLanguage = langSelect.value;
-      this.plugin.saveSettings();
+      void this.plugin.saveSettings();
       this.plugin.createEngine();
       this.render();
     });
@@ -1663,6 +1664,33 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
           const content = await this.app.vault.read(file);
           await this.showSidebarWithResults(await this.parseReferences(content));
         }));
+        submenu.addSeparator();
+        submenu.addItem((subItem) => {
+          subItem.setTitle("Source language").setIcon("book-open");
+          const langMenu = subItem.setSubmenu();
+          const languages = getAvailableLanguages().filter((l) => l.code !== "ase");
+          for (const lang of languages) {
+            langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.sourceLanguage).onClick(async () => {
+              this.settings.sourceLanguage = lang.code;
+              await this.saveSettings();
+              this.createEngine();
+              new import_obsidian5.Notice(`Source language: ${lang.vernacularName}`);
+            }));
+          }
+        });
+        submenu.addItem((subItem) => {
+          subItem.setTitle("Output language").setIcon("languages");
+          const langMenu = subItem.setSubmenu();
+          const languages = getAvailableLanguages();
+          for (const lang of languages) {
+            langMenu.addItem((langItem) => langItem.setTitle(`${lang.vernacularName} (${lang.code})`).setChecked(lang.code === this.settings.outputLanguage).onClick(async () => {
+              this.settings.outputLanguage = lang.code;
+              await this.saveSettings();
+              this.createEngine();
+              new import_obsidian5.Notice(`Output language: ${lang.vernacularName}`);
+            }));
+          }
+        });
       });
       menu.showAtMouseEvent(evt);
     });
