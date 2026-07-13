@@ -370,6 +370,42 @@ export default class TraverturePlugin extends Plugin {
                     const content = await this.app.vault.read(file);
                     await this.showSidebarWithResults(await this.parseReferences(content));
                 }));
+
+                submenu.addSeparator();
+
+                submenu.addItem((subItem: any) => {
+                    subItem.setTitle('Source language').setIcon('book-open');
+                    const langMenu = subItem.setSubmenu();
+                    const languages = getAvailableLanguages().filter(l => l.code !== 'ase');
+                    for (const lang of languages) {
+                        langMenu.addItem((langItem: any) => langItem
+                            .setTitle(`${lang.vernacularName} (${lang.code})`)
+                            .setChecked(lang.code === this.settings.sourceLanguage)
+                            .onClick(async () => {
+                                this.settings.sourceLanguage = lang.code;
+                                await this.saveSettings();
+                                this.createEngine();
+                                new Notice(`Source language: ${lang.vernacularName}`);
+                            }));
+                    }
+                });
+
+                submenu.addItem((subItem: any) => {
+                    subItem.setTitle('Output language').setIcon('languages');
+                    const langMenu = subItem.setSubmenu();
+                    const languages = getAvailableLanguages();
+                    for (const lang of languages) {
+                        langMenu.addItem((langItem: any) => langItem
+                            .setTitle(`${lang.vernacularName} (${lang.code})`)
+                            .setChecked(lang.code === this.settings.outputLanguage)
+                            .onClick(async () => {
+                                this.settings.outputLanguage = lang.code;
+                                await this.saveSettings();
+                                this.createEngine();
+                                new Notice(`Output language: ${lang.vernacularName}`);
+                            }));
+                    }
+                });
             });
             menu.showAtMouseEvent(evt);
         });
