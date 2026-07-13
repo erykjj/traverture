@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added ASL as output/translation language, with links to videos
+
 ### Changed
 
 ### Fixed
