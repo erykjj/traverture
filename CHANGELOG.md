@@ -11,7 +11,7 @@
 ### Removed
 
 ____
-## [3.1.0] - 2026-07-13
+## [3.1.1] - 2026-07-13
 ### Added
 
 - Added **ASL** as output language, with links to videos
@@ -74,7 +74,7 @@ ____
 - Initial Obidian Community release
 
 ____
-[3.1.0]:https://github.com/erykjj/traverture/releases/tag/3.1.0
+[3.1.1]:https://github.com/erykjj/traverture/releases/tag/3.1.1
 [3.0.2]:https://github.com/erykjj/traverture/releases/tag/3.0.2
 [2.0.2]:https://github.com/erykjj/traverture/releases/tag/2.0.2
 [1.2.1]:https://github.com/erykjj/traverture/releases/tag/1.2.1
