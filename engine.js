@@ -30,6 +30,24 @@ export class TravertureEngine {
         }
     }
     /**
+     * Returns the URL to fetch ASL video metadata for a given book and chapter
+     * @param {number} book_number
+     * @param {number} chapter
+     * @returns {string}
+     */
+    static get_asl_metadata_url(book_number, chapter) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.travertureengine_get_asl_metadata_url(book_number, chapter);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
      * Returns a sorted JSON array of {code, vernacularName, englishName} for all available scripture languages
      * @returns {string}
      */
