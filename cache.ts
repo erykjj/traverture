@@ -160,8 +160,9 @@ export async function fetchAslTimecodes(bookNum: number, chapter: number, startV
         if (!fileFormats) return null;
 
         let markers;
-        for (const format of Object.values(fileFormats) as any[]) {
-            for (const file of format) {
+        for (const format of Object.values(fileFormats)) {
+            const files = format as Array<{ markers?: { markers?: Array<{ verseNumber: number; startTime: string; duration: string }> } }>;
+            for (const file of files) {
                 if (file.markers?.markers) {
                     markers = file.markers.markers;
                     break;

@@ -139,7 +139,7 @@ export function createTravertureEditorPlugin(plugin: any) {
                     if (entry) {
                         e.preventDefault();
                         e.stopPropagation();
-                        showModal(plugin, entry.bcv);
+                        void showModal(plugin, entry.bcv);
                     }
                 }
             }

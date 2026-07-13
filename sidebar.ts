@@ -162,7 +162,7 @@ export class TravertureSidebarView extends ItemView {
         langSelect.addEventListener('change', () => { 
             this.outputLang = langSelect.value;
             this.plugin.settings.outputLanguage = langSelect.value;
-            this.plugin.saveSettings();
+            void this.plugin.saveSettings();
             this.plugin.createEngine();
             this.render();
         });
