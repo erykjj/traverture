@@ -20,7 +20,7 @@ If you are concerned about the "Scorecard" review or the "Caution" warning on th
   - Accent-insensitive search/filter
   - Sort by any column (ascending/descending/original order)
   - Column visibility toggles
-  - Translation language dropdown with live book name translation
+  - Output language dropdown with live book name translation
   - Option to render book names in all-caps
   - Option to filter out duplicate entries
   - Copy table (with current filter/sort, etc.) to clipboard (TSV format)
@@ -32,7 +32,8 @@ If you are concerned about the "Scorecard" review or the "Caution" warning on th
 - **Reformat references** – Convert references between Full (e.g., "1 Corinthians"), Standard (e.g., "1 Cor."), and Official (e.g., "1Co") name formats. Works on selections or entire documents.
 
 - **Multi-language support** – Parse references in any supported language, and display or fetch verse text in a different language.
-  - Supported languages: Danish, Dutch, English, French, German, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Russian, Spanish, Swedish, Ukrainian
+  - Supported languages: ASL, Danish, Dutch, English, French, German, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Russian, Spanish, Swedish, Ukrainian
+    - ASL (American Sign Language) is available as an output language only; links open directly to the video segment for the verse range.
 
 - **Desktop and mobile support**
 
@@ -78,7 +79,7 @@ Feel free to get in touch and post any [issues and/or suggestions](https://githu
 
 ______
 
-[^1]: Bible citation text is taken from [*New World Translation of the Holy Scriptures*](https://www.jw.org/en/library/bible/study-bible/books/) (*NWT*) (© Watch Tower Bible and Tract Society of Pennsylvania). In the future, other translations may be included.
+[^1]: Bible citation text is taken from [*New World Translation of the Holy Scriptures*](https://www.jw.org/en/library/bible/study-bible/books/) (*NWT*) (© Watch Tower Bible and Tract Society of Pennsylvania).
 
 [^2]: [*JW Library*](https://www.jw.org/en/online-help/jw-library/) is a registered trademark of Watch Tower Bible and Tract Society of Pennsylvania.
 
