@@ -307,7 +307,7 @@ export default class TraverturePlugin extends Plugin {
                 submenu.addItem((subItem: any) => {
                     subItem.setTitle('Source language').setIcon('book-open');
                     const langMenu = subItem.setSubmenu();
-                    const languages = getAvailableLanguages();
+                    const languages = getAvailableLanguages().filter(l => l.code !== 'ase');
                     for (const lang of languages) {
                         langMenu.addItem((langItem: any) => langItem
                             .setTitle(`${lang.vernacularName} (${lang.code})`)
@@ -579,7 +579,7 @@ export default class TraverturePlugin extends Plugin {
         menu.addItem((item: any) => {
             item.setTitle('Source language').setIcon('book-open');
             const langMenu = item.setSubmenu();
-            const languages = getAvailableLanguages();
+            const languages = getAvailableLanguages().filter(l => l.code !== 'ase');
             for (const lang of languages) {
                 langMenu.addItem((langItem: any) => langItem
                     .setTitle(`${lang.vernacularName} (${lang.code})`)

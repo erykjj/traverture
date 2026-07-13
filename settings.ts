@@ -30,7 +30,9 @@ export class TravertureSettingTab extends PluginSettingTab {
             .setName('Source language')
             .setDesc('Language of the scripture references in your notes')
             .addDropdown(dropdown => {
-                for (const lang of languages) dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
+                for (const lang of languages.filter(l => l.code !== 'ase')) {
+                    dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
+                }
                 dropdown.setValue(this.plugin.settings.sourceLanguage)
                     .onChange(async (value) => { this.plugin.settings.sourceLanguage = value; await this.plugin.saveSettings(); this.plugin.createEngine(); });
             });
