@@ -32,7 +32,7 @@ If you are concerned about the "Scorecard" review or the "Caution" warning on th
 - **Reformat references** – Convert references between Full (e.g., "1 Corinthians"), Standard (e.g., "1 Cor."), and Official (e.g., "1Co") name formats. Works on selections or entire documents.
 
 - **Multi-language support** – Parse references in any supported language, and display or fetch verse text in a different language.
-  - Supported languages: ASL, Danish, Dutch, English, French, German, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Russian, Spanish, Swedish, Ukrainian
+  - Supported languages: ASL, Cebuano, Danish, Dutch, English, Estonian, French, German, Haitian Creole, Hungarian, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Romanian, Russian, Spanish, Swedish, Tagalog, Ukrainian
     - ASL (American Sign Language) is available as an output language only; links open directly to the video segment for the verse range.
 
 - **Desktop and mobile support**
