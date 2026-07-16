@@ -1,6 +1,6 @@
 {
-  "name": "obsidian-traverture",
-  "version": "1.0.0",
+  "name": "traverture",
+  "version": "3.2.0",
   "description": "Scripture reference parser for Obsidian",
   "main": "main.js",
   "scripts": {
@@ -8,16 +8,13 @@
     "build": "node esbuild.config.mjs production"
   },
   "keywords": [],
-  "author": "",
+  "author": "Eryk J.",
   "license": "MIT",
   "devDependencies": {
-    "esbuild": "^0.24.0",
-    "esbuild-plugin-wasm": "^1.1.0",
-    "obsidian": "^1.7.0",
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6",
+    "esbuild": "^0.28.1",
+    "obsidian": "1.13.1",
     "typescript": "^5.5.0"
-  },
-  "dependencies": {
-    "@codemirror/state": "^6.7.0",
-    "@codemirror/view": "^6.43.2"
   }
 }
