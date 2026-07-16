@@ -37,7 +37,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 'latest'
-          # cache: 'npm'
+          cache: 'npm'
 
       - name: Install dependencies and build
         run: |
@@ -77,16 +77,6 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
-      - name: Delete existing attestations
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.tag.outputs.TAG }}
-        run: |
-          # List and delete existing attestations for this tag
-          gh api /repos/${{ github.repository }}/attestations --jq '.[].bundle_id' 2>/dev/null | while read id; do
-            gh api --method DELETE /repos/${{ github.repository }}/attestations/$id 2>/dev/null
-          done || true
-
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v4
         with:
@@ -107,5 +97,4 @@ jobs:
           gh release create "$TAG" \
             --title="$TAG" \
             --notes="${{ steps.extract.outputs.changelog_section }}" \
-            --draft \
             main.js manifest.json styles.css
