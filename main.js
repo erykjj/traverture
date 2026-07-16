@@ -990,6 +990,14 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
   }
+  getSettingDefinitions() {
+    return [
+      { key: "sourceLanguage", name: "Source language", description: "Language of the scripture references in your notes", type: "dropdown", defaultValue: "en" },
+      { key: "outputLanguage", name: "Output language", description: "Language for displaying book names and fetching verse text", type: "dropdown", defaultValue: "en" },
+      { key: "autoDetect", name: "Auto-detect references", description: "Automatically detect scripture references without {{ }} markers", type: "toggle", defaultValue: true },
+      { key: "titleFormat", name: "Modal title format", description: "How scripture references are displayed in the verse modal title", type: "dropdown", defaultValue: "full" }
+    ];
+  }
   display() {
     const { containerEl } = this;
     containerEl.empty();
