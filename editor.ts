@@ -135,7 +135,7 @@ export function createTravertureEditorPlugin(plugin: any) {
                     const pos = _view.posAtCoords({ x: e.clientX, y: e.clientY });
                     if (pos === null) return;
 
-                    const entry = plugin._editBcvs?.find((b: any) => pos >= b.from && pos <= b.to);
+                    const entry = plugin._editBcvs?.find((b: any) => pos > b.from && pos < b.to);
                     if (entry) {
                         e.preventDefault();
                         e.stopPropagation();
