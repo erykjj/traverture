@@ -1359,6 +1359,7 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
     this.engine = null;
+    this.processingElements = /* @__PURE__ */ new Set();
     this.parseGuard = false;
   }
   async loadSettings() {
@@ -1432,6 +1433,9 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     return results;
   }
   processElement(el) {
+    if (el.querySelector(".callout, svg")) return;
+    if (this.processingElements.has(el)) return;
+    this.processingElements.add(el);
     let html = el.innerHTML;
     if (/\{\{(.+?)\}\}/g.test(html)) {
       html = html.replace(/\{\{(.+?)\}\}/g, (_fullMatch, inner) => {
@@ -1537,6 +1541,7 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
         })();
       });
     });
+    this.processingElements.delete(el);
   }
   insertLinks(text, clauses) {
     if (clauses.length === 0) return text;
