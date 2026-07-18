@@ -14,6 +14,7 @@ import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './ty
 export default class TraverturePlugin extends Plugin {
     settings = DEFAULT_SETTINGS;
     engine: any = null;
+    private processingElements = new Set<HTMLElement>();
 
     async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); }
     async saveSettings() { await this.saveData(this.settings); }
@@ -93,6 +94,9 @@ export default class TraverturePlugin extends Plugin {
     }
 
     processElement(el: HTMLElement) {
+        if (el.querySelector('.callout, svg')) return;
+        if (this.processingElements.has(el)) return;
+        this.processingElements.add(el);
         let html = el.innerHTML;
 
         // Process {{ }} blocks (forced parsing)
@@ -212,6 +216,7 @@ export default class TraverturePlugin extends Plugin {
                 modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText, timecodes);
             })(); });
         });
+        this.processingElements.delete(el);
     }
 
     private insertLinks(text: string, clauses: Array<[string, number, number, string[][]]>): string {
