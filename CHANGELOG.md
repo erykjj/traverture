@@ -11,6 +11,11 @@
 ### Removed
 
 ____
+## [3.3.0] - 2026-07-18
+### Fixed
+
+- Fixed issue with callout icons
+
 ## [3.2.3] - 2026-07-16
 ### Added
 
@@ -83,4 +88,5 @@ ____
 - Initial Obidian Community release
 
 ____
+[3.3.0]:https://github.com/erykjj/traverture/releases/tag/3.3.0
 [3.2.3]:https://github.com/erykjj/traverture/releases/tag/3.2.3
