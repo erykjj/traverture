@@ -1392,22 +1392,39 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     if (!parsed) return results;
     const clauses = JSON.parse(parsed);
     if (clauses.length === 0) return results;
-    let currentOriginal = "";
     let lastBookNum = -1;
-    const engFull = new TravertureEngine("en", "en", "full", false);
-    const engStd = new TravertureEngine("en", "en", "standard", false);
-    const engOff = new TravertureEngine("en", "en", "official", false);
-    for (const [clauseText, , , ranges] of clauses) {
+    let groupStart = 0;
+    let groupEnd = 0;
+    let groupCount = 0;
+    const clauseData = [];
+    for (const [, startPos, endPos, ranges] of clauses) {
       if (ranges.length === 0) continue;
       const bookNum = parseInt(ranges[0][0].substring(0, 2));
       if (bookNum !== lastBookNum) {
-        currentOriginal = clauseText;
+        if (lastBookNum !== -1 && groupCount > 0) {
+          const original = engineText.substring(groupStart, groupEnd);
+          for (let i = clauseData.length - 1; i >= 0 && i >= clauseData.length - groupCount; i--) {
+            clauseData[i].original = original;
+          }
+        }
+        groupStart = startPos;
         lastBookNum = bookNum;
-      } else if (currentOriginal && /^\d/.test(clauseText)) {
-        currentOriginal += `; ${clauseText}`;
-      } else {
-        currentOriginal = clauseText;
+        groupCount = 0;
       }
+      groupEnd = endPos;
+      groupCount++;
+      clauseData.push({ ranges, bookNum, original: "" });
+    }
+    if (lastBookNum !== -1 && groupCount > 0) {
+      const original = engineText.substring(groupStart, groupEnd);
+      for (let i = clauseData.length - 1; i >= 0 && i >= clauseData.length - groupCount; i--) {
+        clauseData[i].original = original;
+      }
+    }
+    const engFull = new TravertureEngine("en", "en", "full", false);
+    const engStd = new TravertureEngine("en", "en", "standard", false);
+    const engOff = new TravertureEngine("en", "en", "official", false);
+    for (const { ranges, bookNum, original } of clauseData) {
       for (const range of ranges) {
         const singleRange = [[range[0], range[1]]];
         const rangeJson = JSON.stringify(singleRange);
@@ -1416,8 +1433,8 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
         const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
         const startBcv = range[0], endBcv = range[1];
         results.push({
-          scripture: currentOriginal,
-          fullRef: fullDecoded[0] || currentOriginal,
+          scripture: original,
+          fullRef: fullDecoded[0] || original,
           standardRef: stdDecoded[0] || "",
           officialRef: offDecoded[0] || "",
           startBcv,
