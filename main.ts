@@ -48,26 +48,44 @@ export default class TraverturePlugin extends Plugin {
         const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
         if (clauses.length === 0) return results;
 
-        let currentOriginal = '';
         let lastBookNum = -1;
+        let groupStart = 0;
+        let groupEnd = 0;
+        let groupCount = 0;
+
+        const clauseData: Array<{ ranges: string[][]; bookNum: number; original: string }> = [];
+
+        for (const [, startPos, endPos, ranges] of clauses) {
+            if (ranges.length === 0) continue;
+            const bookNum = parseInt(ranges[0][0].substring(0, 2));
+
+            if (bookNum !== lastBookNum) {
+                if (lastBookNum !== -1 && groupCount > 0) {
+                    const original = engineText.substring(groupStart, groupEnd);
+                    for (let i = clauseData.length - 1; i >= 0 && i >= clauseData.length - groupCount; i--) {
+                        clauseData[i].original = original;
+                    }
+                }
+                groupStart = startPos;
+                lastBookNum = bookNum;
+                groupCount = 0;
+            }
+            groupEnd = endPos;
+            groupCount++;
+            clauseData.push({ ranges, bookNum, original: '' });
+        }
+        if (lastBookNum !== -1 && groupCount > 0) {
+            const original = engineText.substring(groupStart, groupEnd);
+            for (let i = clauseData.length - 1; i >= 0 && i >= clauseData.length - groupCount; i--) {
+                clauseData[i].original = original;
+            }
+        }
 
         const engFull = new wasmModule.TravertureEngine('en', 'en', 'full', false);
         const engStd = new wasmModule.TravertureEngine('en', 'en', 'standard', false);
         const engOff = new wasmModule.TravertureEngine('en', 'en', 'official', false);
 
-        for (const [clauseText, , , ranges] of clauses) {
-            if (ranges.length === 0) continue;
-            const bookNum = parseInt(ranges[0][0].substring(0, 2));
-
-            if (bookNum !== lastBookNum) {
-                currentOriginal = clauseText;
-                lastBookNum = bookNum;
-            } else if (currentOriginal && /^\d/.test(clauseText)) {
-                currentOriginal += `; ${clauseText}`;
-            } else {
-                currentOriginal = clauseText;
-            }
-
+        for (const { ranges, bookNum, original } of clauseData) {
             for (const range of ranges) {
                 const singleRange = [[range[0], range[1]]];
                 const rangeJson = JSON.stringify(singleRange);
@@ -77,8 +95,8 @@ export default class TraverturePlugin extends Plugin {
                 const startBcv = range[0], endBcv = range[1];
 
                 results.push({
-                    scripture: currentOriginal,
-                    fullRef: fullDecoded[0] || currentOriginal,
+                    scripture: original,
+                    fullRef: fullDecoded[0] || original,
                     standardRef: stdDecoded[0] || '',
                     officialRef: offDecoded[0] || '',
                     startBcv, endBcv,
