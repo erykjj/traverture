@@ -1,3 +1,5 @@
+[![Static Badge](https://img.shields.io/badge/releases-orange?logo=rss&logoColor=orange&color=black)](https://github.com/erykjj/traverture/releases.atom) [![GitHub Downloads](https://img.shields.io/github/downloads/erykjj/traverture/total)](https://github.com/erykjj/traverture/releases/latest)
+
 # tra.VER:ture – Obsidian plugin
 
 > **traverture** (n.): The act of traversing text to find, convert, and reformat scripture references – a turning across formats, translations, and styles. From Latin *trans-* ("across") + *vertere* ("to turn") + *-ura* (action/result).
@@ -72,8 +74,6 @@ Depending on the length of the scripture passage and the device, initial verse l
 4. Configure source and output languages in the plugin settings (if installing for the first time)
 
 ---
-
-[![Static Badge](https://img.shields.io/badge/releases-orange?style=plastic&logo=rss&logoColor=orange&color=black)](https://github.com/erykjj/traverture/releases.atom)
 
 Feel free to get in touch and post any [issues and/or suggestions](https://github.com/erykjj/traverture/issues).
 
