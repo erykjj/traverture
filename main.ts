@@ -37,10 +37,21 @@ export default class TraverturePlugin extends Plugin {
         );
     }
 
+    private stripFrontmatter(content: string): string {
+        if (content.startsWith('---')) {
+            const endIndex = content.indexOf('---', 3);
+            if (endIndex !== -1) {
+                return content.substring(endIndex + 3);
+            }
+        }
+        return content;
+    }
+
     async parseReferences(text: string): Promise<SidebarRef[]> {
         const results: SidebarRef[] = [];
         if (!this.engine) return results;
 
+        text = this.stripFrontmatter(text);
         const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪⟪$1⟫⟫');
         const parsed = this.safeParse(engineText);
         if (!parsed) return results;
@@ -390,7 +401,7 @@ export default class TraverturePlugin extends Plugin {
                 submenu.addItem((subItem: any) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
                     const file = view.file;
                     if (!file) return;
-                    const content = await this.app.vault.read(file);
+                    const content = this.stripFrontmatter(await this.app.vault.read(file));
                     await this.showSidebarWithResults(await this.parseReferences(content));
                 }));
 
@@ -443,7 +454,8 @@ export default class TraverturePlugin extends Plugin {
 
         this.addCommand({ id: 'parse-document-references', name: 'tra.VER:ture: Parse document', icon: 'file-text', callback: async () => {
             const file = this.app.workspace.getActiveFile(); if (!file) return;
-            await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+            const content = this.stripFrontmatter(await this.app.vault.read(file));
+            await this.showSidebarWithResults(await this.parseReferences(content));
         }});
 
         this.addCommand({ id: 'parse-selection-references', name: 'tra.VER:ture: Parse selection', icon: 'sidebar-right', editorCallback: async (editor: any) => {
@@ -620,7 +632,8 @@ export default class TraverturePlugin extends Plugin {
 
         menu.addItem((item: any) => item.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
             if (!file) { new Notice('No file open.'); return; }
-            await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+            const content = this.stripFrontmatter(await this.app.vault.read(file));
+            await this.showSidebarWithResults(await this.parseReferences(content));
         }));
         menu.addItem((item: any) => {
             item.setTitle('Reformat document').setIcon('pencil');
