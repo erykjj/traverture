@@ -11,6 +11,11 @@
 ### Removed
 
 ____
+## [3.4.0] - 2026-07-24
+### Changed
+
+- Note metadata is excluded from document parsing
+
 ## [3.3.2] - 2026-07-19
 ### Fixed
 
@@ -98,6 +103,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[3.4.0]:https://github.com/erykjj/traverture/releases/tag/3.4.0
 [3.3.2]:https://github.com/erykjj/traverture/releases/tag/3.3.2
 [3.3.1]:https://github.com/erykjj/traverture/releases/tag/3.3.1
 [3.3.0]:https://github.com/erykjj/traverture/releases/tag/3.3.0
