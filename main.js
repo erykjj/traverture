@@ -1384,9 +1384,19 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       text
     );
   }
+  stripFrontmatter(content) {
+    if (content.startsWith("---")) {
+      const endIndex = content.indexOf("---", 3);
+      if (endIndex !== -1) {
+        return content.substring(endIndex + 3);
+      }
+    }
+    return content;
+  }
   async parseReferences(text) {
     const results = [];
     if (!this.engine) return results;
+    text = this.stripFrontmatter(text);
     const engineText = text.replace(/\{\{(.+?)\}\}/g, "\u27EA\u27EA$1\u27EB\u27EB");
     const parsed = this.safeParse(engineText);
     if (!parsed) return results;
@@ -1691,7 +1701,7 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
         submenu.addItem((subItem) => subItem.setTitle("Parse document").setIcon("sidebar-right").onClick(async () => {
           const file = view.file;
           if (!file) return;
-          const content = await this.app.vault.read(file);
+          const content = this.stripFrontmatter(await this.app.vault.read(file));
           await this.showSidebarWithResults(await this.parseReferences(content));
         }));
         submenu.addSeparator();
@@ -1733,7 +1743,8 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     this.addCommand({ id: "parse-document-references", name: "tra.VER:ture: Parse document", icon: "file-text", callback: async () => {
       const file = this.app.workspace.getActiveFile();
       if (!file) return;
-      await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+      const content = this.stripFrontmatter(await this.app.vault.read(file));
+      await this.showSidebarWithResults(await this.parseReferences(content));
     } });
     this.addCommand({ id: "parse-selection-references", name: "tra.VER:ture: Parse selection", icon: "sidebar-right", editorCallback: async (editor) => {
       const selection = editor.getSelection();
@@ -1908,7 +1919,8 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
         new import_obsidian5.Notice("No file open.");
         return;
       }
-      await this.showSidebarWithResults(await this.parseReferences(await this.app.vault.read(file)));
+      const content = this.stripFrontmatter(await this.app.vault.read(file));
+      await this.showSidebarWithResults(await this.parseReferences(content));
     }));
     menu.addItem((item) => {
       item.setTitle("Reformat document").setIcon("pencil");
