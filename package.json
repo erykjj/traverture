@@ -1,7 +1,7 @@
 {
   "name": "traverture",
   "version": "3.4.0",
-  "description": "Scripture reference parser for Obsidian",
+  "description": "Parse, convert, and preview scripture references; insert citations from NWT Bible, and launch in JW Library and JW.ORG.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
