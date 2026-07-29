@@ -1,4 +1,4 @@
-import { PluginSettingTab, Setting } from 'obsidian';
+import { PluginSettingTab, Setting, Notice } from 'obsidian';
 // @ts-ignore
 import * as wasmModule from './engine.js';
 import { getAvailableLanguages } from './languages';
@@ -80,5 +80,45 @@ export class TravertureSettingTab extends PluginSettingTab {
                     this.plugin.settings.autoDetect = value;
                     await this.plugin.saveSettings();
                 }));
+
+        // Link scheme selection
+        new Setting(containerEl)
+            .setName('JW link scheme')
+            .setDesc('Choose how JW links are opened: plugin popup (default), JW Library app scheme, or web finder.')
+            .addDropdown(dropdown => {
+                dropdown.addOption('popup', 'Plugin popup (existing behavior)');
+                dropdown.addOption('jwlibrary', 'Open via jwlibrary:// (native JW Library app)');
+                dropdown.addOption('jworg', 'Open via https://www.jw.org/finder (web)');
+                dropdown.setValue(this.plugin.settings.linkScheme ?? 'popup')
+                    .onChange(async (value) => {
+                        this.plugin.settings.linkScheme = value as any;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        // Import EPUB button
+        new Setting(containerEl)
+            .setName('Import EPUB for offline lookup')
+            .setDesc('Upload an EPUB file to enable offline citation lookup stored in the vault.')
+            .addButton((btn) =>
+                btn.setButtonText('Import EPUB').onClick(async () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.epub,application/epub+zip';
+                    input.style.display = 'none';
+                    input.onchange = async () => {
+                        const file = input.files?.[0];
+                        if (!file) return;
+                        if (!this.plugin.epubImportService) { new Notice('EPUB importer not initialized.'); input.remove(); return; }
+                        const data = new Uint8Array(await file.arrayBuffer());
+                        const res = await this.plugin.epubImportService.importEpub(data, file.name);
+                        if (!res.success) new Notice(`EPUB import failed: ${res.error ?? 'unknown'}`);
+                        else new Notice(`Imported offline corpus: ${res.metadata?.language}`);
+                        input.remove();
+                    };
+                    document.body.appendChild(input);
+                    input.click();
+                }),
+            );
     }
 }
