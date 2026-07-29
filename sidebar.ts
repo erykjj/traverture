@@ -260,6 +260,11 @@ export class TravertureSidebarView extends ItemView {
                     link.setAttribute('data-ref', displayVal);
                     link.addEventListener('click', (e) => { void (async () => {
                         if (e.button !== 0) return;
+                        if (e.ctrlKey || e.metaKey) {
+                            const langSymbol = wasmModule.TravertureEngine.get_lang_symbol(this.outputLang);
+                            window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`, '_blank');
+                            return;
+                        }
                         e.preventDefault(); e.stopPropagation();
                         const timecodes = this.outputLang === 'ase' 
                             ? await getAslTimecodes(bcv) 

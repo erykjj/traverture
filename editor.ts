@@ -134,9 +134,13 @@ export function createTravertureEditorPlugin(plugin: any) {
                     if (e.button !== 0) return;
                     const pos = _view.posAtCoords({ x: e.clientX, y: e.clientY });
                     if (pos === null) return;
-
                     const entry = plugin._editBcvs?.find((b: any) => pos > b.from && pos < b.to);
                     if (entry) {
+                        if (e.ctrlKey || e.metaKey) {
+                            const langSymbol = (plugin.engine.constructor).get_lang_symbol(plugin.settings.outputLanguage);
+                            window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${entry.bcv}`, '_blank');
+                            return;
+                        }
                         e.preventDefault();
                         e.stopPropagation();
                         void showModal(plugin, entry.bcv);

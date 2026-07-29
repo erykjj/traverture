@@ -230,8 +230,17 @@ export default class TraverturePlugin extends Plugin {
         el.querySelectorAll('.traverture-ref-link').forEach(link => {
             link.addEventListener('click', (e) => { void (async () => {
                 if ((e as MouseEvent).button !== 0) return;
-                e.preventDefault(); e.stopPropagation();
                 const bcv = link.getAttribute('data-bcv')!;
+                if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
+                    const langSymbol = wasmModule.TravertureEngine.get_lang_symbol(this.settings.outputLanguage);
+                    window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`, '_blank');
+                    return;
+                }
+                e.preventDefault(); e.stopPropagation();
+                if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
+                    window.open(`jwlibrary:///finder?wtlocale=E&bible=${bcv}`, '_blank');
+                    return;
+                }
                 const fmtEngine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.titleFormat, false);
                 const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[bcv, bcv]])));
                 const refText = decoded[0] || link.textContent || '';
