@@ -10,11 +10,18 @@ import { VerseModal } from './modal';
 import { TravertureSettingTab } from './settings';
 import { TravertureSidebarView } from './sidebar';
 import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './types';
+import { buildJwLibraryFinderUrlForReference, buildJwOrgFinderUrlForReference } from './linkScheme';
+import { VaultOfflineEpubRepository } from './VaultOfflineEpubRepository';
+import { EpubImportService } from './EpubImportService';
 
 export default class TraverturePlugin extends Plugin {
     settings = DEFAULT_SETTINGS;
     engine: any = null;
     private processingElements = new Set<HTMLElement>();
+
+    // offline importer & repo
+    offlineRepo: VaultOfflineEpubRepository | null = null;
+    epubImportService: EpubImportService | null = null;
 
     async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); }
     async saveSettings() { await this.saveData(this.settings); }
@@ -132,7 +139,7 @@ export default class TraverturePlugin extends Plugin {
         if (/\{\{(.+?)\}\}/g.test(html)) {
             html = html.replace(/\{\{(.+?)\}\}/g, (_fullMatch: string, inner: string) => {
                 if (!this.engine) return _fullMatch;
-                
+
                 const refText = inner.replace(/\*\*/g, '').replace(/\*/g, '');
                 const engineInput = '⟪⟪' + refText + '⟫⟫';
                 const parsed = this.safeParse(engineInput);
@@ -143,26 +150,26 @@ export default class TraverturePlugin extends Plugin {
                 let result = inner;
                 let bookName = '';
                 const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
-                
+
                 for (let i = 0; i < sorted.length; i++) {
                     const [clauseText, , , ranges] = sorted[i];
                     const origIndex = clauses.indexOf(sorted[i]);
-                    
+
                     if (origIndex === 0) {
                         const match = clauseText.match(/^(.+?)\s+\d/);
                         if (match) bookName = match[1];
                     }
-                    
+
                     let displayText = clauseText;
                     if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
                         displayText = `${bookName} ${clauseText}`;
                     }
-                    
+
                     for (const range of ranges) {
                         const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
                         const link = `<a class="traverture-ref-link" data-bcv="${bcv}" data-ref="${displayText}">${clauseText}</a>`;
-                        const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        
+                        const escaped = clauseText.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+
                         if (/^\d+$/.test(clauseText)) {
                             const regex = new RegExp(`(^|[\\s,;])${escaped}(?=[\\s,;]|$)`, 'g');
                             result = result.replace(regex, `$1${link}`);
@@ -232,11 +239,45 @@ export default class TraverturePlugin extends Plugin {
                 if ((e as MouseEvent).button !== 0) return;
                 e.preventDefault(); e.stopPropagation();
                 const bcv = link.getAttribute('data-bcv')!;
+
+                // If user selected an alternate link scheme, open external url instead of modal
+                const scheme = this.settings.linkScheme ?? 'popup';
+                if (scheme === 'jwlibrary' || scheme === 'jworg') {
+                    // parse bcv of form BBCCC VVV? or BBCCC VVV-BBCCC VVV ? We'll handle single range or hyphen.
+                    const first = bcv.split('-')[0];
+                    const chapter = parseInt(first.substring(2,5));
+                    const verseStart = parseInt(first.substring(5,8));
+                    const verseEnd = first.length >= 8 ? parseInt(first.substring(5,8)) : undefined;
+
+                    let url = '';
+                    if (scheme === 'jwlibrary') {
+                        url = buildJwLibraryFinderUrlForReference({ chapter, verseStart, verseEnd });
+                    } else {
+                        url = buildJwOrgFinderUrlForReference({ chapter, verseStart, verseEnd });
+                    }
+
+                    try {
+                        // try electron shell if available
+                        // eslint-disable-next-line @typescript-eslint/no-var-requires
+                        const maybeRequire = (window as any).require;
+                        if (maybeRequire) {
+                            const { shell } = maybeRequire('electron') as typeof import('electron');
+                            void shell.openExternal(url);
+                        } else {
+                            window.open(url, '_blank', 'noopener');
+                        }
+                    } catch {
+                        window.open(url, '_blank', 'noopener');
+                    }
+
+                    return;
+                }
+
                 const fmtEngine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.titleFormat, false);
                 const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[bcv, bcv]])));
                 const refText = decoded[0] || link.textContent || '';
-                const timecodes = this.settings.outputLanguage === 'ase' 
-                    ? await getAslTimecodes(bcv) 
+                const timecodes = this.settings.outputLanguage === 'ase'
+                    ? await getAslTimecodes(bcv)
                     : undefined;
                 const modal = new VerseModal();
                 modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText, timecodes);
@@ -250,32 +291,32 @@ export default class TraverturePlugin extends Plugin {
 
     private insertLinks(text: string, clauses: Array<[string, number, number, string[][]]>): string {
         if (clauses.length === 0) return text;
-        
+
         const positions: Array<{ start: number; end: number; displayText: string; bcv: string; clauseText: string }> = [];
         let bookName = '';
-        
+
         for (let i = 0; i < clauses.length; i++) {
             const [clauseText, startPos, endPos, ranges] = clauses[i];
-            
+
             if (i === 0 || !/^\d/.test(clauseText)) {
                 const match = clauseText.match(/^(.+?)\s+\d/);
                 if (match) bookName = match[1];
             }
-            
+
             let displayText = clauseText;
             if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
                 displayText = `${bookName} ${clauseText}`;
             }
-            
+
             if (ranges.length === 0) continue;
             const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
-            
+
             positions.push({ start: startPos, end: endPos, displayText, bcv, clauseText });
         }
-        
+
         if (positions.length === 0) return text;
         positions.sort((a, b) => a.start - b.start);
-        
+
         let result = '';
         let pos = 0;
 
@@ -296,6 +337,10 @@ export default class TraverturePlugin extends Plugin {
         try { await wasmModule.default({ module_or_path: wasmBinary }); this.createEngine(); }
         catch (e) { console.error('tra.VER:ture: WASM error:', e); }
 
+        // initialize offline repository & importer
+        this.offlineRepo = new VaultOfflineEpubRepository(this.app, this.manifest.id);
+        this.epubImportService = new EpubImportService(this.offlineRepo);
+
         this.addSettingTab(new TravertureSettingTab(this.app, this));
         this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
 
@@ -312,7 +357,7 @@ export default class TraverturePlugin extends Plugin {
                 const submenu = item.setSubmenu();
 
                 if (selection) {
-                    submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(selection)); }));
+                    submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferenc[...]
                     submenu.addItem((subItem: any) => {
                         subItem.setTitle('Insert citation').setIcon('quote-glyph');
                         const citeMenu = subItem.setSubmenu();
@@ -329,7 +374,7 @@ export default class TraverturePlugin extends Plugin {
                     submenu.addSeparator();
                 }
 
-                submenu.addItem((subItem: any) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(editor.getValue())); }));
+                submenu.addItem((subItem: any) => subItem.setName('Parse document').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(ed[...]
                 submenu.addItem((subItem: any) => {
                     subItem.setTitle('Reformat document').setIcon('pencil');
                     const reformatMenu = subItem.setSubmenu();
@@ -593,7 +638,7 @@ export default class TraverturePlugin extends Plugin {
             }
             
             if (allText) {
-                const escaped = group.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escaped = group.original.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
                 result = result.replace(new RegExp(escaped), withRef ? `"${allText}" (${group.original})` : `${group.original}: "${allText}"`);
             }
         }
