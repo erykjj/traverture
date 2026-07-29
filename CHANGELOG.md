@@ -11,6 +11,15 @@
 ### Removed
 
 ____
+## [3.5.0] - 2026-07-29
+### Added
+
+- `Ctrl/Cmd`+click opens references directly in *JW Library* (if installed)
+
+### Changed
+
+- Updated engine with better rejection of false-positives
+
 ## [3.4.0] - 2026-07-24
 ### Changed
 
@@ -103,6 +112,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[3.5.0]:https://github.com/erykjj/traverture/releases/tag/3.5.0
 [3.4.0]:https://github.com/erykjj/traverture/releases/tag/3.4.0
 [3.3.2]:https://github.com/erykjj/traverture/releases/tag/3.3.2
 [3.3.1]:https://github.com/erykjj/traverture/releases/tag/3.3.1
