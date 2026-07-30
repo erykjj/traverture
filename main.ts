@@ -10,7 +10,6 @@ import { VerseModal } from './modal';
 import { TravertureSettingTab } from './settings';
 import { TravertureSidebarView } from './sidebar';
 import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './types';
-import { buildJwLibraryFinderUrlForReference, buildJwOrgFinderUrlForReference } from './linkScheme';
 import { VaultOfflineEpubRepository } from './VaultOfflineEpubRepository';
 import { EpubImportService } from './EpubImportService';
 
@@ -270,23 +269,28 @@ export default class TraverturePlugin extends Plugin {
 
                     const scheme = this.settings.linkScheme ?? 'popup';
                     if (scheme === 'jwlibrary' || scheme === 'jworg') {
-                        const first = bcv.split('-')[0];
-                        const chapter = parseInt(first.substring(2, 5));
-                        const verseStart = parseInt(first.substring(5, 8));
-                        const verseEnd = first.length >= 8 ? parseInt(first.substring(5, 8)) : undefined;
+                        const languages = getAvailableLanguages();
+                        const langObj = languages.find(l => l.code === this.settings.outputLanguage);
+                        const langSymbol = langObj
+                            ? wasmModule.TravertureEngine.get_lang_symbol(this.settings.outputLanguage)
+                            : 'E';
+                        const timecodes = this.settings.outputLanguage === 'ase'
+                            ? await getAslTimecodes(bcv)
+                            : undefined;
 
-                        let url = '';
-                        if (scheme === 'jwlibrary') {
-                            url = buildJwLibraryFinderUrlForReference({ chapter, verseStart, verseEnd });
-                        } else {
-                            url = buildJwOrgFinderUrlForReference({ chapter, verseStart, verseEnd });
-                        }
+                        const url = scheme === 'jwlibrary'
+                            ? (timecodes
+                                ? `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}&ts=${timecodes}`
+                                : `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`)
+                            : (timecodes
+                                ? `https://www.jw.org/finder?wtlocale=${langSymbol}&bible=${bcv}&ts=${timecodes}`
+                                : `https://www.jw.org/finder?wtlocale=${langSymbol}&bible=${bcv}`);
 
                         try {
                             const maybeRequire = (window as any).require;
                             if (maybeRequire) {
                                 const { shell } = maybeRequire('electron') as typeof import('electron');
-                                void shell.openExternal(url);
+                                await shell.openExternal(url);
                             } else {
                                 window.open(url, '_blank', 'noopener');
                             }
