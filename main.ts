@@ -357,7 +357,7 @@ export default class TraverturePlugin extends Plugin {
                 const submenu = item.setSubmenu();
 
                 if (selection) {
-                    submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferenc[...]
+                    submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(selection)
                     submenu.addItem((subItem: any) => {
                         subItem.setTitle('Insert citation').setIcon('quote-glyph');
                         const citeMenu = subItem.setSubmenu();
@@ -374,7 +374,7 @@ export default class TraverturePlugin extends Plugin {
                     submenu.addSeparator();
                 }
 
-                submenu.addItem((subItem: any) => subItem.setName('Parse document').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(ed[...]
+                submenu.addItem((subItem: any) => subItem.setName('Parse document').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(editor.getValue())
                 submenu.addItem((subItem: any) => {
                     subItem.setTitle('Reformat document').setIcon('pencil');
                     const reformatMenu = subItem.setSubmenu();
