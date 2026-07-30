@@ -3,7 +3,7 @@ import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView } from 'obsidian';
 import wasmBinary from './engine_bg.wasm';
 // @ts-ignore
 import * as wasmModule from './engine.js';
-import { fetchVerseWithExtras, getAslTimecodes } from './cache';
+import { fetchVerseWithExtrasOfflineFirst, getAslTimecodes } from './cache';
 import { createTravertureEditorPlugin } from './editor';
 import { getAvailableLanguages } from './languages';
 import { VerseModal } from './modal';
@@ -322,9 +322,10 @@ export default class TraverturePlugin extends Plugin {
                         timecodes
                     );
 
-                    const verseData = await fetchVerseWithExtras(
+                    const verseData = await fetchVerseWithExtrasOfflineFirst(
                         bcv,
                         this.settings.outputLanguage,
+                        this.offlineRepo,
                         modal.getSignal()
                     );
 
@@ -851,7 +852,7 @@ export default class TraverturePlugin extends Plugin {
                 let verseText = fetchedCache.get(cacheKey);
 
                 if (verseText === undefined) {
-                    const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
+                    const verseData = await fetchVerseWithExtrasOfflineFirst(bcv, this.settings.outputLanguage, this.offlineRepo);
                     if (verseData) {
                         let html = verseData.html
                             .replace(/<span class="parabreak"><\/span>/g, ' ')
