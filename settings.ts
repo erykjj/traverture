@@ -12,6 +12,36 @@ export class TravertureSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    private async chooseAndImportEpub(overwriteExisting = false): Promise<void> {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.epub,application/epub+zip';
+        input.style.display = 'none';
+
+        const done = new Promise<void>((resolve) => {
+            input.onchange = async () => {
+                try {
+                    const file = input.files?.[0];
+                    if (!file) return;
+                    if (!this.plugin.epubImportService) {
+                        new Notice('EPUB importer not initialized.');
+                        return;
+                    }
+                    const data = new Uint8Array(await file.arrayBuffer());
+                    const res = await this.plugin.epubImportService.importEpub(data, file.name, overwriteExisting);
+                    if (!res.success) new Notice(`EPUB import failed: ${res.error ?? 'unknown'}`);
+                    else new Notice(`Imported offline corpus: ${res.metadata?.language}`);
+                } finally {
+                    input.remove();
+                    resolve();
+                }
+            };
+        });
+
+        document.body.appendChild(input);
+        input.click();
+        await done;
+    }
 
     getSettingDefinitions(): any[] {
         return [
@@ -22,7 +52,7 @@ export class TravertureSettingTab extends PluginSettingTab {
         ];
     }
 
-    display(): void {
+    async display(): Promise<void> {
         const { containerEl } = this;
         containerEl.empty();
 
@@ -102,23 +132,44 @@ export class TravertureSettingTab extends PluginSettingTab {
             .setDesc('Upload an EPUB file to enable offline citation lookup stored in the vault.')
             .addButton((btn) =>
                 btn.setButtonText('Import EPUB').onClick(async () => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = '.epub,application/epub+zip';
-                    input.style.display = 'none';
-                    input.onchange = async () => {
-                        const file = input.files?.[0];
-                        if (!file) return;
-                        if (!this.plugin.epubImportService) { new Notice('EPUB importer not initialized.'); input.remove(); return; }
-                        const data = new Uint8Array(await file.arrayBuffer());
-                        const res = await this.plugin.epubImportService.importEpub(data, file.name);
-                        if (!res.success) new Notice(`EPUB import failed: ${res.error ?? 'unknown'}`);
-                        else new Notice(`Imported offline corpus: ${res.metadata?.language}`);
-                        input.remove();
-                    };
-                    document.body.appendChild(input);
-                    input.click();
+                    await this.chooseAndImportEpub(false);
+                    this.display();
                 }),
+            );
+
+        const activeLanguage = this.plugin.settings.outputLanguage;
+        const metadata = await this.plugin.offlineRepo?.getMetadata(activeLanguage);
+
+        new Setting(containerEl)
+            .setName('Offline EPUB corpus')
+            .setDesc(
+                metadata
+                    ? `Current offline corpus for ${activeLanguage}: ${metadata.fileName} (${metadata.chapterCount ?? 0} chapters)`
+                    : `No offline corpus imported for ${activeLanguage}.`
+            )
+            .addButton((btn) =>
+                btn
+                    .setButtonText('Replace EPUB')
+                    .setDisabled(!metadata)
+                    .onClick(async () => {
+                        await this.chooseAndImportEpub(true);
+                        this.display();
+                    }),
+            )
+            .addButton((btn) =>
+                btn
+                    .setButtonText('Delete EPUB')
+                    .setWarning()
+                    .setDisabled(!metadata)
+                    .onClick(async () => {
+                        if (!this.plugin.offlineRepo) {
+                            new Notice('Offline EPUB repository not initialized.');
+                            return;
+                        }
+                        await this.plugin.offlineRepo.removeLanguage(activeLanguage);
+                        new Notice(`Deleted offline corpus for ${activeLanguage}.`);
+                        this.display();
+                    }),
             );
     }
 }
