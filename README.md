@@ -77,6 +77,8 @@ Depending on the length of the scripture passage and the device, initial verse l
 
 Feel free to get in touch and post any [issues and/or suggestions](https://github.com/erykjj/traverture/issues).
 
+My other Obsidian plugin: **con[VER]sum**: [GitHub repo](https://github.com/erykjj/conversum)
+
 ______
 
 [^1]: Bible citation text is taken from [*New World Translation of the Holy Scriptures*](https://www.jw.org/en/library/bible/study-bible/books/) (*NWT*) (© Watch Tower Bible and Tract Society of Pennsylvania).
