@@ -27,9 +27,9 @@ export class VaultOfflineEpubRepository {
     this.basePath = `.${pluginId}/offline-epub`;
   }
 
-  private async ensureFolder() {
+  private async ensureFolder(path: string) {
     try {
-      await this.app.vault.createFolder(this.basePath);
+      await this.app.vault.createFolder(path);
     } catch (_) {
       // ignore if exists
     }
@@ -39,7 +39,11 @@ export class VaultOfflineEpubRepository {
     return `${this.basePath}/${language}.metadata.json`;
   }
 
-  private getCorpusPath(language: string): string {
+  private getIndexPath(language: string): string {
+    return `${this.basePath}/${language}.index.json`;
+  }
+
+  private getLegacyCorpusPath(language: string): string {
     return `${this.basePath}/${language}.corpus.json`;
   }
 
@@ -49,53 +53,50 @@ export class VaultOfflineEpubRepository {
     return `${this.basePath}/${language}/${bookKey}/${chapterKey}.json`;
   }
 
-  private async ensureLanguageFolder(language: string): Promise<void> {
-    await this.ensureFolder();
-    try {
-      await this.app.vault.createFolder(`${this.basePath}/${language}`);
-    } catch (_) {
-      // ignore if exists
-    }
-  }
-
-  private async ensureBookFolder(language: string, book: number | string): Promise<void> {
-    await this.ensureLanguageFolder(language);
-    const bookKey = String(book).padStart(3, '0');
-    try {
-      await this.app.vault.createFolder(`${this.basePath}/${language}/${bookKey}`);
-    } catch (_) {
-      // ignore if exists
-    }
+  private async ensureChapterFolder(language: string, book: number | string): Promise<void> {
+    await this.ensureFolder(this.basePath);
+    await this.ensureFolder(`${this.basePath}/${language}`);
+    await this.ensureFolder(`${this.basePath}/${language}/${String(book).padStart(3, '0')}`);
   }
 
   async saveCorpus(metadata: CorpusMetadata, chapters: OfflineChapter[]): Promise<void> {
-    await this.ensureFolder();
-
-    const metaPath = this.getMetadataPath(metadata.language);
-    const dataPath = this.getCorpusPath(metadata.language);
-
     const normalizedMetadata: CorpusMetadata = {
       ...metadata,
       importedAt: metadata.importedAt || new Date().toISOString(),
       chapterCount: metadata.chapterCount ?? chapters.length,
     };
 
-    await this.app.vault.adapter.write(metaPath, JSON.stringify(normalizedMetadata, null, 2));
-    await this.app.vault.adapter.write(dataPath, JSON.stringify(chapters, null, 2));
+    await this.ensureFolder(this.basePath);
+    await this.app.vault.adapter.write(this.getMetadataPath(metadata.language), JSON.stringify(normalizedMetadata, null, 2));
+
+    const index = chapters.map((chapter) => ({
+      language: chapter.language,
+      book: chapter.book,
+      chapter: chapter.chapter,
+      title: chapter.title ?? '',
+    }));
+    await this.app.vault.adapter.write(this.getIndexPath(metadata.language), JSON.stringify(index, null, 2));
 
     for (const chapter of chapters) {
-      const book = chapter.book;
-      const chapterNum = chapter.chapter;
-      await this.ensureBookFolder(metadata.language, book);
-      const chapterPath = this.getChapterPath(metadata.language, book, chapterNum);
-      await this.app.vault.adapter.write(chapterPath, JSON.stringify(chapter, null, 2));
+      await this.saveChapter(metadata.language, chapter);
+    }
+
+    try {
+      await this.app.vault.adapter.remove(this.getLegacyCorpusPath(metadata.language));
+    } catch (_) {
+      // ignore missing legacy corpus file
     }
   }
 
+  async saveChapter(language: string, chapter: OfflineChapter): Promise<void> {
+    await this.ensureChapterFolder(language, chapter.book);
+    const chapterPath = this.getChapterPath(language, chapter.book, chapter.chapter);
+    await this.app.vault.adapter.write(chapterPath, JSON.stringify(chapter, null, 2));
+  }
+
   async getMetadata(language: string): Promise<CorpusMetadata | null> {
-    const metaPath = this.getMetadataPath(language);
     try {
-      const text = await this.app.vault.adapter.read(metaPath);
+      const text = await this.app.vault.adapter.read(this.getMetadataPath(language));
       return JSON.parse(text) as CorpusMetadata;
     } catch (_) {
       return null;
@@ -106,10 +107,28 @@ export class VaultOfflineEpubRepository {
     return (await this.getMetadata(language)) !== null;
   }
 
-  async getCorpus(language: string): Promise<OfflineChapter[] | null> {
-    const dataPath = this.getCorpusPath(language);
+  async getCorpusIndex(language: string): Promise<Array<{ language: string; book: number | string; chapter: number | string; title?: string }> | null> {
     try {
-      const text = await this.app.vault.adapter.read(dataPath);
+      const text = await this.app.vault.adapter.read(this.getIndexPath(language));
+      return JSON.parse(text);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async getCorpus(language: string): Promise<OfflineChapter[] | null> {
+    const index = await this.getCorpusIndex(language);
+    if (index && index.length > 0) {
+      const chapters: OfflineChapter[] = [];
+      for (const entry of index) {
+        const chapter = await this.getChapter(language, entry.book, entry.chapter);
+        if (chapter) chapters.push(chapter);
+      }
+      return chapters;
+    }
+
+    try {
+      const text = await this.app.vault.adapter.read(this.getLegacyCorpusPath(language));
       return JSON.parse(text) as OfflineChapter[];
     } catch (_) {
       return null;
@@ -117,18 +136,13 @@ export class VaultOfflineEpubRepository {
   }
 
   async getChapter(language: string, book: number | string, chapter: number | string): Promise<OfflineChapter | null> {
-    const chapterPath = this.getChapterPath(language, book, chapter);
     try {
-      const text = await this.app.vault.adapter.read(chapterPath);
+      const text = await this.app.vault.adapter.read(this.getChapterPath(language, book, chapter));
       return JSON.parse(text) as OfflineChapter;
     } catch (_) {
       const corpus = await this.getCorpus(language);
       if (!corpus) return null;
-      return (
-        corpus.find(
-          (entry) => String(entry.book) === String(book) && String(entry.chapter) === String(chapter)
-        ) ?? null
-      );
+      return corpus.find((entry) => String(entry.book) === String(book) && String(entry.chapter) === String(chapter)) ?? null;
     }
   }
 
@@ -144,12 +158,10 @@ export class VaultOfflineEpubRepository {
 
     const end = verseEnd ?? verseStart;
     const verses: string[] = [];
-
     for (let verse = verseStart; verse <= end; verse++) {
       const text = chapterData.verses[String(verse)];
       if (text) verses.push(text.trim());
     }
-
     return verses.length > 0 ? verses.join(' ') : null;
   }
 
@@ -166,18 +178,19 @@ export class VaultOfflineEpubRepository {
   }
 
   async removeLanguage(language: string): Promise<void> {
-    const metaPath = this.getMetadataPath(language);
-    const dataPath = this.getCorpusPath(language);
+    const paths = [
+      this.getMetadataPath(language),
+      this.getIndexPath(language),
+      this.getLegacyCorpusPath(language),
+    ];
+
+    for (const path of paths) {
+      try {
+        await this.app.vault.adapter.remove(path);
+      } catch (_) {}
+    }
+
     const languageFolder = `${this.basePath}/${language}`;
-
-    try {
-      await this.app.vault.adapter.remove(metaPath);
-    } catch (_) {}
-
-    try {
-      await this.app.vault.adapter.remove(dataPath);
-    } catch (_) {}
-
     try {
       const listed = await this.app.vault.adapter.list(languageFolder);
       for (const file of listed.files) {
