@@ -51,7 +51,6 @@ export class EpubImportService {
   }
 
   private findNavPath(opfDoc: Document, rootDir: string): string | null {
-    // Try to find <item properties="nav" href="..."/>
     const items = Array.from(opfDoc.getElementsByTagName('item')) as Element[];
     for (const item of items) {
       const props = item.getAttribute('properties') || '';
@@ -59,7 +58,6 @@ export class EpubImportService {
       if (props.includes('nav') && href) return posixJoin(rootDir, href);
     }
 
-    // fallback: find any file with 'nav' in href
     for (const item of items) {
       const href = item.getAttribute('href') || '';
       if (href.toLowerCase().includes('nav')) return posixJoin(rootDir, href);
@@ -82,23 +80,29 @@ export class EpubImportService {
   async importEpub(fileData: Uint8Array, sourceFileName = 'imported.epub', overwriteExisting = false): Promise<ImportResult> {
     try {
       if (!fileData || fileData.length === 0) return { success: false, error: 'No EPUB file provided.' };
+
       const checksum = `sha256:${await webCryptoSha256(fileData)}`;
       const raw = unzipSync(fileData);
       const archive = new Map(Object.entries(raw).map(([p, v]) => [p, strFromU8(v as Uint8Array)]));
 
       const rootFile = this.getRootFilePath(archive);
       if (!rootFile) return { success: false, error: 'Invalid EPUB: missing container root.' };
+
       const rootDir = posixDirname(rootFile);
       const opfText = archive.get(rootFile);
       if (!opfText) return { success: false, error: 'Invalid EPUB: missing package document.' };
+
       const opfDoc = parseXml(opfText);
 
-      // language detection
-      const langNode = opfDoc.querySelector('metadata > language, dc\:language, language');
-      const language = langNode?.textContent?.trim() || 'und';
+      const language =
+        opfDoc.getElementsByTagName('dc:language')[0]?.textContent?.trim() ||
+        opfDoc.getElementsByTagName('language')[0]?.textContent?.trim() ||
+        'und';
 
       const existing = await this.repository.getMetadata(language).catch(() => null);
-      if (existing && !overwriteExisting) return { success: false, error: `An offline corpus for ${language} already exists.` };
+      if (existing && !overwriteExisting) {
+        return { success: false, error: `An offline corpus for ${language} already exists.` };
+      }
 
       const navPath = this.findNavPath(opfDoc, rootDir);
       const chapters: OfflineChapter[] = [];
@@ -106,21 +110,24 @@ export class EpubImportService {
       if (navPath && archive.has(navPath)) {
         const navContent = archive.get(navPath)!;
         const entries = this.extractNavEntries(navContent, rootDir);
-        // translate entries into chapter documents. This is a best-effort approach.
+
         for (let i = 0; i < entries.length; i++) {
           const entry = entries[i];
           const [filePart, anchor] = entry.href.split('#');
           const contentPath = filePart ? posixJoin(rootDir, filePart) : navPath;
           const chapterDocText = archive.get(contentPath);
           let verseText = '';
+
           if (chapterDocText) {
             try {
               const doc = parseXml(chapterDocText);
               if (anchor) {
                 const el = doc.getElementById(anchor);
-                verseText = el ? (el.textContent || '').trim() : (doc.body?.textContent || '').trim();
+                verseText = el
+                  ? (el.textContent || '').trim()
+                  : (doc.documentElement?.textContent || '').trim();
               } else {
-                verseText = doc.body?.textContent?.trim() || '';
+                verseText = doc.documentElement?.textContent?.trim() || '';
               }
             } catch (_) {
               verseText = chapterDocText;
@@ -137,17 +144,24 @@ export class EpubImportService {
           chapters.push(ch);
         }
       } else {
-        // fallback: collect all .xhtml/.html files
         for (const [path, txt] of archive.entries()) {
           if (path.endsWith('.xhtml') || path.endsWith('.html') || path.endsWith('.htm')) {
             const doc = parseXml(txt);
             const title = doc.querySelector('title')?.textContent || path;
-            chapters.push({ language, book: title, chapter: path, title: title, verses: { '1': doc.body?.textContent?.trim() || '' } });
+            chapters.push({
+              language,
+              book: title,
+              chapter: path,
+              title,
+              verses: { '1': doc.documentElement?.textContent?.trim() || '' }
+            });
           }
         }
       }
 
-      if (chapters.length === 0) return { success: false, error: 'Unsupported EPUB structure: no chapters found.' };
+      if (chapters.length === 0) {
+        return { success: false, error: 'Unsupported EPUB structure: no chapters found.' };
+      }
 
       const metadata = { language, fileName: sourceFileName, checksum, chapterCount: chapters.length };
       await this.repository.saveCorpus(metadata, chapters);
