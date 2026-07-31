@@ -80,5 +80,24 @@ export class TravertureSettingTab extends PluginSettingTab {
                     this.plugin.settings.autoDetect = value;
                     await this.plugin.saveSettings();
                 }));
+
+        const footerEl = containerEl.createDiv({ cls: 'traverture-settings-footer' });
+        const footerText = footerEl.createSpan();
+        footerText.appendChild(document.createTextNode('My other Obsidian plugin: '));
+        footerText.createEl('strong', { text: 'con[VER]sum' });
+        footerText.appendChild(document.createTextNode(': '));
+        const githubLink = footerText.createEl('a', {
+            text: 'GitHub repo',
+            href: 'https://github.com/erykjj/conversum'
+        });
+        githubLink.setAttribute('target', '_blank');
+        githubLink.setAttribute('rel', 'noopener noreferrer');
+        footerText.appendChild(document.createTextNode(', '));
+        const obsidianLink = footerText.createEl('a', {
+            text: 'Obsidian Community',
+            href: 'https://community.obsidian.md/plugins/conversum'
+        });
+        obsidianLink.setAttribute('target', '_blank');
+        obsidianLink.setAttribute('rel', 'noopener noreferrer');
     }
 }
