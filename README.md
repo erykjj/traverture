@@ -77,7 +77,7 @@ Depending on the length of the scripture passage and the device, initial verse l
 
 Feel free to get in touch and post any [issues and/or suggestions](https://github.com/erykjj/traverture/issues).
 
-My other Obsidian plugin: **con[VER]sum**: [GitHub repo](https://github.com/erykjj/conversum)
+My other Obsidian plugin: **con[VER]sum**: [GitHub repo](https://github.com/erykjj/conversum),  [Obsidian Community](https://community.obsidian.md/plugins/conversum)
 
 ______
 
