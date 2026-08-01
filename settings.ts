@@ -12,16 +12,6 @@ export class TravertureSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-
-    getSettingDefinitions(): any[] {
-        return [
-            { key: 'sourceLanguage', name: 'Source language', description: 'Language of the scripture references in your notes', type: 'dropdown', defaultValue: 'en' },
-            { key: 'outputLanguage', name: 'Output language', description: 'Language for displaying book names and fetching verse text', type: 'dropdown', defaultValue: 'en' },
-            { key: 'autoDetect', name: 'Auto-detect references', description: 'Automatically detect scripture references without {{ }} markers', type: 'toggle', defaultValue: true },
-            { key: 'titleFormat', name: 'Modal title format', description: 'How scripture references are displayed in the verse modal title', type: 'dropdown', defaultValue: 'full' },
-        ];
-    }
-
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
@@ -44,16 +34,26 @@ export class TravertureSettingTab extends PluginSettingTab {
                     dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
                 }
                 dropdown.setValue(this.plugin.settings.sourceLanguage)
-                    .onChange(async (value) => { this.plugin.settings.sourceLanguage = value; await this.plugin.saveSettings(); this.plugin.createEngine(); });
+                    .onChange(async (value) => {
+                        this.plugin.settings.sourceLanguage = value;
+                        await this.plugin.saveSettings();
+                        this.plugin.createEngine();
+                    });
             });
 
         new Setting(containerEl)
             .setName('Output language')
             .setDesc('Language for displaying and fetching scripture text')
             .addDropdown(dropdown => {
-                for (const lang of languages) dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
+                for (const lang of languages) {
+                    dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
+                }
                 dropdown.setValue(this.plugin.settings.outputLanguage)
-                    .onChange(async (value) => { this.plugin.settings.outputLanguage = value; await this.plugin.saveSettings(); this.plugin.createEngine(); });
+                    .onChange(async (value) => {
+                        this.plugin.settings.outputLanguage = value;
+                        await this.plugin.saveSettings();
+                        this.plugin.createEngine();
+                    });
             });
 
         new Setting(containerEl)
