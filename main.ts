@@ -52,51 +52,21 @@ export default class TraverturePlugin extends Plugin {
         if (!this.engine) return results;
 
         text = this.stripFrontmatter(text);
-        const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪⟪$1⟫⟫');
+        const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
         const parsed = this.safeParse(engineText);
         if (!parsed) return results;
 
         const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
         if (clauses.length === 0) return results;
 
-        let lastBookNum = -1;
-        let groupStart = 0;
-        let groupEnd = 0;
-        let groupCount = 0;
-
-        const clauseData: Array<{ ranges: string[][]; bookNum: number; original: string }> = [];
-
-        for (const [, startPos, endPos, ranges] of clauses) {
-            if (ranges.length === 0) continue;
-            const bookNum = parseInt(ranges[0][0].substring(0, 2));
-
-            if (bookNum !== lastBookNum) {
-                if (lastBookNum !== -1 && groupCount > 0) {
-                    const original = engineText.substring(groupStart, groupEnd);
-                    for (let i = clauseData.length - 1; i >= 0 && i >= clauseData.length - groupCount; i--) {
-                        clauseData[i].original = original;
-                    }
-                }
-                groupStart = startPos;
-                lastBookNum = bookNum;
-                groupCount = 0;
-            }
-            groupEnd = endPos;
-            groupCount++;
-            clauseData.push({ ranges, bookNum, original: '' });
-        }
-        if (lastBookNum !== -1 && groupCount > 0) {
-            const original = engineText.substring(groupStart, groupEnd);
-            for (let i = clauseData.length - 1; i >= 0 && i >= clauseData.length - groupCount; i--) {
-                clauseData[i].original = original;
-            }
-        }
-
         const engFull = new wasmModule.TravertureEngine('en', 'en', 'full', false);
         const engStd = new wasmModule.TravertureEngine('en', 'en', 'standard', false);
         const engOff = new wasmModule.TravertureEngine('en', 'en', 'official', false);
 
-        for (const { ranges, bookNum, original } of clauseData) {
+        for (const [clauseText] of clauses) {
+            const ranges = clauses.find(c => c[0] === clauseText)?.[3] || [];
+            if (ranges.length === 0) continue;
+            
             for (const range of ranges) {
                 const singleRange = [[range[0], range[1]]];
                 const rangeJson = JSON.stringify(singleRange);
@@ -104,10 +74,11 @@ export default class TraverturePlugin extends Plugin {
                 const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
                 const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
                 const startBcv = range[0], endBcv = range[1];
+                const bookNum = parseInt(startBcv.substring(0, 2));
 
                 results.push({
-                    scripture: original,
-                    fullRef: fullDecoded[0] || original,
+                    scripture: clauseText,
+                    fullRef: fullDecoded[0] || clauseText,
                     standardRef: stdDecoded[0] || '',
                     officialRef: offDecoded[0] || '',
                     startBcv, endBcv,
@@ -390,8 +361,22 @@ export default class TraverturePlugin extends Plugin {
         this.registerDomEvent(activeDocument, 'contextmenu', (evt: MouseEvent) => {
             const view = this.app.workspace.getActiveViewOfType(MarkdownView);
             if (!view || view.getMode() !== 'preview') return;
-
-            const selection = activeDocument.getSelection()?.toString() || '';
+            const domSelection = activeDocument.getSelection();
+            let bcvs: string[] = [];
+            let hasSelection = false;
+            if (domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed) {
+                hasSelection = true;
+                const range = domSelection.getRangeAt(0);
+                const container = range.commonAncestorContainer;
+                const parentEl = container.nodeType === Node.TEXT_NODE ? container.parentElement : container as HTMLElement;
+                const links = parentEl?.querySelectorAll?.('.traverture-ref-link') || [];
+                links.forEach((link: any) => {
+                    if (domSelection.containsNode(link, true)) {
+                        const bcv = link.getAttribute('data-bcv');
+                        if (bcv) bcvs.push(bcv);
+                    }
+                });
+            }
 
             evt.preventDefault();
             evt.stopPropagation();
@@ -400,10 +385,14 @@ export default class TraverturePlugin extends Plugin {
             menu.addItem((item: any) => {
                 item.setTitle('tra.VER:ture').setIcon('book-open');
                 const submenu = item.setSubmenu();
-
-                if (selection) {
+                if (hasSelection) {
                     submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
-                        await this.showSidebarWithResults(await this.parseReferences(selection));
+                        if (bcvs.length > 0) {
+                            await this.showSidebarWithResults(await this.parseBcvs(bcvs));
+                        } else {
+                            const textSelection = domSelection?.toString() || '';
+                            await this.showSidebarWithResults(await this.parseReferences(textSelection));
+                        }
                     }));
                 }
 
@@ -496,6 +485,36 @@ export default class TraverturePlugin extends Plugin {
             const selection = editor.getSelection(); if (!selection) return;
             this.reformatReferences(editor, selection, 'official');
         }});
+    }
+
+    async parseBcvs(bcvs: string[]): Promise<SidebarRef[]> {
+        const results: SidebarRef[] = [];
+        const engFull = new wasmModule.TravertureEngine('en', 'en', 'full', false);
+        const engStd = new wasmModule.TravertureEngine('en', 'en', 'standard', false);
+        const engOff = new wasmModule.TravertureEngine('en', 'en', 'official', false);
+        for (const bcv of bcvs) {
+            const parts = bcv.split('-');
+            const startBcv = parts[0];
+            const endBcv = parts.length > 1 ? parts[1] : parts[0];
+            const rangeJson = JSON.stringify([[startBcv, endBcv]]);
+            const fullDecoded = JSON.parse(engFull.decode_scriptures(rangeJson));
+            const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
+            const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
+            const bookNum = parseInt(startBcv.substring(0, 2));
+            results.push({
+                scripture: fullDecoded[0] || bcv,
+                fullRef: fullDecoded[0] || bcv,
+                standardRef: stdDecoded[0] || '',
+                officialRef: offDecoded[0] || '',
+                startBcv, endBcv,
+                startCh: parseInt(startBcv.substring(2, 5)),
+                endCh: parseInt(endBcv.substring(2, 5)),
+                startVerse: parseInt(startBcv.substring(5, 8)),
+                endVerse: parseInt(endBcv.substring(5, 8)),
+                bookNum,
+            });
+        }
+        return results;
     }
 
     async showSidebarWithResults(refs: SidebarRef[]) {
