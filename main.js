@@ -1013,14 +1013,6 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
   }
-  getSettingDefinitions() {
-    return [
-      { key: "sourceLanguage", name: "Source language", description: "Language of the scripture references in your notes", type: "dropdown", defaultValue: "en" },
-      { key: "outputLanguage", name: "Output language", description: "Language for displaying book names and fetching verse text", type: "dropdown", defaultValue: "en" },
-      { key: "autoDetect", name: "Auto-detect references", description: "Automatically detect scripture references without {{ }} markers", type: "toggle", defaultValue: true },
-      { key: "titleFormat", name: "Modal title format", description: "How scripture references are displayed in the verse modal title", type: "dropdown", defaultValue: "full" }
-    ];
-  }
   display() {
     const { containerEl } = this;
     containerEl.empty();
@@ -1043,7 +1035,9 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
       });
     });
     new import_obsidian3.Setting(containerEl).setName("Output language").setDesc("Language for displaying and fetching scripture text").addDropdown((dropdown) => {
-      for (const lang of languages) dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
+      for (const lang of languages) {
+        dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
+      }
       dropdown.setValue(this.plugin.settings.outputLanguage).onChange(async (value) => {
         this.plugin.settings.outputLanguage = value;
         await this.plugin.saveSettings();
@@ -1443,44 +1437,17 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     const results = [];
     if (!this.engine) return results;
     text = this.stripFrontmatter(text);
-    const engineText = text.replace(/\{\{(.+?)\}\}/g, "\u27EA\u27EA$1\u27EB\u27EB");
+    const engineText = text.replace(/\{\{(.+?)\}\}/g, "\u27EA$1\u27EB");
     const parsed = this.safeParse(engineText);
     if (!parsed) return results;
     const clauses = JSON.parse(parsed);
     if (clauses.length === 0) return results;
-    let lastBookNum = -1;
-    let groupStart = 0;
-    let groupEnd = 0;
-    let groupCount = 0;
-    const clauseData = [];
-    for (const [, startPos, endPos, ranges] of clauses) {
-      if (ranges.length === 0) continue;
-      const bookNum = parseInt(ranges[0][0].substring(0, 2));
-      if (bookNum !== lastBookNum) {
-        if (lastBookNum !== -1 && groupCount > 0) {
-          const original = engineText.substring(groupStart, groupEnd);
-          for (let i = clauseData.length - 1; i >= 0 && i >= clauseData.length - groupCount; i--) {
-            clauseData[i].original = original;
-          }
-        }
-        groupStart = startPos;
-        lastBookNum = bookNum;
-        groupCount = 0;
-      }
-      groupEnd = endPos;
-      groupCount++;
-      clauseData.push({ ranges, bookNum, original: "" });
-    }
-    if (lastBookNum !== -1 && groupCount > 0) {
-      const original = engineText.substring(groupStart, groupEnd);
-      for (let i = clauseData.length - 1; i >= 0 && i >= clauseData.length - groupCount; i--) {
-        clauseData[i].original = original;
-      }
-    }
     const engFull = new TravertureEngine("en", "en", "full", false);
     const engStd = new TravertureEngine("en", "en", "standard", false);
     const engOff = new TravertureEngine("en", "en", "official", false);
-    for (const { ranges, bookNum, original } of clauseData) {
+    for (const [clauseText] of clauses) {
+      const ranges = clauses.find((c) => c[0] === clauseText)?.[3] || [];
+      if (ranges.length === 0) continue;
       for (const range of ranges) {
         const singleRange = [[range[0], range[1]]];
         const rangeJson = JSON.stringify(singleRange);
@@ -1488,9 +1455,10 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
         const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
         const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
         const startBcv = range[0], endBcv = range[1];
+        const bookNum = parseInt(startBcv.substring(0, 2));
         results.push({
-          scripture: original,
-          fullRef: fullDecoded[0] || original,
+          scripture: clauseText,
+          fullRef: fullDecoded[0] || clauseText,
           standardRef: stdDecoded[0] || "",
           officialRef: offDecoded[0] || "",
           startBcv,
@@ -1741,16 +1709,36 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     this.registerDomEvent(activeDocument, "contextmenu", (evt) => {
       const view = this.app.workspace.getActiveViewOfType(import_obsidian5.MarkdownView);
       if (!view || view.getMode() !== "preview") return;
-      const selection = activeDocument.getSelection()?.toString() || "";
+      const domSelection = activeDocument.getSelection();
+      let bcvs = [];
+      let hasSelection = false;
+      if (domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed) {
+        hasSelection = true;
+        const range = domSelection.getRangeAt(0);
+        const container = range.commonAncestorContainer;
+        const parentEl = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
+        const links = parentEl?.querySelectorAll?.(".traverture-ref-link") || [];
+        links.forEach((link) => {
+          if (domSelection.containsNode(link, true)) {
+            const bcv = link.getAttribute("data-bcv");
+            if (bcv) bcvs.push(bcv);
+          }
+        });
+      }
       evt.preventDefault();
       evt.stopPropagation();
       const menu = new import_obsidian5.Menu();
       menu.addItem((item) => {
         item.setTitle("tra.VER:ture").setIcon("book-open");
         const submenu = item.setSubmenu();
-        if (selection) {
+        if (hasSelection) {
           submenu.addItem((subItem) => subItem.setTitle("Parse selection").setIcon("sidebar-right").onClick(async () => {
-            await this.showSidebarWithResults(await this.parseReferences(selection));
+            if (bcvs.length > 0) {
+              await this.showSidebarWithResults(await this.parseBcvs(bcvs));
+            } else {
+              const textSelection = domSelection?.toString() || "";
+              await this.showSidebarWithResults(await this.parseReferences(textSelection));
+            }
           }));
         }
         submenu.addItem((subItem) => subItem.setTitle("Parse document").setIcon("sidebar-right").onClick(async () => {
@@ -1832,6 +1820,36 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       this.reformatReferences(editor, selection, "official");
     } });
   }
+  async parseBcvs(bcvs) {
+    const results = [];
+    const engFull = new TravertureEngine("en", "en", "full", false);
+    const engStd = new TravertureEngine("en", "en", "standard", false);
+    const engOff = new TravertureEngine("en", "en", "official", false);
+    for (const bcv of bcvs) {
+      const parts = bcv.split("-");
+      const startBcv = parts[0];
+      const endBcv = parts.length > 1 ? parts[1] : parts[0];
+      const rangeJson = JSON.stringify([[startBcv, endBcv]]);
+      const fullDecoded = JSON.parse(engFull.decode_scriptures(rangeJson));
+      const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
+      const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
+      const bookNum = parseInt(startBcv.substring(0, 2));
+      results.push({
+        scripture: fullDecoded[0] || bcv,
+        fullRef: fullDecoded[0] || bcv,
+        standardRef: stdDecoded[0] || "",
+        officialRef: offDecoded[0] || "",
+        startBcv,
+        endBcv,
+        startCh: parseInt(startBcv.substring(2, 5)),
+        endCh: parseInt(endBcv.substring(2, 5)),
+        startVerse: parseInt(startBcv.substring(5, 8)),
+        endVerse: parseInt(endBcv.substring(5, 8)),
+        bookNum
+      });
+    }
+    return results;
+  }
   async showSidebarWithResults(refs) {
     const { workspace } = this.app;
     let leaves = workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
@@ -1872,7 +1890,8 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     }
   }
   async insertCitation(editor, text, withRef) {
-    const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, "full", false, text);
+    const engineText = text.replace(/\{\{(.+?)\}\}/g, "\u27EA$1\u27EB");
+    const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, "full", false, engineText);
     if (!parsed) {
       new import_obsidian5.Notice("No scripture references found.");
       return;
@@ -1882,61 +1901,53 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       new import_obsidian5.Notice("No scripture references found.");
       return;
     }
-    const groups = [];
-    let lastBookNum = -1;
-    let groupStart = 0;
-    let groupEnd = 0;
-    let currentBcvs = [];
-    for (const [, startPos, endPos, ranges] of clauses) {
-      if (ranges.length === 0) continue;
-      const bookNum = parseInt(ranges[0][0].substring(0, 2));
-      if (bookNum !== lastBookNum) {
-        if (currentBcvs.length > 0) groups.push({ original: text.substring(groupStart, groupEnd), bcvs: currentBcvs });
-        groupStart = startPos;
-        lastBookNum = bookNum;
-        currentBcvs = [];
-      }
-      groupEnd = endPos;
-      for (const range of ranges) {
-        currentBcvs.push(range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`);
-      }
-    }
-    if (currentBcvs.length > 0) groups.push({ original: text.substring(groupStart, groupEnd), bcvs: currentBcvs });
     let result = text;
     const fetchedCache = /* @__PURE__ */ new Map();
-    for (const group of groups) {
-      let allText = "";
-      for (const bcv of group.bcvs) {
-        const cacheKey = `${this.settings.outputLanguage}:${bcv}`;
-        let verseText = fetchedCache.get(cacheKey);
-        if (verseText === void 0) {
-          const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
-          if (verseData) {
-            let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, " ").replace(/<span class="newblock"><\/span>/g, " ");
-            const tempDiv = activeDocument.createElement("div");
-            const parsedHtml = new DOMParser().parseFromString(html, "text/html");
-            for (const child of Array.from(parsedHtml.body.childNodes)) {
-              tempDiv.appendChild(child.cloneNode(true));
-            }
-            if (withRef) {
-              tempDiv.querySelectorAll("sup.verseNum, .chapterNum").forEach((el) => el.remove());
-            } else {
-              tempDiv.querySelectorAll(".chapterNum").forEach((el) => {
-                const textNode = el.querySelector("a") || el;
-                if (textNode) textNode.textContent = "1 ";
-              });
-            }
-            verseText = (tempDiv.textContent || "").replace(/\u00A0/g, " ").replace(/\u202F/g, " ").replace(/\+/g, "").replace(/\*/g, "").replace(/\s+/g, " ").trim();
-            fetchedCache.set(cacheKey, verseText);
-          } else {
-            fetchedCache.set(cacheKey, "");
-          }
-        }
-        if (verseText) allText += (allText ? " " : "") + verseText;
+    for (let i = clauses.length - 1; i >= 0; i--) {
+      const [clauseText, , , ranges] = clauses[i];
+      if (ranges.length === 0) continue;
+      let origStart = text.indexOf("{{" + clauseText + "}}");
+      let origLength;
+      let originalRef;
+      if (origStart !== -1) {
+        origLength = clauseText.length + 4;
+        originalRef = "{{" + clauseText + "}}";
+      } else {
+        origStart = text.indexOf(clauseText);
+        if (origStart === -1) continue;
+        origLength = clauseText.length;
+        originalRef = clauseText;
       }
-      if (allText) {
-        const escaped = group.original.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        result = result.replace(new RegExp(escaped), withRef ? `"${allText}" (${group.original})` : `${group.original}: "${allText}"`);
+      const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
+      const cacheKey = `${this.settings.outputLanguage}:${bcv}`;
+      let verseText = fetchedCache.get(cacheKey);
+      if (verseText === void 0) {
+        const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
+        if (verseData) {
+          let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, " ").replace(/<span class="newblock"><\/span>/g, " ");
+          const tempDiv = activeDocument.createElement("div");
+          const parsedHtml = new DOMParser().parseFromString(html, "text/html");
+          for (const child of Array.from(parsedHtml.body.childNodes)) {
+            tempDiv.appendChild(child.cloneNode(true));
+          }
+          if (withRef) {
+            tempDiv.querySelectorAll("sup.verseNum, .chapterNum").forEach((el) => el.remove());
+          } else {
+            tempDiv.querySelectorAll(".chapterNum").forEach((el) => {
+              const textNode = el.querySelector("a") || el;
+              if (textNode) textNode.textContent = "1 ";
+            });
+          }
+          verseText = (tempDiv.textContent || "").replace(/\u00A0/g, " ").replace(/\u202F/g, " ").replace(/\+/g, "").replace(/\*/g, "").replace(/\s+/g, " ").trim();
+          fetchedCache.set(cacheKey, verseText);
+        } else {
+          fetchedCache.set(cacheKey, "");
+        }
+      }
+      if (verseText) {
+        const before = result.substring(0, origStart);
+        const after = result.substring(origStart + origLength);
+        result = before + (withRef ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`) + after;
       }
     }
     editor.replaceSelection(result);
