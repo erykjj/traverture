@@ -11,6 +11,11 @@
 ### Removed
 
 ____
+## [3.5.1] - 2026-07-31
+### Changed
+
+- Minor cosmetic changes
+
 ## [3.5.0] - 2026-07-29
 ### Added
 
@@ -112,6 +117,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[3.5.1]:https://github.com/erykjj/traverture/releases/tag/3.5.1
 [3.5.0]:https://github.com/erykjj/traverture/releases/tag/3.5.0
 [3.4.0]:https://github.com/erykjj/traverture/releases/tag/3.4.0
 [3.3.2]:https://github.com/erykjj/traverture/releases/tag/3.3.2
