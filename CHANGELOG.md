@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- Fixed settings panel in dark mode
+
 ### Removed
 
 ____
