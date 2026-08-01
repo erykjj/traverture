@@ -556,73 +556,58 @@ export default class TraverturePlugin extends Plugin {
     }
 
     async insertCitation(editor: any, text: string, withRef: boolean) {
-        const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, 'full', false, text);
+        const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
+        const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, 'full', false, engineText);
         if (!parsed) { new Notice('No scripture references found.'); return; }
-        
         const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
         if (clauses.length === 0) { new Notice('No scripture references found.'); return; }
-        
-        const groups: Array<{ original: string; bcvs: string[] }> = [];
-        let lastBookNum = -1;
-        let groupStart = 0;
-        let groupEnd = 0;
-        let currentBcvs: string[] = [];
-        
-        for (const [, startPos, endPos, ranges] of clauses) {
-            if (ranges.length === 0) continue;
-            const bookNum = parseInt(ranges[0][0].substring(0, 2));
-            
-            if (bookNum !== lastBookNum) {
-                if (currentBcvs.length > 0) groups.push({ original: text.substring(groupStart, groupEnd), bcvs: currentBcvs });
-                groupStart = startPos;
-                lastBookNum = bookNum;
-                currentBcvs = [];
-            }
-            groupEnd = endPos;
-            
-            for (const range of ranges) {
-                currentBcvs.push(range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`);
-            }
-        }
-        if (currentBcvs.length > 0) groups.push({ original: text.substring(groupStart, groupEnd), bcvs: currentBcvs });
-        
         let result = text;
         const fetchedCache = new Map<string, string>();
-        
-        for (const group of groups) {
-            let allText = '';
-            for (const bcv of group.bcvs) {
-                const cacheKey = `${this.settings.outputLanguage}:${bcv}`;
-                let verseText = fetchedCache.get(cacheKey);
-                if (verseText === undefined) {
-                    const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
-                    if (verseData) {
-                        let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
-                        const tempDiv = activeDocument.createElement('div');
-                        const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
-                        for (const child of Array.from(parsedHtml.body.childNodes)) {
-                            tempDiv.appendChild(child.cloneNode(true));
-                        }
-                        if (withRef) {
-                            tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
-                        } else {
-                            tempDiv.querySelectorAll('.chapterNum').forEach(el => {
-                                const textNode = el.querySelector('a') || el;
-                                if (textNode) textNode.textContent = '1 ';
-                            });
-                        }
-                        verseText = (tempDiv.textContent || '').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
-                        fetchedCache.set(cacheKey, verseText);
-                    } else {
-                        fetchedCache.set(cacheKey, '');
-                    }
-                }
-                if (verseText) allText += (allText ? ' ' : '') + verseText;
+        for (let i = clauses.length - 1; i >= 0; i--) {
+            const [clauseText, , , ranges] = clauses[i];
+            if (ranges.length === 0) continue;
+            let origStart = text.indexOf('{{' + clauseText + '}}');
+            let origLength: number;
+            let originalRef: string;
+            if (origStart !== -1) {
+                origLength = clauseText.length + 4;
+                originalRef = '{{' + clauseText + '}}';
+            } else {
+                origStart = text.indexOf(clauseText);
+                if (origStart === -1) continue;
+                origLength = clauseText.length;
+                originalRef = clauseText;
             }
-            
-            if (allText) {
-                const escaped = group.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                result = result.replace(new RegExp(escaped), withRef ? `"${allText}" (${group.original})` : `${group.original}: "${allText}"`);
+            const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
+            const cacheKey = `${this.settings.outputLanguage}:${bcv}`;
+            let verseText = fetchedCache.get(cacheKey);
+            if (verseText === undefined) {
+                const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
+                if (verseData) {
+                    let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
+                    const tempDiv = activeDocument.createElement('div');
+                    const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
+                    for (const child of Array.from(parsedHtml.body.childNodes)) {
+                        tempDiv.appendChild(child.cloneNode(true));
+                    }
+                    if (withRef) {
+                        tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
+                    } else {
+                        tempDiv.querySelectorAll('.chapterNum').forEach(el => {
+                            const textNode = el.querySelector('a') || el;
+                            if (textNode) textNode.textContent = '1 ';
+                        });
+                    }
+                    verseText = (tempDiv.textContent || '').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+                    fetchedCache.set(cacheKey, verseText);
+                } else {
+                    fetchedCache.set(cacheKey, '');
+                }
+            }
+            if (verseText) {
+                const before = result.substring(0, origStart);
+                const after = result.substring(origStart + origLength);
+                result = before + (withRef ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`) + after;
             }
         }
         editor.replaceSelection(result);
