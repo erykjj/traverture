@@ -2,52 +2,53 @@ export type LinkScheme = 'jwlibrary' | 'jworg';
 
 export const DEFAULT_LINK_SCHEME: LinkScheme = 'jwlibrary';
 
-export function buildJwLibraryFinderUrlForReference(params: {
+type FinderReferenceParams = {
   bibleId?: string;
   book?: string;
   chapter?: number;
   verseStart?: number;
   verseEnd?: number;
   extra?: Record<string, string>;
-}): string {
+};
+
+function buildFinderQuery(params: FinderReferenceParams): string {
   const q = new URLSearchParams();
   if (params.bibleId) q.set('bible', params.bibleId);
   if (params.book) q.set('book', params.book);
   if (params.chapter !== undefined) q.set('chapter', String(params.chapter));
   if (params.verseStart !== undefined) {
-    if (params.verseEnd !== undefined) {
-      q.set('verse', `${params.verseStart}-${params.verseEnd}`);
-    } else {
-      q.set('verse', String(params.verseStart));
-    }
+    q.set(
+      'verse',
+      params.verseEnd !== undefined
+        ? `${params.verseStart}-${params.verseEnd}`
+        : String(params.verseStart),
+    );
   }
   if (params.extra) {
-    for (const [k, v] of Object.entries(params.extra)) q.set(k, v);
+    for (const [key, value] of Object.entries(params.extra)) {
+      q.set(key, value);
+    }
   }
-  return `jwlibrary:///finder?${q.toString()}`;
+  return q.toString();
 }
 
-export function buildJwOrgFinderUrlForReference(params: {
-  bibleId?: string;
-  book?: string;
-  chapter?: number;
-  verseStart?: number;
-  verseEnd?: number;
-  extra?: Record<string, string>;
-}): string {
-  const q = new URLSearchParams();
-  if (params.bibleId) q.set('bible', params.bibleId);
-  if (params.book) q.set('book', params.book);
-  if (params.chapter !== undefined) q.set('chapter', String(params.chapter));
-  if (params.verseStart !== undefined) {
-    if (params.verseEnd !== undefined) {
-      q.set('verse', `${params.verseStart}-${params.verseEnd}`);
-    } else {
-      q.set('verse', String(params.verseStart));
-    }
-  }
-  if (params.extra) {
-    for (const [k, v] of Object.entries(params.extra)) q.set(k, v);
-  }
-  return `https://www.jw.org/finder?${q.toString()}`;
+export function buildJwLibraryFinderUrlForReference(
+  params: FinderReferenceParams,
+): string {
+  return `jwlibrary:///finder?${buildFinderQuery(params)}`;
+}
+
+export function buildJwOrgFinderUrlForReference(
+  params: FinderReferenceParams,
+): string {
+  return `jworg://finder?${buildFinderQuery(params)}`;
+}
+
+export function buildFinderUrlForReference(
+  scheme: LinkScheme,
+  params: FinderReferenceParams,
+): string {
+  return scheme === 'jworg'
+    ? buildJwOrgFinderUrlForReference(params)
+    : buildJwLibraryFinderUrlForReference(params);
 }
