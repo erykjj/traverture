@@ -13,42 +13,34 @@ function buildDecorations(view: any, plugin: any) {
     for (const { from, to } of view.visibleRanges) {
         const text = view.state.doc.sliceString(from, to);
         const decorated: Array<{ from: number; to: number }> = [];
-
         let match;
         while ((match = REF_PATTERN.exec(text)) !== null) {
             const blockStart = from + match.index;
             const blockEnd = blockStart + match[0].length;
             const innerStart = blockStart + 2;
             const innerEnd = blockEnd - 2;
-
             if (cursor.from <= blockEnd && cursor.to >= blockStart) continue;
-
             allDecos.push({ from: blockStart, to: innerStart, deco: Decoration.replace({}) });
             allDecos.push({ from: innerEnd, to: blockEnd, deco: Decoration.replace({}) });
             decorated.push({ from: blockStart, to: innerStart });
             decorated.push({ from: innerEnd, to: blockEnd });
-
             const innerText = match[1];
             const cleanMatch = match[0].replace(/\*\*/g, '').replace(/\*/g, '');
             const engineInput = cleanMatch.replace('{{', '⟪⟪').replace('}}', '⟫⟫');
             const parsed = plugin.safeParse?.(engineInput);
             if (!parsed) continue;
-
             const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
             const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
-            
             for (const clause of sorted) {
                 const [clauseText, , , ranges] = clause;
                 if (ranges.length === 0) continue;
                 const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
-                
                 const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const refRegex = new RegExp(escaped, 'g');
                 let refMatch;
                 while ((refMatch = refRegex.exec(innerText)) !== null) {
                     const refStart = innerStart + refMatch.index;
                     const refEnd = refStart + clauseText.length;
-                    
                     const overlaps = decorated.some(p => refStart < p.to && refEnd > p.from);
                     if (!overlaps) {
                         allDecos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
@@ -58,30 +50,19 @@ function buildDecorations(view: any, plugin: any) {
                 }
             }
         }
-
         if (plugin.settings.autoDetect) {
             const decoratedRanges = [...decorated].sort((a, b) => a.from - b.from);
             let pos = from;
-
             for (const d of decoratedRanges) {
-                if (pos < d.from) {
-                    const segment = view.state.doc.sliceString(pos, d.from);
-                    processSegment(pos, segment, plugin, allDecos, decorated, bcvs);
-                }
+                if (pos < d.from) processSegment(pos, view.state.doc.sliceString(pos, d.from), plugin, allDecos, decorated, bcvs);
                 pos = Math.max(pos, d.to);
             }
-            if (pos < to) {
-                const segment = view.state.doc.sliceString(pos, to);
-                processSegment(pos, segment, plugin, allDecos, decorated, bcvs);
-            }
+            if (pos < to) processSegment(pos, view.state.doc.sliceString(pos, to), plugin, allDecos, decorated, bcvs);
         }
     }
-
     allDecos.sort((a, b) => a.from - b.from);
     const builder: any = new RangeSetBuilder();
-    for (const d of allDecos) {
-        builder.add(d.from, d.to, d.deco);
-    }
+    for (const d of allDecos) builder.add(d.from, d.to, d.deco);
     plugin._editBcvs = bcvs;
     return builder.finish();
 }
@@ -89,18 +70,14 @@ function buildDecorations(view: any, plugin: any) {
 function processSegment(basePos: number, segment: string, plugin: any, allDecos: Array<{ from: number; to: number; deco: any }>, decorated: Array<{ from: number; to: number }>, bcvs: Array<{ from: number; to: number; bcv: string }>) {
     const parsed = plugin.safeParse?.(segment);
     if (!parsed) return;
-
     const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
     if (clauses.length === 0) return;
-
     for (const clause of clauses) {
         const [, startPos, endPos, ranges] = clause;
         if (ranges.length === 0) continue;
         const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
-        
         const refStart = basePos + startPos;
         const refEnd = basePos + endPos;
-
         const overlaps = decorated.some(p => refStart < p.to && refEnd > p.from);
         if (!overlaps) {
             allDecos.push({ from: refStart, to: refEnd, deco: Decoration.mark({ class: 'cm-traverture-ref' }) });
@@ -112,19 +89,12 @@ function processSegment(basePos: number, segment: string, plugin: any, allDecos:
 
 export function createTravertureEditorPlugin(plugin: any) {
     plugin._editBcvs = [];
-
     return ViewPlugin.fromClass(
         class {
             decorations: any;
-
-            constructor(view: any) {
-                this.decorations = buildDecorations(view, plugin);
-            }
-
+            constructor(view: any) { this.decorations = buildDecorations(view, plugin); }
             update(update: any) {
-                if (update.docChanged || update.selectionSet || update.viewportChanged) {
-                    this.decorations = buildDecorations(update.view, plugin);
-                }
+                if (update.docChanged || update.selectionSet || update.viewportChanged) this.decorations = buildDecorations(update.view, plugin);
             }
         },
         {
@@ -134,12 +104,14 @@ export function createTravertureEditorPlugin(plugin: any) {
                     if (e.button !== 0) return;
                     const pos = _view.posAtCoords({ x: e.clientX, y: e.clientY });
                     if (pos === null) return;
-
                     const entry = plugin._editBcvs?.find((b: any) => pos > b.from && pos < b.to);
                     if (entry) {
                         e.preventDefault();
                         e.stopPropagation();
-                        void showModal(plugin, entry.bcv);
+                        void (async () => {
+                            if (await openExternalReference(plugin, entry.bcv)) return;
+                            await showModal(plugin, entry.bcv);
+                        })();
                     }
                 }
             }
@@ -147,19 +119,37 @@ export function createTravertureEditorPlugin(plugin: any) {
     );
 }
 
+async function openExternalReference(plugin: any, bcv: string): Promise<boolean> {
+    const scheme = plugin.settings.linkScheme ?? 'popup';
+    if (scheme !== 'jwlibrary' && scheme !== 'jworg') return false;
+    const langObj = getAvailableLanguages().find(l => l.code === plugin.settings.outputLanguage);
+    const langSymbol = langObj ? plugin.engine.constructor.get_lang_symbol(plugin.settings.outputLanguage) : 'E';
+    const timecodes = plugin.settings.outputLanguage === 'ase' ? await getAslTimecodes(bcv) : undefined;
+    const query = timecodes ? `?wtlocale=${langSymbol}&bible=${bcv}&ts=${timecodes}` : `?wtlocale=${langSymbol}&bible=${bcv}`;
+    const url = scheme === 'jwlibrary' ? `jwlibrary:///finder${query}` : `https://www.jw.org/finder${query}`;
+    try {
+        const maybeRequire = (window as any).require;
+        if (maybeRequire) {
+            const { shell } = maybeRequire('electron');
+            await shell.openExternal(url);
+        } else {
+            window.open(url, '_blank', 'noopener');
+        }
+        return true;
+    } catch (error) {
+        console.error('Failed to open external scripture link:', error);
+        return false;
+    }
+}
+
 async function showModal(plugin: any, bcv: string): Promise<void> {
     const parts = bcv.split('-');
     const startBcv = parts[0];
     const endBcv = parts.length > 1 ? parts[1] : parts[0];
-    
     const fmtEngine = new (plugin.engine.constructor)(plugin.settings.sourceLanguage, plugin.settings.outputLanguage, plugin.settings.titleFormat, false);
     const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[startBcv, endBcv]])));
     const displayText = decoded[0] || bcv;
-
-    const timecodes = plugin.settings.outputLanguage === 'ase' 
-        ? await getAslTimecodes(bcv) 
-        : undefined;
-
+    const timecodes = plugin.settings.outputLanguage === 'ase' ? await getAslTimecodes(bcv) : undefined;
     const modal = new VerseModal();
     modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText, timecodes);
     void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage, modal.getSignal()).then(verseData => {
