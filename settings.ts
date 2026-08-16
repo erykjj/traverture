@@ -2,7 +2,7 @@ import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type TraverturePlugin from "./main";
 import { getAvailableLanguages } from "./languages";
 
-export default class TravertureSettingTab extends PluginSettingTab {
+export class TravertureSettingTab extends PluginSettingTab {
 	plugin: TraverturePlugin;
 
 	constructor(app: App, plugin: TraverturePlugin) {
@@ -200,3 +200,5 @@ export default class TravertureSettingTab extends PluginSettingTab {
 			);
 	}
 }
+
+export default TravertureSettingTab;
