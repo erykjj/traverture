@@ -35,7 +35,7 @@ function buildFinderQuery(params: FinderReferenceParams): string {
 export function buildJwLibraryFinderUrlForReference(
   params: FinderReferenceParams,
 ): string {
-  return `jwlibrary:///finder?${buildFinderQuery(params)}`;
+  return `jwlibrary://finder?${buildFinderQuery(params)}`;
 }
 
 export function buildJwOrgFinderUrlForReference(
