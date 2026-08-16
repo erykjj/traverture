@@ -42,24 +42,19 @@ export default class TraverturePlugin extends Plugin {
 		if (scheme !== "jwlibrary" && scheme !== "jworg") return false;
 
 		const languages = getAvailableLanguages();
-		const language = languages.find(
-			(item) => item.code === this.settings.outputLanguage
-		);
+		const language = languages.find((item) => item.code === this.settings.outputLanguage);
 		const langSymbol = language
 			? TravertureEngine.get_lang_symbol(this.settings.outputLanguage)
 			: "E";
-		const timecodes =
-			this.settings.outputLanguage === "ase"
-				? await getAslTimecodes(bcv)
-				: undefined;
-
+		const timecodes = this.settings.outputLanguage === "ase"
+			? await getAslTimecodes(bcv)
+			: undefined;
 		const query = timecodes
 			? `?wtlocale=${langSymbol}&bible=${bcv}&ts=${timecodes}`
 			: `?wtlocale=${langSymbol}&bible=${bcv}`;
-		const url =
-			scheme === "jwlibrary"
-				? `jwlibrary:///finder${query}`
-				: `https://www.jw.org/finder${query}`;
+		const url = scheme === "jwlibrary"
+			? `jwlibrary:///finder${query}`
+			: `https://www.jw.org/finder${query}`;
 
 		try {
 			const maybeRequire = window.require;
@@ -76,10 +71,7 @@ export default class TraverturePlugin extends Plugin {
 		}
 	}
 
-	private async handleReferenceClick(
-		bcv: string,
-		refText: string
-	): Promise<void> {
+	private async handleReferenceClick(bcv: string, refText: string): Promise<void> {
 		if (await this.openExternalReference(bcv)) return;
 
 		const formatEngine = new TravertureEngine(
@@ -88,16 +80,12 @@ export default class TraverturePlugin extends Plugin {
 			this.settings.titleFormat,
 			false
 		);
-		const decoded = JSON.parse(
-			formatEngine.decode_scriptures(JSON.stringify([[bcv, bcv]]))
-		);
+		const decoded = JSON.parse(formatEngine.decode_scriptures(JSON.stringify([[bcv, bcv]])));
 		const displayText = decoded[0] || refText;
-		const timecodes =
-			this.settings.outputLanguage === "ase"
-				? await getAslTimecodes(bcv)
-				: undefined;
+		const timecodes = this.settings.outputLanguage === "ase"
+			? await getAslTimecodes(bcv)
+			: undefined;
 		const modal = new VerseModal();
-
 		modal.show(
 			{ html: "*Verse lookup unavailable*\n\n", citation: displayText },
 			bcv,
@@ -105,7 +93,6 @@ export default class TraverturePlugin extends Plugin {
 			displayText,
 			timecodes
 		);
-
 		const verseData = await fetchVerseWithExtrasOfflineFirst(
 			bcv,
 			this.settings.outputLanguage,
@@ -113,7 +100,6 @@ export default class TraverturePlugin extends Plugin {
 			modal.getSignal()
 		);
 		if (!modal.isVisible()) return;
-
 		modal.show(
 			verseData || { html: "*Loading...*\n\n", citation: displayText },
 			bcv,
@@ -129,18 +115,24 @@ export default class TraverturePlugin extends Plugin {
 		this.offlineRepo = new VaultOfflineEpubRepository(this.app, this.manifest.id);
 		this.epubImportService = new EpubImportService(this.offlineRepo);
 		this.addSettingTab(new TravertureSettingTab(this.app, this));
-		this.registerView(
-			VIEW_TYPE_TRAVERTURE_SIDEBAR,
-			(leaf) => new TravertureSidebarView(leaf, this)
-		);
+		this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
 		this.registerEditorExtension(createTravertureEditorPlugin(this));
-		this.registerMarkdownPostProcessor((element) => {
-			this.processElement(element);
-		});
+		this.registerMarkdownPostProcessor((element) => this.processElement(element));
 	}
 
 	private processElement(element: HTMLElement): void {
-		// Existing post-processing implementation remains in the repository.
-		// Link handlers should call handleReferenceClick(bcv, link.textContent ?? "").
+		const links = element.querySelectorAll<HTMLElement>(".traverture-ref-link");
+		for (const link of links) {
+			link.addEventListener("click", (event) => {
+				void (async () => {
+					if (event.button !== 0) return;
+					event.preventDefault();
+					event.stopPropagation();
+					const bcv = link.getAttribute("data-bcv");
+					if (!bcv) return;
+					await this.handleReferenceClick(bcv, link.textContent || "");
+				})();
+			});
+		}
 	}
 }
