@@ -10,6 +10,7 @@
   - under-the-hood optimizations
 - Performance optimizations
   - re-use engines
+- Added TypeScript types to reduce unsafe warnings
 
 ### Fixed
 
