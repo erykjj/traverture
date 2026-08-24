@@ -8,6 +8,8 @@
 
 - Updated engine to v3
   - under-the-hood optimizations
+- Performance optimizations
+  - re-use engines
 
 ### Fixed
 
