@@ -29,12 +29,6 @@ The WASM module:
 
 ---
 
-## CSS
-
-The plugin uses `!important` CSS flags in a few places to override Obsidian's default sidebar and button styles. This is necessary because Obsidian's built-in styles are highly specific and would otherwise break the plugin's table and modal layouts. No `!important` flags affect anything outside the plugin's own interface elements (sidebar, modal, and inline links).
-
----
-
 ## TypeScript Warnings
 
-The plugin source contains TypeScript strictness warnings. **These warnings are cosmetic and do not affect functionality or security**. All external data (API responses) is validated before use.
+The plugin source contains some TypeScript strictness warnings inherent to JavaScript interop (e.g., `JSON.parse` returning `any`, WASM module type casting). **These warnings are cosmetic and do not affect functionality or security**. All external data (API responses) is validated before use.
