@@ -522,6 +522,16 @@ function decodeScriptures(ranges, outputLanguage, nameFormat = "full", capitaliz
     return null;
   }
 }
+function getEngineVersion() {
+  if (!engineInitialized) {
+    return "Engine not initialized";
+  }
+  try {
+    return wasmModule2.TravertureEngine.get_version();
+  } catch {
+    return "Unknown";
+  }
+}
 function getBookName(bookNumber, langCode, format = "full", capitalize = false) {
   if (!engineInitialized) {
     return "";
@@ -1134,7 +1144,7 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
     containerEl.empty();
     const headerEl = containerEl.createDiv({ cls: "traverture-settings-header" });
     headerEl.createSpan({ text: "tra.VER:ture", cls: "traverture-settings-title" });
-    const engineVersion = TravertureEngine.get_version();
+    const engineVersion = getEngineVersion();
     headerEl.createSpan({
       text: `v${this.plugin.manifest.version} \u2013 ${engineVersion}`,
       cls: "traverture-version-info"
@@ -1175,16 +1185,16 @@ var TravertureSettingTab = class extends import_obsidian3.PluginSettingTab {
     }));
     const footerEl = containerEl.createDiv({ cls: "traverture-settings-footer" });
     const footerText = footerEl.createSpan();
-    footerText.appendChild(document.createTextNode("My other Obsidian plugin: "));
+    footerText.appendChild(activeDocument.createTextNode("My other Obsidian plugin: "));
     footerText.createEl("strong", { text: "con[VER]sum" });
-    footerText.appendChild(document.createTextNode(": "));
+    footerText.appendChild(activeDocument.createTextNode(": "));
     const githubLink = footerText.createEl("a", {
       text: "GitHub repo",
       href: "https://github.com/erykjj/conversum"
     });
     githubLink.setAttribute("target", "_blank");
     githubLink.setAttribute("rel", "noopener noreferrer");
-    footerText.appendChild(document.createTextNode(", "));
+    footerText.appendChild(activeDocument.createTextNode(", "));
     const obsidianLink = footerText.createEl("a", {
       text: "Obsidian Community",
       href: "https://community.obsidian.md/plugins/conversum"
@@ -1208,10 +1218,10 @@ var VIEW_TYPE_TRAVERTURE_SIDEBAR = "traverture-sidebar-view";
 
 // sidebar.ts
 var SIDEBAR_COLUMNS = [
-  { key: "scripture", label: "Original", width: "140px", align: "left", mono: void 0 },
-  { key: "fullRef", label: "Full", width: "180px", align: "left", mono: void 0 },
-  { key: "standardRef", label: "Standard", width: "140px", align: "left", mono: void 0 },
-  { key: "officialRef", label: "Official", width: "120px", align: "left", mono: void 0 },
+  { key: "scripture", label: "Original", width: "140px", align: "left", mono: false },
+  { key: "fullRef", label: "Full", width: "180px", align: "left", mono: false },
+  { key: "standardRef", label: "Standard", width: "140px", align: "left", mono: false },
+  { key: "officialRef", label: "Official", width: "120px", align: "left", mono: false },
   { key: "startBcv", label: "Start BCV", width: "120px", align: "center", mono: true },
   { key: "endBcv", label: "End BCV", width: "120px", align: "center", mono: true },
   { key: "startCh", label: "Start Ch", width: "80px", align: "center", mono: true },
