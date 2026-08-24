@@ -8,19 +8,20 @@ import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR, NameFormat } from './types';
 import type TraverturePlugin from './main';
 
 export const SIDEBAR_COLUMNS = [
-    { key: 'scripture', label: 'Original', width: '140px', align: 'left' as const, mono: undefined as true | undefined },
-    { key: 'fullRef', label: 'Full', width: '180px', align: 'left' as const, mono: undefined as true | undefined },
-    { key: 'standardRef', label: 'Standard', width: '140px', align: 'left' as const, mono: undefined as true | undefined },
-    { key: 'officialRef', label: 'Official', width: '120px', align: 'left' as const, mono: undefined as true | undefined },
-    { key: 'startBcv', label: 'Start BCV', width: '120px', align: 'center' as const, mono: true as true },
-    { key: 'endBcv', label: 'End BCV', width: '120px', align: 'center' as const, mono: true as true },
-    { key: 'startCh', label: 'Start Ch', width: '80px', align: 'center' as const, mono: true as true },
-    { key: 'endCh', label: 'End Ch', width: '80px', align: 'center' as const, mono: true as true },
-    { key: 'startVerse', label: 'Start Vs', width: '80px', align: 'center' as const, mono: true as true },
-    { key: 'endVerse', label: 'End Vs', width: '80px', align: 'center' as const, mono: true as true },
+    { key: 'scripture', label: 'Original', width: '140px', align: 'left', mono: false },
+    { key: 'fullRef', label: 'Full', width: '180px', align: 'left', mono: false },
+    { key: 'standardRef', label: 'Standard', width: '140px', align: 'left', mono: false },
+    { key: 'officialRef', label: 'Official', width: '120px', align: 'left', mono: false },
+    { key: 'startBcv', label: 'Start BCV', width: '120px', align: 'center', mono: true },
+    { key: 'endBcv', label: 'End BCV', width: '120px', align: 'center', mono: true },
+    { key: 'startCh', label: 'Start Ch', width: '80px', align: 'center', mono: true },
+    { key: 'endCh', label: 'End Ch', width: '80px', align: 'center', mono: true },
+    { key: 'startVerse', label: 'Start Vs', width: '80px', align: 'center', mono: true },
+    { key: 'endVerse', label: 'End Vs', width: '80px', align: 'center', mono: true },
 ] as const;
 
-type SidebarColumnKey = typeof SIDEBAR_COLUMNS[number]['key'];
+type SidebarColumn = typeof SIDEBAR_COLUMNS[number];
+type SidebarColumnKey = SidebarColumn['key'];
 
 export class TravertureSidebarView extends ItemView {
     plugin: TraverturePlugin;

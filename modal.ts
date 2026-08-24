@@ -1,7 +1,7 @@
 // modal.ts
 
 import { setIcon } from 'obsidian';
-import { getAvailableLanguagesCached as getAvailableLanguages, getLangSymbol, getBookName } from './engine-wrapper';
+import { getLangSymbol, getBookName } from './engine-wrapper';
 import { VerseData } from './types';
 
 export class VerseModal {

@@ -1,6 +1,6 @@
 // main.ts
 
-import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, MenuItem, TFile } from 'obsidian';
+import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, MenuItem } from 'obsidian';
 // @ts-ignore
 import * as wasmModuleUntyped from './engine.js';
 import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, getLangSymbol } from './engine-wrapper';

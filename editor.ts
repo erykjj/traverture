@@ -5,7 +5,7 @@ import { RangeSetBuilder } from '@codemirror/state';
 import { decodeScriptures, getLangSymbol } from './engine-wrapper';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { VerseModal } from './modal';
-import { ParsedReference, NameFormat } from './types';
+import { ParsedReference } from './types';
 import type TraverturePlugin from './main';
 
 interface BcvEntry {

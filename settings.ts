@@ -1,16 +1,14 @@
 // settings.ts
 
-import { PluginSettingTab, Setting } from 'obsidian';
-// @ts-ignore
-import * as wasmModule from './engine.js';
-import { getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
+import { App, PluginSettingTab, Setting } from 'obsidian';
+import { getEngineVersion, getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
 import { NameFormat } from './types';
 import TraverturePlugin from './main';
 
 export class TravertureSettingTab extends PluginSettingTab {
     plugin: TraverturePlugin;
 
-    constructor(app: any, plugin: TraverturePlugin) {
+    constructor(app: App, plugin: TraverturePlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
@@ -21,7 +19,7 @@ export class TravertureSettingTab extends PluginSettingTab {
 
         const headerEl = containerEl.createDiv({ cls: 'traverture-settings-header' });
         headerEl.createSpan({ text: 'tra.VER:ture', cls: 'traverture-settings-title' });
-        const engineVersion = wasmModule.TravertureEngine.get_version();
+        const engineVersion = getEngineVersion();
         headerEl.createSpan({ 
             text: `v${this.plugin.manifest.version} – ${engineVersion}`,
             cls: 'traverture-version-info'
@@ -86,16 +84,16 @@ export class TravertureSettingTab extends PluginSettingTab {
 
         const footerEl = containerEl.createDiv({ cls: 'traverture-settings-footer' });
         const footerText = footerEl.createSpan();
-        footerText.appendChild(document.createTextNode('My other Obsidian plugin: '));
+        footerText.appendChild(activeDocument.createTextNode('My other Obsidian plugin: '));
         footerText.createEl('strong', { text: 'con[VER]sum' });
-        footerText.appendChild(document.createTextNode(': '));
+        footerText.appendChild(activeDocument.createTextNode(': '));
         const githubLink = footerText.createEl('a', {
             text: 'GitHub repo',
             href: 'https://github.com/erykjj/conversum'
         });
         githubLink.setAttribute('target', '_blank');
         githubLink.setAttribute('rel', 'noopener noreferrer');
-        footerText.appendChild(document.createTextNode(', '));
+        footerText.appendChild(activeDocument.createTextNode(', '));
         const obsidianLink = footerText.createEl('a', {
             text: 'Obsidian Community',
             href: 'https://community.obsidian.md/plugins/conversum'
