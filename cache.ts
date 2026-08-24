@@ -11,6 +11,55 @@ interface CacheEntry {
     ts: number;
 }
 
+interface CommentaryData {
+    id: number;
+    content: string;
+    source: string;
+}
+
+interface FootnoteData {
+    id: number;
+    content: string;
+    source: string;
+}
+
+interface CrossReferenceData {
+    id: number;
+    source: string;
+    targets: Array<{ vs: string; standardCitation: string; abbreviatedCitation: string }>;
+}
+
+interface VerseApiResponse {
+    html: string;
+    citation?: string;
+    footnotes?: FootnoteData[];
+    crossReferences?: CrossReferenceData[];
+    commentaries?: CommentaryData[];
+}
+
+interface JwApiResponse {
+    ranges?: {
+        [key: string]: VerseApiResponse;
+    };
+}
+
+interface AslMarker {
+    verseNumber: number;
+    startTime: string;
+    duration: string;
+}
+
+interface AslFile {
+    markers?: {
+        markers?: AslMarker[];
+    };
+}
+
+interface AslTimecodes {
+    startTime: string;
+    endTime: string;
+}
+
 const verseCache = new Map<string, CacheEntry>();
 
 function isCacheFresh(entry: CacheEntry): boolean {
@@ -47,7 +96,7 @@ export async function fetchVerseWithExtras(range: string, langCode: string, sign
         const response = await requestUrl({ url });
         if (signal?.aborted) return null;
 
-        const data = response.json;
+        const data = response.json as JwApiResponse;
         const verseData = data.ranges?.[apiRange];
         if (verseData) {
             if (signal?.aborted) return null;
@@ -56,7 +105,7 @@ export async function fetchVerseWithExtras(range: string, langCode: string, sign
                 citation: (verseData.citation || '').replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' '),
                 footnotes: verseData.footnotes || [],
                 crossReferences: verseData.crossReferences || [],
-                commentaries: verseData.commentaries?.filter((c: any) => c.content) || [],
+                commentaries: verseData.commentaries?.filter((c: CommentaryData) => c.content) || [],
             };
             setCachedVerse(cacheKey, result);
             return result;
@@ -122,7 +171,7 @@ export async function fetchVerse(range: string, langCode: string): Promise<Verse
 
     try {
         const response = await requestUrl({ url });
-        const data = response.json;
+        const data = response.json as JwApiResponse;
         const verseData = data.ranges?.[apiRange];
         if (verseData) {
             const result: VerseData = {
@@ -138,11 +187,6 @@ export async function fetchVerse(range: string, langCode: string): Promise<Verse
     return null;
 }
 
-interface AslTimecodes {
-    startTime: string;
-    endTime: string;
-}
-
 const aslMetaCache = new Map<string, AslTimecodes>();
 
 export async function fetchAslTimecodes(bookNum: number, chapter: number, startVerse: number, endVerse: number): Promise<string | null> {
@@ -155,25 +199,21 @@ export async function fetchAslTimecodes(bookNum: number, chapter: number, startV
     try {
         const url = getAslMetadataUrl(bookNum, chapter);
         const response = await requestUrl({ url });
-        const data = response.json;
+        const data = response.json as { files?: { ASL?: AslFile[] } };
         const fileFormats = data.files?.ASL;
         if (!fileFormats) return null;
 
-        let markers;
-        for (const format of Object.values(fileFormats)) {
-            const files = format as Array<{ markers?: { markers?: Array<{ verseNumber: number; startTime: string; duration: string }> } }>;
-            for (const file of files) {
-                if (file.markers?.markers) {
-                    markers = file.markers.markers;
-                    break;
-                }
+        let markers: AslMarker[] | undefined;
+        for (const file of fileFormats) {
+            if (file.markers?.markers) {
+                markers = file.markers.markers;
+                break;
             }
-            if (markers) break;
         }
         if (!markers) return null;
 
-        const firstMarker = markers.find((m: any) => m.verseNumber === startVerse);
-        const lastMarker = markers.find((m: any) => m.verseNumber === endVerse);
+        const firstMarker = markers.find((m: AslMarker) => m.verseNumber === startVerse);
+        const lastMarker = markers.find((m: AslMarker) => m.verseNumber === endVerse);
         if (!firstMarker || !lastMarker) return null;
 
         const startSeconds = parseTimecode(firstMarker.startTime);

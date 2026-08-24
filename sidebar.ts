@@ -1,26 +1,26 @@
 // sidebar.ts
 
-import { ItemView, WorkspaceLeaf } from 'obsidian';
-// @ts-ignore
-import * as wasmModule from './engine.js';
-import { getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
+import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
+import { getAvailableLanguagesCached as getAvailableLanguages, getBookName, getLangSymbol } from './engine-wrapper';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { VerseModal } from './modal';
-import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR } from './types';
+import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR, NameFormat } from './types';
 import type TraverturePlugin from './main';
 
 export const SIDEBAR_COLUMNS = [
-    { key: 'scripture', label: 'Original', width: '140px', align: 'left' as const },
-    { key: 'fullRef', label: 'Full', width: '180px', align: 'left' as const },
-    { key: 'standardRef', label: 'Standard', width: '140px', align: 'left' as const },
-    { key: 'officialRef', label: 'Official', width: '120px', align: 'left' as const },
-    { key: 'startBcv', label: 'Start BCV', width: '120px', align: 'center' as const, mono: true },
-    { key: 'endBcv', label: 'End BCV', width: '120px', align: 'center' as const, mono: true },
-    { key: 'startCh', label: 'Start Ch', width: '80px', align: 'center' as const, mono: true },
-    { key: 'endCh', label: 'End Ch', width: '80px', align: 'center' as const, mono: true },
-    { key: 'startVerse', label: 'Start Vs', width: '80px', align: 'center' as const, mono: true },
-    { key: 'endVerse', label: 'End Vs', width: '80px', align: 'center' as const, mono: true },
-];
+    { key: 'scripture', label: 'Original', width: '140px', align: 'left' as const, mono: undefined as true | undefined },
+    { key: 'fullRef', label: 'Full', width: '180px', align: 'left' as const, mono: undefined as true | undefined },
+    { key: 'standardRef', label: 'Standard', width: '140px', align: 'left' as const, mono: undefined as true | undefined },
+    { key: 'officialRef', label: 'Official', width: '120px', align: 'left' as const, mono: undefined as true | undefined },
+    { key: 'startBcv', label: 'Start BCV', width: '120px', align: 'center' as const, mono: true as true },
+    { key: 'endBcv', label: 'End BCV', width: '120px', align: 'center' as const, mono: true as true },
+    { key: 'startCh', label: 'Start Ch', width: '80px', align: 'center' as const, mono: true as true },
+    { key: 'endCh', label: 'End Ch', width: '80px', align: 'center' as const, mono: true as true },
+    { key: 'startVerse', label: 'Start Vs', width: '80px', align: 'center' as const, mono: true as true },
+    { key: 'endVerse', label: 'End Vs', width: '80px', align: 'center' as const, mono: true as true },
+] as const;
+
+type SidebarColumnKey = typeof SIDEBAR_COLUMNS[number]['key'];
 
 export class TravertureSidebarView extends ItemView {
     plugin: TraverturePlugin;
@@ -47,19 +47,19 @@ export class TravertureSidebarView extends ItemView {
     async onOpen() { this.contentEl.empty(); this.contentEl.addClass('traverture-sidebar'); }
     async onClose() { this.contentEl.empty(); }
 
-    async setState(state: any, _result: any): Promise<void> {
+    async setState(state: Record<string, unknown>, _result: ViewStateResult): Promise<void> {
         if (state) {
-            if (state.outputLang !== undefined) this.outputLang = state.outputLang;
-            if (state.capitalize !== undefined) this.capitalize = state.capitalize;
-            if (state.uniqueOnly !== undefined) this.uniqueOnly = state.uniqueOnly;
-            if (state.visibleColumns && Array.isArray(state.visibleColumns)) {
-                this.visibleColumns = new Set(state.visibleColumns);
+            if (typeof state.outputLang === 'string') this.outputLang = state.outputLang;
+            if (typeof state.capitalize === 'boolean') this.capitalize = state.capitalize;
+            if (typeof state.uniqueOnly === 'boolean') this.uniqueOnly = state.uniqueOnly;
+            if (Array.isArray(state.visibleColumns)) {
+                this.visibleColumns = new Set(state.visibleColumns as string[]);
             }
         }
         await super.setState(state, _result);
     }
 
-    getState(): any {
+    getState(): Record<string, unknown> {
         const state = super.getState();
         return { ...state, outputLang: this.outputLang, capitalize: this.capitalize, uniqueOnly: this.uniqueOnly, visibleColumns: [...this.visibleColumns] };
     }
@@ -81,15 +81,23 @@ export class TravertureSidebarView extends ItemView {
         return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '').toLowerCase();
     }
 
-    private getDisplayRef(ref: SidebarRef, format: 'full' | 'standard' | 'official'): string {
-        const bookName = wasmModule.TravertureEngine.get_book_name(ref.bookNum, this.outputLang, format, this.capitalize);
+    private getDisplayRef(ref: SidebarRef, format: NameFormat): string {
+        const bookName = getBookName(ref.bookNum, this.outputLang, format, this.capitalize);
         if (!bookName) return ref.fullRef;
-        const engBookName = wasmModule.TravertureEngine.get_book_name(ref.bookNum, 'en', 'full', false);
+        const engBookName = getBookName(ref.bookNum, 'en', 'full', false);
         if (engBookName && ref.fullRef.startsWith(engBookName)) {
             const rest = ref.fullRef.substring(engBookName.length); // " 3" or " 1:3"
             return `${bookName}${rest}`;
         }
         return `${bookName}`;
+    }
+
+    private getRefValue(ref: SidebarRef, key: SidebarColumnKey): string {
+        if (key === 'fullRef') return this.getDisplayRef(ref, 'full');
+        if (key === 'standardRef') return this.getDisplayRef(ref, 'standard');
+        if (key === 'officialRef') return this.getDisplayRef(ref, 'official');
+        const raw = ref[key];
+        return String(raw ?? '');
     }
 
     private getFilteredSortedRefs(): SidebarRef[] {
@@ -102,26 +110,16 @@ export class TravertureSidebarView extends ItemView {
             const q = this.normalizeForSearch(this.searchQuery);
             refs = refs.filter(r => SIDEBAR_COLUMNS.some(col => {
                 if (!this.visibleColumns.has(col.key)) return false;
-                let val: string;
-                if (col.key === 'fullRef') val = this.getDisplayRef(r, 'full');
-                else if (col.key === 'standardRef') val = this.getDisplayRef(r, 'standard');
-                else if (col.key === 'officialRef') val = this.getDisplayRef(r, 'official');
-                else val = String((r as any)[col.key] ?? '');
+                const val = this.getRefValue(r, col.key);
                 return this.normalizeForSearch(val).includes(q);
             }));
         }
         if (this.sortColumn && this.sortDir !== 0) {
+            const sortKey = this.sortColumn as SidebarColumnKey;
             refs.sort((a, b) => {
-                const getVal = (ref: SidebarRef): string | number => {
-                    const key = this.sortColumn!;
-                    if (key === 'fullRef') return this.getDisplayRef(ref, 'full');
-                    if (key === 'standardRef') return this.getDisplayRef(ref, 'standard');
-                    if (key === 'officialRef') return this.getDisplayRef(ref, 'official');
-                    const raw = (ref as any)[key];
-                    return typeof raw === 'number' ? raw : String(raw ?? '');
-                };
-                const aVal = getVal(a), bVal = getVal(b);
-                const cmp = typeof aVal === 'number' && typeof bVal === 'number' ? aVal - bVal : String(aVal).localeCompare(String(bVal));
+                const aVal = this.getRefValue(a, sortKey);
+                const bVal = this.getRefValue(b, sortKey);
+                const cmp = aVal.localeCompare(bVal);
                 return this.sortDir === 1 ? cmp : -cmp;
             });
         }
@@ -184,12 +182,7 @@ export class TravertureSidebarView extends ItemView {
         const copyBtn = topRow.createEl('button', { text: 'COPY', cls: 'traverture-sidebar-copy-btn' });
         copyBtn.addEventListener('click', () => {
             const headers = visibleCols.map(c => c.label).join('\t');
-            const body = refs.map(r => visibleCols.map(c => {
-                if (c.key === 'fullRef') return this.getDisplayRef(r, 'full');
-                if (c.key === 'standardRef') return this.getDisplayRef(r, 'standard');
-                if (c.key === 'officialRef') return this.getDisplayRef(r, 'official');
-                return String((r as any)[c.key] ?? '');
-            }).join('\t')).join('\n');
+            const body = refs.map(r => visibleCols.map(c => this.getRefValue(r, c.key)).join('\t')).join('\n');
             void navigator.clipboard.writeText(`${headers}\n${body}`);
             copyBtn.textContent = 'COPIED';
             window.setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
@@ -250,11 +243,7 @@ export class TravertureSidebarView extends ItemView {
                 const td = row.createEl('td', { cls: 'traverture-sidebar-td' });
                 td.style.textAlign = col.align;
                 if (col.mono) td.addClass('traverture-mono');
-                let displayVal: string;
-                if (col.key === 'fullRef') displayVal = this.getDisplayRef(ref, 'full');
-                else if (col.key === 'standardRef') displayVal = this.getDisplayRef(ref, 'standard');
-                else if (col.key === 'officialRef') displayVal = this.getDisplayRef(ref, 'official');
-                else displayVal = String((ref as any)[col.key] ?? '');
+                const displayVal = this.getRefValue(ref, col.key);
                 if (col.key === 'fullRef' || col.key === 'standardRef' || col.key === 'officialRef') {
                     const link = td.createEl('a', { text: displayVal, cls: 'traverture-ref-link' });
                     const bcv = ref.startBcv === ref.endBcv ? ref.startBcv : `${ref.startBcv}-${ref.endBcv}`;
@@ -263,7 +252,7 @@ export class TravertureSidebarView extends ItemView {
                     link.addEventListener('click', (e) => { void (async () => {
                         if (e.button !== 0) return;
                         if (e.ctrlKey || e.metaKey) {
-                            const langSymbol = wasmModule.TravertureEngine.get_lang_symbol(this.outputLang);
+                            const langSymbol = getLangSymbol(this.outputLang);
                             window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`, '_blank');
                             return;
                         }

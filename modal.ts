@@ -1,9 +1,7 @@
 // modal.ts
 
 import { setIcon } from 'obsidian';
-// @ts-ignore
-import * as wasmModule from './engine.js';
-import { getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
+import { getAvailableLanguagesCached as getAvailableLanguages, getLangSymbol, getBookName } from './engine-wrapper';
 import { VerseData } from './types';
 
 export class VerseModal {
@@ -18,9 +16,7 @@ export class VerseModal {
         this.hidden = false;
         this.abortController = new AbortController();
 
-        const languages = getAvailableLanguages();
-        const langObj = languages.find(l => l.code === outputLang);
-        const langSymbol = langObj ? wasmModule.TravertureEngine.get_lang_symbol(outputLang) : 'E';
+        const langSymbol = getLangSymbol(outputLang);
         this.currentTitle = titleOverride || verseData.citation;
 
         const jwlibUrl = timecodes 
@@ -139,7 +135,7 @@ export class VerseModal {
                 el.setAttribute('title', this.stripHtml(footnote.content));
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this.showMarkerPopover(el, footnote.content, 'Footnote');
+                    this.showMarkerPopover(el, footnote.content);
                 });
             }
         });
@@ -153,13 +149,13 @@ export class VerseModal {
                 el.setAttribute('title', targets);
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this.showMarkerPopover(el, targets, 'Cross References');
+                    this.showMarkerPopover(el, targets);
                 });
             }
         });
     }
 
-    private showMarkerPopover(anchor: HTMLElement, content: string, label: string) {
+    private showMarkerPopover(anchor: HTMLElement, content: string) {
         activeDocument.querySelector('.traverture-marker-popover')?.remove();
 
         const popover = activeDocument.createElement('div');
@@ -201,7 +197,7 @@ export class VerseModal {
             let text = '';
             for (const c of commentaries) {
                 const bookNum = parseInt(c.source.substring(0, 2));
-                const bookName = wasmModule.TravertureEngine.get_book_name(bookNum, outputLang, 'full', false);
+                const bookName = getBookName(bookNum, outputLang, 'full', false);
                 const ch = parseInt(c.source.substring(2, 5));
                 const vs = parseInt(c.source.substring(5, 8));
 
@@ -239,7 +235,7 @@ export class VerseModal {
             note.className = 'traverture-modal-commentary-note';
 
             const bookNum = parseInt(c.source.substring(0, 2));
-            const bookName = wasmModule.TravertureEngine.get_book_name(bookNum, outputLang, 'full', false);
+            const bookName = getBookName(bookNum, outputLang, 'full', false);
             const ch = parseInt(c.source.substring(2, 5));
             const vs = parseInt(c.source.substring(5, 8));
             const citation = activeDocument.createElement('div');

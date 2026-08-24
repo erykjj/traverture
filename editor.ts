@@ -1,24 +1,37 @@
 // editor.ts
 
-import { decodeScriptures } from './engine-wrapper';
+import { ViewPlugin, EditorView, Decoration, DecorationSet, ViewUpdate } from '@codemirror/view';
+import { RangeSetBuilder } from '@codemirror/state';
+import { decodeScriptures, getLangSymbol } from './engine-wrapper';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { VerseModal } from './modal';
-import { ViewPlugin, Decoration } from '@codemirror/view';
-import { RangeSetBuilder } from '@codemirror/state';
+import { ParsedReference, NameFormat } from './types';
+import type TraverturePlugin from './main';
 
+interface BcvEntry {
+    from: number;
+    to: number;
+    bcv: string;
+}
+
+interface DecoEntry {
+    from: number;
+    to: number;
+    deco: Decoration;
+}
 
 const REF_PATTERN = /\{\{(.+?)\}\}/g;
 
-function buildDecorations(view: any, plugin: any) {
-    const allDecos: Array<{ from: number; to: number; deco: any }> = [];
+function buildDecorations(view: EditorView, plugin: TraverturePlugin): DecorationSet {
+    const allDecos: DecoEntry[] = [];
     const cursor = view.state.selection.main;
-    const bcvs: Array<{ from: number; to: number; bcv: string }> = [];
+    const bcvs: BcvEntry[] = [];
 
     for (const { from, to } of view.visibleRanges) {
         const text = view.state.doc.sliceString(from, to);
         const decorated: Array<{ from: number; to: number }> = [];
 
-        let match;
+        let match: RegExpExecArray | null;
         while ((match = REF_PATTERN.exec(text)) !== null) {
             const blockStart = from + match.index;
             const blockEnd = blockStart + match[0].length;
@@ -38,7 +51,7 @@ function buildDecorations(view: any, plugin: any) {
             const parsed = plugin.safeParse?.(engineInput);
             if (!parsed) continue;
 
-            const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+            const clauses: ParsedReference[] = JSON.parse(parsed);
             const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
             
             for (const clause of sorted) {
@@ -48,7 +61,7 @@ function buildDecorations(view: any, plugin: any) {
                 
                 const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const refRegex = new RegExp(escaped, 'g');
-                let refMatch;
+                let refMatch: RegExpExecArray | null;
                 while ((refMatch = refRegex.exec(innerText)) !== null) {
                     const refStart = innerStart + refMatch.index;
                     const refEnd = refStart + clauseText.length;
@@ -82,19 +95,26 @@ function buildDecorations(view: any, plugin: any) {
     }
 
     allDecos.sort((a, b) => a.from - b.from);
-    const builder: any = new RangeSetBuilder();
+    const builder = new RangeSetBuilder<Decoration>();
     for (const d of allDecos) {
         builder.add(d.from, d.to, d.deco);
     }
-    plugin._editBcvs = bcvs;
+    (plugin as unknown as { _editBcvs: BcvEntry[] })._editBcvs = bcvs;
     return builder.finish();
 }
 
-function processSegment(basePos: number, segment: string, plugin: any, allDecos: Array<{ from: number; to: number; deco: any }>, decorated: Array<{ from: number; to: number }>, bcvs: Array<{ from: number; to: number; bcv: string }>) {
+function processSegment(
+    basePos: number,
+    segment: string,
+    plugin: TraverturePlugin,
+    allDecos: DecoEntry[],
+    decorated: Array<{ from: number; to: number }>,
+    bcvs: BcvEntry[]
+): void {
     const parsed = plugin.safeParse?.(segment);
     if (!parsed) return;
 
-    const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+    const clauses: ParsedReference[] = JSON.parse(parsed);
     if (clauses.length === 0) return;
 
     for (const clause of clauses) {
@@ -114,34 +134,35 @@ function processSegment(basePos: number, segment: string, plugin: any, allDecos:
     }
 }
 
-export function createTravertureEditorPlugin(plugin: any) {
-    plugin._editBcvs = [];
+export function createTravertureEditorPlugin(plugin: TraverturePlugin) {
+    (plugin as unknown as { _editBcvs: BcvEntry[] })._editBcvs = [];
 
     return ViewPlugin.fromClass(
         class {
-            decorations: any;
+            decorations: DecorationSet;
 
-            constructor(view: any) {
+            constructor(view: EditorView) {
                 this.decorations = buildDecorations(view, plugin);
             }
 
-            update(update: any) {
+            update(update: ViewUpdate) {
                 if (update.docChanged || update.selectionSet || update.viewportChanged) {
                     this.decorations = buildDecorations(update.view, plugin);
                 }
             }
         },
         {
-            decorations: (v: any) => v.decorations,
+            decorations: (v: { decorations: DecorationSet }) => v.decorations,
             eventHandlers: {
-                mousedown: (e: MouseEvent, _view: any) => {
+                mousedown: (e: MouseEvent, view: EditorView) => {
                     if (e.button !== 0) return;
-                    const pos = _view.posAtCoords({ x: e.clientX, y: e.clientY });
+                    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
                     if (pos === null) return;
-                    const entry = plugin._editBcvs?.find((b: any) => pos > b.from && pos < b.to);
+                    const bcvs = (plugin as unknown as { _editBcvs: BcvEntry[] })._editBcvs;
+                    const entry = bcvs?.find((b: BcvEntry) => pos > b.from && pos < b.to);
                     if (entry) {
                         if (e.ctrlKey || e.metaKey) {
-                            const langSymbol = (plugin.engine.constructor).get_lang_symbol(plugin.settings.outputLanguage);
+                            const langSymbol = getLangSymbol(plugin.settings.outputLanguage);
                             window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${entry.bcv}`, '_blank');
                             return;
                         }
@@ -155,7 +176,7 @@ export function createTravertureEditorPlugin(plugin: any) {
     );
 }
 
-async function showModal(plugin: any, bcv: string): Promise<void> {
+async function showModal(plugin: TraverturePlugin, bcv: string): Promise<void> {
     const parts = bcv.split('-');
     const startBcv = parts[0];
     const endBcv = parts.length > 1 ? parts[1] : parts[0];

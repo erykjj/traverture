@@ -1,19 +1,25 @@
 // main.ts
 
-import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView } from 'obsidian';
+import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, MenuItem, TFile } from 'obsidian';
 // @ts-ignore
-import * as wasmModule from './engine.js';
-import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
+import * as wasmModuleUntyped from './engine.js';
+import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, getLangSymbol } from './engine-wrapper';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { createTravertureEditorPlugin } from './editor';
 import { VerseModal } from './modal';
 import { TravertureSettingTab } from './settings';
 import { TravertureSidebarView } from './sidebar';
-import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef } from './types';
+import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef, TravertureEngineInstance, TravertureEngineStatic, NameFormat, ParsedReference } from './types';
+
+const wasmModule = wasmModuleUntyped as unknown as { TravertureEngine: TravertureEngineStatic };
+
+function getSubmenu(item: MenuItem): Menu {
+    return (item as unknown as { setSubmenu(): Menu }).setSubmenu();
+}
 
 export default class TraverturePlugin extends Plugin {
     settings = DEFAULT_SETTINGS;
-    engine: any = null;
+    engine: TravertureEngineInstance | null = null;
     private processingElements = new Set<HTMLElement>();
 
     async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); }
@@ -26,9 +32,8 @@ export default class TraverturePlugin extends Plugin {
         prewarmEngines(this.settings.sourceLanguage, this.settings.outputLanguage);
     }
 
-    private parseGuard = false;
-
     safeParse(text: string): string | null {
+        if (!this.engine) return null;
         return this.engine.parse(
             this.settings.sourceLanguage,
             this.settings.outputLanguage,
@@ -57,7 +62,7 @@ export default class TraverturePlugin extends Plugin {
         const parsed = this.safeParse(engineText);
         if (!parsed) return results;
 
-        const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+        const clauses: ParsedReference[] = JSON.parse(parsed);
         if (clauses.length === 0) return results;
 
         for (const [clauseText] of clauses) {
@@ -104,7 +109,7 @@ export default class TraverturePlugin extends Plugin {
                 const engineInput = '⟪⟪' + refText + '⟫⟫';
                 const parsed = this.safeParse(engineInput);
                 if (!parsed) return inner;
-                const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+                const clauses: ParsedReference[] = JSON.parse(parsed);
                 if (clauses.length === 0) return inner;
 
                 let result = inner;
@@ -168,7 +173,7 @@ export default class TraverturePlugin extends Plugin {
                 const text = textNode.nodeValue || '';
                 const parsed = this.safeParse(text);
                 if (!parsed) continue;
-                const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+                const clauses: ParsedReference[] = JSON.parse(parsed);
                 if (clauses.length === 0) continue;
 
                 const linked = this.insertLinks(text, clauses);
@@ -199,16 +204,12 @@ export default class TraverturePlugin extends Plugin {
                 if ((e as MouseEvent).button !== 0) return;
                 const bcv = link.getAttribute('data-bcv')!;
                 if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
-                    const langSymbol = wasmModule.TravertureEngine.get_lang_symbol(this.settings.outputLanguage);
+                    const langSymbol = getLangSymbol(this.settings.outputLanguage);
                     window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`, '_blank');
                     return;
                 }
                 e.preventDefault(); e.stopPropagation();
-                if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
-                    window.open(`jwlibrary:///finder?wtlocale=E&bible=${bcv}`, '_blank');
-                    return;
-                }
-                const decoded = decodeScriptures([[bcv, bcv]], this.settings.outputLanguage, this.settings.titleFormat as 'full' | 'standard' | 'official');
+                const decoded = decodeScriptures([[bcv, bcv]], this.settings.outputLanguage, this.settings.titleFormat);
                 const refText = decoded?.[0] || link.textContent || '';
                 const timecodes = this.settings.outputLanguage === 'ase' 
                     ? await getAslTimecodes(bcv) 
@@ -223,7 +224,7 @@ export default class TraverturePlugin extends Plugin {
         this.processingElements.delete(el);
     }
 
-    private insertLinks(text: string, clauses: Array<[string, number, number, string[][]]>): string {
+    private insertLinks(text: string, clauses: ParsedReference[]): string {
         if (clauses.length === 0) return text;
         
         const positions: Array<{ start: number; end: number; displayText: string; bcv: string; clauseText: string }> = [];
@@ -280,48 +281,48 @@ export default class TraverturePlugin extends Plugin {
             this.processElement(element);
         });
 
-        this.registerEvent(this.app.workspace.on('editor-menu', (menu, editor, _view) => {
+        this.registerEvent(this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, _view) => {
             const selection = editor.getSelection();
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle('tra.VER:ture').setIcon('book-open');
-                const submenu = item.setSubmenu();
+                const submenu = getSubmenu(item);
 
                 if (selection) {
-                    submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(selection)); }));
-                    submenu.addItem((subItem: any) => {
+                    submenu.addItem((subItem: MenuItem) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(selection)); }));
+                    submenu.addItem((subItem: MenuItem) => {
                         subItem.setTitle('Insert citation').setIcon('quote-glyph');
-                        const citeMenu = subItem.setSubmenu();
-                        citeMenu.addItem((citeItem: any) => citeItem.setTitle('Reference: "verse"').onClick(async () => { await this.insertCitation(editor, selection, false); }));
-                        citeMenu.addItem((citeItem: any) => citeItem.setTitle('"verse" (Reference)').onClick(async () => { await this.insertCitation(editor, selection, true); }));
+                        const citeMenu = getSubmenu(subItem);
+                        citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => { await this.insertCitation(editor, selection, false); }));
+                        citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => { await this.insertCitation(editor, selection, true); }));
                     });
-                    submenu.addItem((subItem: any) => {
+                    submenu.addItem((subItem: MenuItem) => {
                         subItem.setTitle('Reformat selection').setIcon('pencil');
-                        const reformatMenu = subItem.setSubmenu();
-                        reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor, selection, 'full')));
-                        reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor, selection, 'standard')));
-                        reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor, selection, 'official')));
+                        const reformatMenu = getSubmenu(subItem);
+                        reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor, selection, 'full')));
+                        reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor, selection, 'standard')));
+                        reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor, selection, 'official')));
                     });
                     submenu.addSeparator();
                 }
 
-                submenu.addItem((subItem: any) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(editor.getValue())); }));
-                submenu.addItem((subItem: any) => {
+                submenu.addItem((subItem: MenuItem) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(editor.getValue())); }));
+                submenu.addItem((subItem: MenuItem) => {
                     subItem.setTitle('Reformat document').setIcon('pencil');
-                    const reformatMenu = subItem.setSubmenu();
-                    reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'full', true)));
-                    reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'standard', true)));
-                    reformatMenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'official', true)));
+                    const reformatMenu = getSubmenu(subItem);
+                    reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'full', true)));
+                    reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'standard', true)));
+                    reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'official', true)));
                 });
 
                 submenu.addSeparator();
 
                 // Source language
-                submenu.addItem((subItem: any) => {
+                submenu.addItem((subItem: MenuItem) => {
                     subItem.setTitle('Source language').setIcon('book-open');
-                    const langMenu = subItem.setSubmenu();
+                    const langMenu = getSubmenu(subItem);
                     const languages = getAvailableLanguages().filter(l => l.code !== 'ase');
                     for (const lang of languages) {
-                        langMenu.addItem((langItem: any) => langItem
+                        langMenu.addItem((langItem: MenuItem) => langItem
                             .setTitle(`${lang.vernacularName} (${lang.code})`)
                             .setChecked(lang.code === this.settings.sourceLanguage)
                             .onClick(async () => {
@@ -334,12 +335,12 @@ export default class TraverturePlugin extends Plugin {
                 });
 
                 // Output language
-                submenu.addItem((subItem: any) => {
+                submenu.addItem((subItem: MenuItem) => {
                     subItem.setTitle('Output language').setIcon('languages');
-                    const langMenu = subItem.setSubmenu();
+                    const langMenu = getSubmenu(subItem);
                     const languages = getAvailableLanguages();
                     for (const lang of languages) {
-                        langMenu.addItem((langItem: any) => langItem
+                        langMenu.addItem((langItem: MenuItem) => langItem
                             .setTitle(`${lang.vernacularName} (${lang.code})`)
                             .setChecked(lang.code === this.settings.outputLanguage)
                             .onClick(async () => {
@@ -365,7 +366,7 @@ export default class TraverturePlugin extends Plugin {
                 const container = range.commonAncestorContainer;
                 const parentEl = container.nodeType === Node.TEXT_NODE ? container.parentElement : container as HTMLElement;
                 const links = parentEl?.querySelectorAll?.('.traverture-ref-link') || [];
-                links.forEach((link: any) => {
+                links.forEach((link: Element) => {
                     if (domSelection.containsNode(link, true)) {
                         const bcv = link.getAttribute('data-bcv');
                         if (bcv) bcvs.push(bcv);
@@ -377,11 +378,11 @@ export default class TraverturePlugin extends Plugin {
             evt.stopPropagation();
 
             const menu = new Menu();
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle('tra.VER:ture').setIcon('book-open');
-                const submenu = item.setSubmenu();
+                const submenu = getSubmenu(item);
                 if (hasSelection) {
-                    submenu.addItem((subItem: any) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
+                    submenu.addItem((subItem: MenuItem) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
                         if (bcvs.length > 0) {
                             await this.showSidebarWithResults(await this.parseBcvs(bcvs));
                         } else {
@@ -391,7 +392,7 @@ export default class TraverturePlugin extends Plugin {
                     }));
                 }
 
-                submenu.addItem((subItem: any) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
+                submenu.addItem((subItem: MenuItem) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
                     const file = view.file;
                     if (!file) return;
                     const content = this.stripFrontmatter(await this.app.vault.read(file));
@@ -400,12 +401,12 @@ export default class TraverturePlugin extends Plugin {
 
                 submenu.addSeparator();
 
-                submenu.addItem((subItem: any) => {
+                submenu.addItem((subItem: MenuItem) => {
                     subItem.setTitle('Source language').setIcon('book-open');
-                    const langMenu = subItem.setSubmenu();
+                    const langMenu = getSubmenu(subItem);
                     const languages = getAvailableLanguages().filter(l => l.code !== 'ase');
                     for (const lang of languages) {
-                        langMenu.addItem((langItem: any) => langItem
+                        langMenu.addItem((langItem: MenuItem) => langItem
                             .setTitle(`${lang.vernacularName} (${lang.code})`)
                             .setChecked(lang.code === this.settings.sourceLanguage)
                             .onClick(async () => {
@@ -417,12 +418,12 @@ export default class TraverturePlugin extends Plugin {
                     }
                 });
 
-                submenu.addItem((subItem: any) => {
+                submenu.addItem((subItem: MenuItem) => {
                     subItem.setTitle('Output language').setIcon('languages');
-                    const langMenu = subItem.setSubmenu();
+                    const langMenu = getSubmenu(subItem);
                     const languages = getAvailableLanguages();
                     for (const lang of languages) {
-                        langMenu.addItem((langItem: any) => langItem
+                        langMenu.addItem((langItem: MenuItem) => langItem
                             .setTitle(`${lang.vernacularName} (${lang.code})`)
                             .setChecked(lang.code === this.settings.outputLanguage)
                             .onClick(async () => {
@@ -451,32 +452,32 @@ export default class TraverturePlugin extends Plugin {
             await this.showSidebarWithResults(await this.parseReferences(content));
         }});
 
-        this.addCommand({ id: 'parse-selection-references', name: 'tra.VER:ture: Parse selection', icon: 'sidebar-right', editorCallback: async (editor: any) => {
+        this.addCommand({ id: 'parse-selection-references', name: 'tra.VER:ture: Parse selection', icon: 'sidebar-right', editorCallback: async (editor: Editor) => {
             const selection = editor.getSelection(); if (!selection) return;
             await this.showSidebarWithResults(await this.parseReferences(selection));
         }});
 
-        this.addCommand({ id: 'insert-citation-ref', name: 'tra.VER:ture: Insert citation (Reference)', icon: 'quote-glyph', editorCallback: async (editor: any) => {
+        this.addCommand({ id: 'insert-citation-ref', name: 'tra.VER:ture: Insert citation (Reference)', icon: 'quote-glyph', editorCallback: async (editor: Editor) => {
             const selection = editor.getSelection(); if (!selection) return;
             await this.insertCitation(editor, selection, false);
         }});
 
-        this.addCommand({ id: 'insert-citation-verse', name: 'tra.VER:ture: Insert citation (verse)', icon: 'quote-glyph', editorCallback: async (editor: any) => {
+        this.addCommand({ id: 'insert-citation-verse', name: 'tra.VER:ture: Insert citation (verse)', icon: 'quote-glyph', editorCallback: async (editor: Editor) => {
             const selection = editor.getSelection(); if (!selection) return;
             await this.insertCitation(editor, selection, true);
         }});
 
-        this.addCommand({ id: 'reformat-full', name: 'tra.VER:ture: Reformat (Full)', icon: 'pencil', editorCallback: (editor: any) => {
+        this.addCommand({ id: 'reformat-full', name: 'tra.VER:ture: Reformat (Full)', icon: 'pencil', editorCallback: (editor: Editor) => {
             const selection = editor.getSelection(); if (!selection) return;
             this.reformatReferences(editor, selection, 'full');
         }});
 
-        this.addCommand({ id: 'reformat-standard', name: 'tra.VER:ture: Reformat (Standard)', icon: 'pencil', editorCallback: (editor: any) => {
+        this.addCommand({ id: 'reformat-standard', name: 'tra.VER:ture: Reformat (Standard)', icon: 'pencil', editorCallback: (editor: Editor) => {
             const selection = editor.getSelection(); if (!selection) return;
             this.reformatReferences(editor, selection, 'standard');
         }});
 
-        this.addCommand({ id: 'reformat-official', name: 'tra.VER:ture: Reformat (Official)', icon: 'pencil', editorCallback: (editor: any) => {
+        this.addCommand({ id: 'reformat-official', name: 'tra.VER:ture: Reformat (Official)', icon: 'pencil', editorCallback: (editor: Editor) => {
             const selection = editor.getSelection(); if (!selection) return;
             this.reformatReferences(editor, selection, 'official');
         }});
@@ -520,11 +521,11 @@ export default class TraverturePlugin extends Plugin {
         void (leaf.view as TravertureSidebarView).displayResults(refs);
     }
 
-    reformatReferences(editor: any, text: string, format: string, wholeDoc: boolean = false) {
+    reformatReferences(editor: Editor, text: string, format: NameFormat, wholeDoc: boolean = false) {
         const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false, text);
         if (!parsed) return;
 
-        const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+        const clauses: ParsedReference[] = JSON.parse(parsed);
         if (clauses.length === 0) return;
 
         let processed = text;
@@ -533,7 +534,7 @@ export default class TraverturePlugin extends Plugin {
             const [, startPos, endPos, ranges] = clauses[i];
             if (ranges.length === 0) continue;
 
-            const decoded = decodeScriptures([ranges[0] as [string, string]], this.settings.sourceLanguage, format as 'full' | 'standard' | 'official');
+            const decoded = decodeScriptures([ranges[0] as [string, string]], this.settings.sourceLanguage, format);
             const formattedRef = decoded?.[0] || '';
             if (!formattedRef) continue;
 
@@ -546,11 +547,11 @@ export default class TraverturePlugin extends Plugin {
         else { editor.replaceSelection(processed); }
     }
 
-    async insertCitation(editor: any, text: string, withRef: boolean) {
+    async insertCitation(editor: Editor, text: string, withRef: boolean) {
         const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
         const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, 'full', false, engineText);
         if (!parsed) { new Notice('No scripture references found.'); return; }
-        const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
+        const clauses: ParsedReference[] = JSON.parse(parsed);
         if (clauses.length === 0) { new Notice('No scripture references found.'); return; }
         let result = text;
         const fetchedCache = new Map<string, string>();
@@ -604,63 +605,63 @@ export default class TraverturePlugin extends Plugin {
         editor.replaceSelection(result);
     }
 
-    showTravertureMenu() {
+    showTravertureMenu(): Menu {
         const file = this.app.workspace.getActiveFile();
         const editor = this.app.workspace.activeEditor?.editor;
         const sel = editor?.getSelection();
         const menu = new Menu();
 
         if (sel) {
-            menu.addItem((item: any) => item.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
+            menu.addItem((item: MenuItem) => item.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
                 await this.showSidebarWithResults(await this.parseReferences(sel));
             }));
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle('Insert citation').setIcon('quote-glyph');
-                const citeMenu = item.setSubmenu();
-                citeMenu.addItem((citeItem: any) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
+                const citeMenu = getSubmenu(item);
+                citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
                     if (editor && sel) await this.insertCitation(editor, sel, false);
                 }));
-                citeMenu.addItem((citeItem: any) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
+                citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
                     if (editor && sel) await this.insertCitation(editor, sel, true);
                 }));
             });
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle('Reformat selection').setIcon('pencil');
-                const submenu = item.setSubmenu();
-                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor!, sel, 'full')));
-                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor!, sel, 'standard')));
-                submenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor!, sel, 'official')));
+                const submenu = getSubmenu(item);
+                submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor!, sel, 'full')));
+                submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor!, sel, 'standard')));
+                submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor!, sel, 'official')));
             });
             menu.addSeparator();
         }
 
-        menu.addItem((item: any) => item.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
+        menu.addItem((item: MenuItem) => item.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
             if (!file) { new Notice('No file open.'); return; }
             const content = this.stripFrontmatter(await this.app.vault.read(file));
             await this.showSidebarWithResults(await this.parseReferences(content));
         }));
-        menu.addItem((item: any) => {
+        menu.addItem((item: MenuItem) => {
             item.setTitle('Reformat document').setIcon('pencil');
-            const submenu = item.setSubmenu();
-            submenu.addItem((fmtItem: any) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => {
+            const submenu = getSubmenu(item);
+            submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => {
                 if (editor) this.reformatReferences(editor, editor.getValue(), 'full', true);
             }));
-            submenu.addItem((fmtItem: any) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => {
+            submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => {
                 if (editor) this.reformatReferences(editor, editor.getValue(), 'standard', true);
             }));
-            submenu.addItem((fmtItem: any) => fmtItem.setTitle('Official (1Co)').onClick(() => {
+            submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => {
                 if (editor) this.reformatReferences(editor, editor.getValue(), 'official', true);
             }));
         });
         menu.addSeparator();
 
         // Source language
-        menu.addItem((item: any) => {
+        menu.addItem((item: MenuItem) => {
             item.setTitle('Source language').setIcon('book-open');
-            const langMenu = item.setSubmenu();
+            const langMenu = getSubmenu(item);
             const languages = getAvailableLanguages().filter(l => l.code !== 'ase');
             for (const lang of languages) {
-                langMenu.addItem((langItem: any) => langItem
+                langMenu.addItem((langItem: MenuItem) => langItem
                     .setTitle(`${lang.vernacularName} (${lang.code})`)
                     .setChecked(lang.code === this.settings.sourceLanguage)
                     .onClick(async () => {
@@ -673,12 +674,12 @@ export default class TraverturePlugin extends Plugin {
         });
 
         // Output language
-        menu.addItem((item: any) => {
+        menu.addItem((item: MenuItem) => {
             item.setTitle('Output language').setIcon('languages');
-            const langMenu = item.setSubmenu();
+            const langMenu = getSubmenu(item);
             const languages = getAvailableLanguages();
             for (const lang of languages) {
-                langMenu.addItem((langItem: any) => langItem
+                langMenu.addItem((langItem: MenuItem) => langItem
                     .setTitle(`${lang.vernacularName} (${lang.code})`)
                     .setChecked(lang.code === this.settings.outputLanguage)
                     .onClick(async () => {

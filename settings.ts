@@ -4,6 +4,7 @@ import { PluginSettingTab, Setting } from 'obsidian';
 // @ts-ignore
 import * as wasmModule from './engine.js';
 import { getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
+import { NameFormat } from './types';
 import TraverturePlugin from './main';
 
 export class TravertureSettingTab extends PluginSettingTab {
@@ -67,8 +68,8 @@ export class TravertureSettingTab extends PluginSettingTab {
                 dropdown.addOption('official', 'Official (1Co)');
                 dropdown
                     .setValue(this.plugin.settings.titleFormat)
-                    .onChange(async (value) => {
-                        this.plugin.settings.titleFormat = value;
+                    .onChange(async (value: string) => {
+                        this.plugin.settings.titleFormat = value as NameFormat;
                         await this.plugin.saveSettings();
                     });
             });

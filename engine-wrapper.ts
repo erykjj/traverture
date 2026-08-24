@@ -1,15 +1,21 @@
 // engine-wrapper.ts
 
 // @ts-ignore
-import * as wasmModule from './engine.js';
+import * as wasmModuleUntyped from './engine.js';
 // @ts-ignore
 import wasmBinary from './engine_bg.wasm';
+import { TravertureEngineInstance, TravertureEngineStatic, NameFormat, ParsedReference, LanguageInfo } from './types';
+
+const wasmModule = wasmModuleUntyped as unknown as {
+    TravertureEngine: TravertureEngineStatic;
+    default(options: { module_or_path: unknown }): Promise<void>;
+};
 
 let engineInitialized = false;
 
-const enginePool = new Map<string, any>();
+const enginePool = new Map<string, TravertureEngineInstance>();
 
-function getEngineKey(language: string, format: 'full' | 'standard' | 'official'): string {
+function getEngineKey(language: string, format: NameFormat): string {
     return `${language}|${format}`;
 }
 
@@ -27,16 +33,16 @@ export async function initEngine(): Promise<void> {
 
 function getOrCreateEngine(
     language: string,
-    format: 'full' | 'standard' | 'official' = 'full',
+    format: NameFormat = 'full',
     capitalize: boolean = false
-): any | null {
+): TravertureEngineInstance | null {
     if (!engineInitialized) {
         console.error('tra.VER:ture: Engine not initialized');
         return null;
     }
     const key = `${getEngineKey(language, format)}|${capitalize ? 'CAPS' : 'lower'}`;
     if (enginePool.has(key)) {
-        return enginePool.get(key);
+        return enginePool.get(key)!;
     }
     try {
         const engine = new wasmModule.TravertureEngine(language, language, format, capitalize);
@@ -68,15 +74,15 @@ export function isEngineReady(): boolean {
     return engineInitialized;
 }
 
-function getParsingEngine(sourceLanguage: string): any | null {
+function getParsingEngine(sourceLanguage: string): TravertureEngineInstance | null {
     return getOrCreateEngine(sourceLanguage, 'full');
 }
 
 function getDecodingEngine(
     outputLanguage: string,
-    nameFormat: 'full' | 'standard' | 'official' = 'full',
+    nameFormat: NameFormat = 'full',
     capitalize: boolean = false
-): any | null {
+): TravertureEngineInstance | null {
     return getOrCreateEngine(outputLanguage, nameFormat, capitalize);
 }
 
@@ -84,14 +90,14 @@ export function parseReferences(
     text: string,
     sourceLanguage: string,
     outputLanguage: string,
-    nameFormat: 'full' | 'standard' | 'official' = 'full',
+    nameFormat: NameFormat = 'full',
     capitalize: boolean = false
-): any[] | null {
+): ParsedReference[] | null {
     const engine = getParsingEngine(sourceLanguage);
     if (!engine) return null;
     try {
         const result = engine.parse(sourceLanguage, outputLanguage, nameFormat, capitalize, text);
-        return JSON.parse(result);
+        return JSON.parse(result) as ParsedReference[];
     } catch (e) {
         console.error('tra.VER:ture: Failed to parse references:', e);
         return null;
@@ -101,7 +107,7 @@ export function parseReferences(
 export function decodeScriptures(
     ranges: Array<[string, string]>,
     outputLanguage: string,
-    nameFormat: 'full' | 'standard' | 'official' = 'full',
+    nameFormat: NameFormat = 'full',
     capitalize: boolean = false
 ): string[] | null {
     const engine = getDecodingEngine(outputLanguage, nameFormat, capitalize);
@@ -109,7 +115,7 @@ export function decodeScriptures(
     try {
         const json = JSON.stringify(ranges);
         const result = engine.decode_scriptures(json);
-        return JSON.parse(result);
+        return JSON.parse(result) as string[];
     } catch (e) {
         console.error('tra.VER:ture: Failed to decode scriptures:', e);
         return null;
@@ -130,7 +136,7 @@ export function getEngineVersion(): string {
 export function getBookName(
     bookNumber: number,
     langCode: string,
-    format: 'full' | 'standard' | 'official' = 'full',
+    format: NameFormat = 'full',
     capitalize: boolean = false
 ): string {
     if (!engineInitialized) {
@@ -154,21 +160,21 @@ export function getLangSymbol(langCode: string): string {
     }
 }
 
-export function getAvailableLanguages(): any[] {
+export function getAvailableLanguages(): LanguageInfo[] {
     if (!engineInitialized) {
         return [];
     }
     try {
         const json = wasmModule.TravertureEngine.get_available_languages();
-        return JSON.parse(json);
+        return JSON.parse(json) as LanguageInfo[];
     } catch {
         return [];
     }
 }
 
-let cachedLanguages: any[] | null = null;
+let cachedLanguages: LanguageInfo[] | null = null;
 
-export function getAvailableLanguagesCached(): any[] {
+export function getAvailableLanguagesCached(): LanguageInfo[] {
     if (!cachedLanguages) {
         cachedLanguages = getAvailableLanguages();
     }
