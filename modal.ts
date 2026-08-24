@@ -1,7 +1,9 @@
+// modal.ts
+
 import { setIcon } from 'obsidian';
 // @ts-ignore
 import * as wasmModule from './engine.js';
-import { getAvailableLanguages } from './languages';
+import { getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
 import { VerseData } from './types';
 
 export class VerseModal {

@@ -1,11 +1,11 @@
+// main.ts
+
 import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView } from 'obsidian';
 // @ts-ignore
-import wasmBinary from './engine_bg.wasm';
-// @ts-ignore
 import * as wasmModule from './engine.js';
+import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { createTravertureEditorPlugin } from './editor';
-import { getAvailableLanguages } from './languages';
 import { VerseModal } from './modal';
 import { TravertureSettingTab } from './settings';
 import { TravertureSidebarView } from './sidebar';
@@ -23,6 +23,7 @@ export default class TraverturePlugin extends Plugin {
         try {
             this.engine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false);
         } catch (e) { console.error('tra.VER:ture: Failed to create engine:', e); }
+        prewarmEngines(this.settings.sourceLanguage, this.settings.outputLanguage);
     }
 
     private parseGuard = false;
@@ -59,28 +60,23 @@ export default class TraverturePlugin extends Plugin {
         const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
         if (clauses.length === 0) return results;
 
-        const engFull = new wasmModule.TravertureEngine('en', 'en', 'full', false);
-        const engStd = new wasmModule.TravertureEngine('en', 'en', 'standard', false);
-        const engOff = new wasmModule.TravertureEngine('en', 'en', 'official', false);
-
         for (const [clauseText] of clauses) {
             const ranges = clauses.find(c => c[0] === clauseText)?.[3] || [];
             if (ranges.length === 0) continue;
             
             for (const range of ranges) {
-                const singleRange = [[range[0], range[1]]];
-                const rangeJson = JSON.stringify(singleRange);
-                const fullDecoded = JSON.parse(engFull.decode_scriptures(rangeJson));
-                const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
-                const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
+                const singleRange: Array<[string, string]> = [[range[0], range[1]]];
+                const fullDecoded = decodeScriptures(singleRange, 'en', 'full');
+                const stdDecoded = decodeScriptures(singleRange, 'en', 'standard');
+                const offDecoded = decodeScriptures(singleRange, 'en', 'official');
                 const startBcv = range[0], endBcv = range[1];
                 const bookNum = parseInt(startBcv.substring(0, 2));
 
                 results.push({
                     scripture: clauseText,
-                    fullRef: fullDecoded[0] || clauseText,
-                    standardRef: stdDecoded[0] || '',
-                    officialRef: offDecoded[0] || '',
+                    fullRef: fullDecoded?.[0] || clauseText,
+                    standardRef: stdDecoded?.[0] || '',
+                    officialRef: offDecoded?.[0] || '',
                     startBcv, endBcv,
                     startCh: parseInt(startBcv.substring(2, 5)),
                     endCh: parseInt(endBcv.substring(2, 5)),
@@ -212,9 +208,8 @@ export default class TraverturePlugin extends Plugin {
                     window.open(`jwlibrary:///finder?wtlocale=E&bible=${bcv}`, '_blank');
                     return;
                 }
-                const fmtEngine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.outputLanguage, this.settings.titleFormat, false);
-                const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[bcv, bcv]])));
-                const refText = decoded[0] || link.textContent || '';
+                const decoded = decodeScriptures([[bcv, bcv]], this.settings.outputLanguage, this.settings.titleFormat as 'full' | 'standard' | 'official');
+                const refText = decoded?.[0] || link.textContent || '';
                 const timecodes = this.settings.outputLanguage === 'ase' 
                     ? await getAslTimecodes(bcv) 
                     : undefined;
@@ -273,7 +268,7 @@ export default class TraverturePlugin extends Plugin {
     async onload() {
         await this.loadSettings();
 
-        try { await wasmModule.default({ module_or_path: wasmBinary }); this.createEngine(); }
+        try { await initEngine(); this.createEngine(); }
         catch (e) { console.error('tra.VER:ture: WASM error:', e); }
 
         this.addSettingTab(new TravertureSettingTab(this.app, this));
@@ -489,23 +484,20 @@ export default class TraverturePlugin extends Plugin {
 
     async parseBcvs(bcvs: string[]): Promise<SidebarRef[]> {
         const results: SidebarRef[] = [];
-        const engFull = new wasmModule.TravertureEngine('en', 'en', 'full', false);
-        const engStd = new wasmModule.TravertureEngine('en', 'en', 'standard', false);
-        const engOff = new wasmModule.TravertureEngine('en', 'en', 'official', false);
         for (const bcv of bcvs) {
             const parts = bcv.split('-');
             const startBcv = parts[0];
             const endBcv = parts.length > 1 ? parts[1] : parts[0];
-            const rangeJson = JSON.stringify([[startBcv, endBcv]]);
-            const fullDecoded = JSON.parse(engFull.decode_scriptures(rangeJson));
-            const stdDecoded = JSON.parse(engStd.decode_scriptures(rangeJson));
-            const offDecoded = JSON.parse(engOff.decode_scriptures(rangeJson));
+            const singleRange: Array<[string, string]> = [[startBcv, endBcv]];
+            const fullDecoded = decodeScriptures(singleRange, 'en', 'full');
+            const stdDecoded = decodeScriptures(singleRange, 'en', 'standard');
+            const offDecoded = decodeScriptures(singleRange, 'en', 'official');
             const bookNum = parseInt(startBcv.substring(0, 2));
             results.push({
-                scripture: fullDecoded[0] || bcv,
-                fullRef: fullDecoded[0] || bcv,
-                standardRef: stdDecoded[0] || '',
-                officialRef: offDecoded[0] || '',
+                scripture: fullDecoded?.[0] || bcv,
+                fullRef: fullDecoded?.[0] || bcv,
+                standardRef: stdDecoded?.[0] || '',
+                officialRef: offDecoded?.[0] || '',
                 startBcv, endBcv,
                 startCh: parseInt(startBcv.substring(2, 5)),
                 endCh: parseInt(endBcv.substring(2, 5)),
@@ -535,15 +527,14 @@ export default class TraverturePlugin extends Plugin {
         const clauses: Array<[string, number, number, string[][]]> = JSON.parse(parsed);
         if (clauses.length === 0) return;
 
-        const fmtEngine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.sourceLanguage, format, false);
         let processed = text;
 
         for (let i = clauses.length - 1; i >= 0; i--) {
             const [, startPos, endPos, ranges] = clauses[i];
             if (ranges.length === 0) continue;
 
-            const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([ranges[0]])));
-            const formattedRef = decoded[0] || '';
+            const decoded = decodeScriptures([ranges[0] as [string, string]], this.settings.sourceLanguage, format as 'full' | 'standard' | 'official');
+            const formattedRef = decoded?.[0] || '';
             if (!formattedRef) continue;
 
             const before = processed.substring(0, startPos);
@@ -702,5 +693,7 @@ export default class TraverturePlugin extends Plugin {
         return menu;
     }
 
-    onunload() { }
+    onunload() {
+        clearEnginePool();
+    }
 }

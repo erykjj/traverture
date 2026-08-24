@@ -1,7 +1,7 @@
+// cache.ts
+
 import { requestUrl } from 'obsidian';
-// @ts-ignore
-import * as wasmModule from './engine.js';
-import { getLangSuffix } from './languages';
+import { getAslMetadataUrl, getLangSuffix } from './engine-wrapper';
 import { VerseData } from './types';
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
@@ -153,7 +153,7 @@ export async function fetchAslTimecodes(bookNum: number, chapter: number, startV
     }
 
     try {
-        const url = wasmModule.TravertureEngine.get_asl_metadata_url(bookNum, chapter);
+        const url = getAslMetadataUrl(bookNum, chapter);
         const response = await requestUrl({ url });
         const data = response.json;
         const fileFormats = data.files?.ASL;

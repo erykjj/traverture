@@ -1,3 +1,5 @@
+// types.ts
+
 export interface TravertureSettings {
     sourceLanguage: string;
     outputLanguage: string;

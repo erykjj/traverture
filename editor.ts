@@ -1,7 +1,11 @@
+// editor.ts
+
+import { decodeScriptures } from './engine-wrapper';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { VerseModal } from './modal';
 import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
+
 
 const REF_PATTERN = /\{\{(.+?)\}\}/g;
 
@@ -156,9 +160,8 @@ async function showModal(plugin: any, bcv: string): Promise<void> {
     const startBcv = parts[0];
     const endBcv = parts.length > 1 ? parts[1] : parts[0];
     
-    const fmtEngine = new (plugin.engine.constructor)(plugin.settings.sourceLanguage, plugin.settings.outputLanguage, plugin.settings.titleFormat, false);
-    const decoded = JSON.parse(fmtEngine.decode_scriptures(JSON.stringify([[startBcv, endBcv]])));
-    const displayText = decoded[0] || bcv;
+    const decoded = decodeScriptures([[startBcv, endBcv]], plugin.settings.outputLanguage, plugin.settings.titleFormat);
+    const displayText = decoded?.[0] || bcv;
 
     const timecodes = plugin.settings.outputLanguage === 'ase' 
         ? await getAslTimecodes(bcv) 

@@ -1,8 +1,10 @@
+// sidebar.ts
+
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 // @ts-ignore
 import * as wasmModule from './engine.js';
+import { getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
-import { getAvailableLanguages } from './languages';
 import { VerseModal } from './modal';
 import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR } from './types';
 import type TraverturePlugin from './main';
