@@ -17,6 +17,15 @@
 ### Removed
 
 ____
+## [3.7.1] - 2026-08-24
+### Changed
+
+- Updated engine to v3
+  - under-the-hood optimizations
+- Performance optimizations
+  - re-use engines
+- Added TypeScript types to reduce unsafe warnings
+
 ## [3.6.0] - 2026-08-01
 ### Fixed
 
@@ -130,6 +139,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[3.7.1]:https://github.com/erykjj/traverture/releases/tag/3.7.1
 [3.6.0]:https://github.com/erykjj/traverture/releases/tag/3.6.0
 [3.5.1]:https://github.com/erykjj/traverture/releases/tag/3.5.1
 [3.5.0]:https://github.com/erykjj/traverture/releases/tag/3.5.0
