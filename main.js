@@ -479,6 +479,18 @@ async function initEngine() {
     throw e;
   }
 }
+function createMainEngine(sourceLanguage, outputLanguage) {
+  if (!engineInitialized) {
+    console.error("tra.VER:ture: Engine not initialized");
+    return null;
+  }
+  try {
+    return new wasmModule2.TravertureEngine(sourceLanguage, outputLanguage, "full", false);
+  } catch (e) {
+    console.error("tra.VER:ture: Failed to create main engine:", e);
+    return null;
+  }
+}
 function getOrCreateEngine(language, format = "full", capitalize = false) {
   if (!engineInitialized) {
     console.error("tra.VER:ture: Engine not initialized");
@@ -1014,7 +1026,7 @@ function buildDecorations(view, plugin) {
       const innerText = match[1];
       const cleanMatch = match[0].replace(/\*\*/g, "").replace(/\*/g, "");
       const engineInput = cleanMatch.replace("{{", "\u27EA\u27EA").replace("}}", "\u27EB\u27EB");
-      const parsed = plugin.safeParse?.(engineInput);
+      const parsed = plugin.safeParse(engineInput);
       if (!parsed) continue;
       const clauses = JSON.parse(parsed);
       const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
@@ -1062,7 +1074,7 @@ function buildDecorations(view, plugin) {
   return builder.finish();
 }
 function processSegment(basePos, segment, plugin, allDecos, decorated, bcvs) {
-  const parsed = plugin.safeParse?.(segment);
+  const parsed = plugin.safeParse(segment);
   if (!parsed) return;
   const clauses = JSON.parse(parsed);
   if (clauses.length === 0) return;
@@ -1508,7 +1520,6 @@ ${body}`);
 };
 
 // main.ts
-var wasmModule3 = engine_exports;
 function getSubmenu(item) {
   return item.setSubmenu();
 }
@@ -1520,17 +1531,14 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
     this.processingElements = /* @__PURE__ */ new Set();
   }
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const savedData = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData);
   }
   async saveSettings() {
     await this.saveData(this.settings);
   }
   createEngine() {
-    try {
-      this.engine = new wasmModule3.TravertureEngine(this.settings.sourceLanguage, this.settings.outputLanguage, "full", false);
-    } catch (e) {
-      console.error("tra.VER:ture: Failed to create engine:", e);
-    }
+    this.engine = createMainEngine(this.settings.sourceLanguage, this.settings.outputLanguage);
     prewarmEngines(this.settings.sourceLanguage, this.settings.outputLanguage);
   }
   safeParse(text) {
