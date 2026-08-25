@@ -51,7 +51,7 @@ function buildDecorations(view: EditorView, plugin: TraverturePlugin): Decoratio
             const parsed = plugin.safeParse(engineInput);
             if (!parsed) continue;
 
-            const clauses: ParsedReference[] = JSON.parse(parsed);
+            const clauses = JSON.parse(parsed) as ParsedReference[];
             const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
             
             for (const clause of sorted) {
@@ -114,7 +114,7 @@ function processSegment(
     const parsed = plugin.safeParse(segment);
     if (!parsed) return;
 
-    const clauses: ParsedReference[] = JSON.parse(parsed);
+    const clauses = JSON.parse(parsed) as ParsedReference[];
     if (clauses.length === 0) return;
 
     for (const clause of clauses) {
