@@ -48,7 +48,7 @@ function buildDecorations(view: EditorView, plugin: TraverturePlugin): Decoratio
             const innerText = match[1];
             const cleanMatch = match[0].replace(/\*\*/g, '').replace(/\*/g, '');
             const engineInput = cleanMatch.replace('{{', '⟪⟪').replace('}}', '⟫⟫');
-            const parsed = plugin.safeParse?.(engineInput);
+            const parsed = plugin.safeParse(engineInput);
             if (!parsed) continue;
 
             const clauses: ParsedReference[] = JSON.parse(parsed);
@@ -111,7 +111,7 @@ function processSegment(
     decorated: Array<{ from: number; to: number }>,
     bcvs: BcvEntry[]
 ): void {
-    const parsed = plugin.safeParse?.(segment);
+    const parsed = plugin.safeParse(segment);
     if (!parsed) return;
 
     const clauses: ParsedReference[] = JSON.parse(parsed);

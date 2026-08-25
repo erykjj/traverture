@@ -1,17 +1,13 @@
 // main.ts
 
 import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, MenuItem } from 'obsidian';
-// @ts-ignore
-import * as wasmModuleUntyped from './engine.js';
-import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, getLangSymbol } from './engine-wrapper';
+import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, getLangSymbol, createMainEngine } from './engine-wrapper';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { createTravertureEditorPlugin } from './editor';
 import { VerseModal } from './modal';
 import { TravertureSettingTab } from './settings';
 import { TravertureSidebarView } from './sidebar';
-import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef, TravertureEngineInstance, TravertureEngineStatic, NameFormat, ParsedReference } from './types';
-
-const wasmModule = wasmModuleUntyped as unknown as { TravertureEngine: TravertureEngineStatic };
+import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef, TravertureEngineInstance, NameFormat, ParsedReference, TravertureSettings } from './types';
 
 function getSubmenu(item: MenuItem): Menu {
     return (item as unknown as { setSubmenu(): Menu }).setSubmenu();
@@ -22,13 +18,14 @@ export default class TraverturePlugin extends Plugin {
     engine: TravertureEngineInstance | null = null;
     private processingElements = new Set<HTMLElement>();
 
-    async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); }
+    async loadSettings() { 
+        const savedData = await this.loadData() as Partial<TravertureSettings> | null;
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData); 
+    }
     async saveSettings() { await this.saveData(this.settings); }
 
     createEngine() {
-        try {
-            this.engine = new wasmModule.TravertureEngine(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false);
-        } catch (e) { console.error('tra.VER:ture: Failed to create engine:', e); }
+        this.engine = createMainEngine(this.settings.sourceLanguage, this.settings.outputLanguage);
         prewarmEngines(this.settings.sourceLanguage, this.settings.outputLanguage);
     }
 
@@ -62,7 +59,7 @@ export default class TraverturePlugin extends Plugin {
         const parsed = this.safeParse(engineText);
         if (!parsed) return results;
 
-        const clauses: ParsedReference[] = JSON.parse(parsed);
+        const clauses = JSON.parse(parsed) as ParsedReference[];
         if (clauses.length === 0) return results;
 
         for (const [clauseText] of clauses) {
@@ -109,7 +106,7 @@ export default class TraverturePlugin extends Plugin {
                 const engineInput = '⟪⟪' + refText + '⟫⟫';
                 const parsed = this.safeParse(engineInput);
                 if (!parsed) return inner;
-                const clauses: ParsedReference[] = JSON.parse(parsed);
+                const clauses = JSON.parse(parsed) as ParsedReference[];
                 if (clauses.length === 0) return inner;
 
                 let result = inner;
@@ -173,7 +170,7 @@ export default class TraverturePlugin extends Plugin {
                 const text = textNode.nodeValue || '';
                 const parsed = this.safeParse(text);
                 if (!parsed) continue;
-                const clauses: ParsedReference[] = JSON.parse(parsed);
+                const clauses = JSON.parse(parsed) as ParsedReference[];
                 if (clauses.length === 0) continue;
 
                 const linked = this.insertLinks(text, clauses);
@@ -525,7 +522,7 @@ export default class TraverturePlugin extends Plugin {
         const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.outputLanguage, 'full', false, text);
         if (!parsed) return;
 
-        const clauses: ParsedReference[] = JSON.parse(parsed);
+        const clauses = JSON.parse(parsed) as ParsedReference[];
         if (clauses.length === 0) return;
 
         let processed = text;
@@ -551,7 +548,7 @@ export default class TraverturePlugin extends Plugin {
         const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
         const parsed = this.engine?.parse(this.settings.sourceLanguage, this.settings.sourceLanguage, 'full', false, engineText);
         if (!parsed) { new Notice('No scripture references found.'); return; }
-        const clauses: ParsedReference[] = JSON.parse(parsed);
+        const clauses = JSON.parse(parsed) as ParsedReference[];
         if (clauses.length === 0) { new Notice('No scripture references found.'); return; }
         let result = text;
         const fetchedCache = new Map<string, string>();

@@ -31,6 +31,19 @@ export async function initEngine(): Promise<void> {
     }
 }
 
+export function createMainEngine(sourceLanguage: string, outputLanguage: string): TravertureEngineInstance | null {
+    if (!engineInitialized) {
+        console.error('tra.VER:ture: Engine not initialized');
+        return null;
+    }
+    try {
+        return new wasmModule.TravertureEngine(sourceLanguage, outputLanguage, 'full', false);
+    } catch (e) {
+        console.error('tra.VER:ture: Failed to create main engine:', e);
+        return null;
+    }
+}
+
 function getOrCreateEngine(
     language: string,
     format: NameFormat = 'full',
