@@ -17,7 +17,7 @@
 ### Removed
 
 ____
-## [3.7.1] - 2026-08-24
+## [3.7.2] - 2026-08-24
 ### Changed
 
 - Updated engine to v3
@@ -139,7 +139,7 @@ ____
 - Initial Obidian Community release
 
 ____
-[3.7.1]:https://github.com/erykjj/traverture/releases/tag/3.7.1
+[3.7.2]:https://github.com/erykjj/traverture/releases/tag/3.7.2
 [3.6.0]:https://github.com/erykjj/traverture/releases/tag/3.6.0
 [3.5.1]:https://github.com/erykjj/traverture/releases/tag/3.5.1
 [3.5.0]:https://github.com/erykjj/traverture/releases/tag/3.5.0
