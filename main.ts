@@ -266,7 +266,7 @@ export default class TraverturePlugin extends Plugin {
     async onload() {
         await this.loadSettings();
 
-        try { await initEngine(); this.createEngine(); }
+        try { await initEngine(this.app); this.createEngine(); }
         catch (e) { console.error('tra.VER:ture: WASM error:', e); }
 
         this.addSettingTab(new TravertureSettingTab(this.app, this));
