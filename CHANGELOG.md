@@ -6,11 +6,7 @@
 
 ### Changed
 
-- Updated engine to v3
-  - under-the-hood optimizations
-- Performance optimizations
-  - re-use engines
-- Added TypeScript types to reduce unsafe warnings
+- Engine tweaks/improvements
 
 ### Fixed
 
