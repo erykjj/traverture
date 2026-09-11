@@ -8,7 +8,7 @@ A scripture reference parser, formatter, and viewer for Obsidian. Automatically 
 
 ## Security and Privacy
 
-If you are concerned about the "Scorecard" review or the "Caution" warning on the [Obsidian Community plugins page](https://community.obsidian.md/plugins/traverture), see [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
+See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
 
 ---
 
