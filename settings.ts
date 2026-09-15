@@ -85,20 +85,23 @@ export class TravertureSettingTab extends PluginSettingTab {
         const footerEl = containerEl.createDiv({ cls: 'traverture-settings-footer' });
         const footerText = footerEl.createSpan();
         footerText.appendChild(activeDocument.createTextNode('My other Obsidian plugin: '));
-        footerText.createEl('strong', { text: 'con[VER]sum' });
-        footerText.appendChild(activeDocument.createTextNode(': '));
-        const githubLink = footerText.createEl('a', {
-            text: 'GitHub repo',
-            href: 'https://github.com/erykjj/conversum'
+
+        const conversumStrong = footerText.createEl('strong');
+        const conversumLink = conversumStrong.createEl('a', {
+            text: 'con[VER]sum',
+            href: 'https://github.com/erykjj/conversum',
         });
-        githubLink.setAttribute('target', '_blank');
-        githubLink.setAttribute('rel', 'noopener noreferrer');
+        conversumLink.setAttribute('target', '_blank');
+        conversumLink.setAttribute('rel', 'noopener noreferrer');
+
         footerText.appendChild(activeDocument.createTextNode(', '));
-        const obsidianLink = footerText.createEl('a', {
-            text: 'Obsidian Community',
-            href: 'https://community.obsidian.md/plugins/conversum'
+
+        const travertureStrong = footerText.createEl('strong');
+        const travertureLink = travertureStrong.createEl('a', {
+            text: 'in(REF)ens',
+            href: 'https://github.com/erykjj/inrefens',
         });
-        obsidianLink.setAttribute('target', '_blank');
-        obsidianLink.setAttribute('rel', 'noopener noreferrer');
+        travertureLink.setAttribute('target', '_blank');
+        travertureLink.setAttribute('rel', 'noopener noreferrer');
     }
 }
