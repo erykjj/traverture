@@ -1,9 +1,5 @@
 # tra.VER:ture Security and Privacy
 
-If you are concerned about the "Scorecard" review or the "Caution" warning on the [Obsidian Community plugins page](https://community.obsidian.md/plugins/traverture), here is some information to ease your mind.
-
----
-
 ## Network Use
 
 This plugin fetches scripture text from the official *jw.org* API when displaying verse previews or inserting citations. No data is sent; only scripture BCV codes are used in the URL to retrieve verse content. Fetched content is cached locally in memory for 1 hour.
