@@ -11,6 +11,11 @@
 ### Removed
 
 ____
+## [4.0.0] - 2026-09-16
+### Added
+
+- Added option to set link color (in Settings)
+
 ## [3.9.2] - 2026-09-16
 ### Changed
 
@@ -154,6 +159,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[4.0.0]:https://github.com/erykjj/traverture/releases/tag/4.0.0
 [3.9.2]:https://github.com/erykjj/traverture/releases/tag/3.9.2
 [3.9.0]:https://github.com/erykjj/traverture/releases/tag/3.9.0
 [3.8.1]:https://github.com/erykjj/traverture/releases/tag/3.8.1
