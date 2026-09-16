@@ -151,7 +151,7 @@ function cleanVerseHtml(rawHtml: string, keepMarkers: boolean = false): string {
 }
 
 export function escapeHtml(text: string): string {
-    const div = activeDocument.createElement('div');
+    const div = createDiv();
     div.textContent = text;
     return div.innerHTML;
 }

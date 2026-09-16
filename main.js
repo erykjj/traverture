@@ -799,20 +799,20 @@ var VerseModal = class {
     this.currentTitle = titleOverride || verseData.citation;
     const jwlibUrl = timecodes ? `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}&ts=${timecodes}` : `jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`;
     const jworgUrl = timecodes ? `https://www.jw.org/finder?wtlocale=${langSymbol}&bible=${bcv}&ts=${timecodes}` : `https://www.jw.org/finder?wtlocale=${langSymbol}&bible=${bcv}`;
-    const modal = activeDocument.createElement("div");
+    const modal = createDiv();
     modal.className = "traverture-modal";
     modal.addEventListener("click", (e) => {
       if (e.target === modal) this.hide();
     });
-    const dialog = activeDocument.createElement("div");
+    const dialog = createDiv();
     dialog.className = "traverture-modal-dialog";
-    const header = activeDocument.createElement("div");
+    const header = createDiv();
     header.className = "traverture-modal-header";
-    const title = activeDocument.createElement("span");
+    const title = createSpan();
     title.className = "traverture-modal-title";
     title.textContent = titleOverride || verseData.citation;
     header.appendChild(title);
-    const buttonGroup = activeDocument.createElement("div");
+    const buttonGroup = createDiv();
     buttonGroup.className = "traverture-modal-buttons";
     const jwlibBtn = this.createHeaderButton("JW Library");
     jwlibBtn.addEventListener("click", () => {
@@ -828,7 +828,7 @@ var VerseModal = class {
     buttonGroup.appendChild(jworgBtn);
     const copyBtn = this.createHeaderButton("COPY");
     copyBtn.addEventListener("click", () => {
-      const tempDiv = activeDocument.createElement("div");
+      const tempDiv = createDiv();
       const cleanHtml = verseData.html.replace(/<sup class="traverture-footnote-marker"[^>]*>\*<\/sup>/g, "").replace(/<sup class="traverture-xref-marker"[^>]*>\+<\/sup>/g, "");
       const parsed2 = new DOMParser().parseFromString(cleanHtml, "text/html");
       for (const child of Array.from(parsed2.body.childNodes)) {
@@ -874,16 +874,16 @@ ${text}`);
       }, 1500);
     });
     buttonGroup.appendChild(copyBtn);
-    const closeBtn = activeDocument.createElement("button");
+    const closeBtn = createEl("button");
     closeBtn.className = "traverture-modal-close";
     closeBtn.textContent = "\u2715";
     closeBtn.addEventListener("click", () => this.hide());
     buttonGroup.appendChild(closeBtn);
     header.appendChild(buttonGroup);
     dialog.appendChild(header);
-    const contentArea = activeDocument.createElement("div");
+    const contentArea = createDiv();
     contentArea.className = "traverture-modal-content";
-    const body = activeDocument.createElement("div");
+    const body = createDiv();
     body.id = "verse-tooltip";
     body.className = "traverture-modal-body";
     const parsed = new DOMParser().parseFromString(verseData.html, "text/html");
@@ -930,7 +930,7 @@ ${text}`);
   }
   showMarkerPopover(anchor, content) {
     activeDocument.querySelector(".traverture-marker-popover")?.remove();
-    const popover = activeDocument.createElement("div");
+    const popover = createDiv();
     popover.className = "traverture-marker-popover";
     popover.textContent = content;
     popover.addEventListener("click", (e) => e.stopPropagation());
@@ -948,14 +948,14 @@ ${text}`);
     window.setTimeout(() => activeDocument.addEventListener("click", closePopover), 10);
   }
   createCommentaryPane(commentaries, outputLang) {
-    const pane = activeDocument.createElement("div");
+    const pane = createDiv();
     pane.className = "traverture-modal-commentary";
-    const paneHeader = activeDocument.createElement("div");
+    const paneHeader = createDiv();
     paneHeader.className = "traverture-modal-commentary-header";
-    const paneTitle = activeDocument.createElement("span");
+    const paneTitle = createSpan();
     paneTitle.textContent = "Study Notes";
     paneHeader.appendChild(paneTitle);
-    const paneCopyBtn = activeDocument.createElement("button");
+    const paneCopyBtn = createEl("button");
     paneCopyBtn.className = "traverture-modal-commentary-copy";
     (0, import_obsidian2.setIcon)(paneCopyBtn, "copy");
     paneCopyBtn.addEventListener("click", () => {
@@ -965,7 +965,7 @@ ${text}`);
         const bookName = getBookName(bookNum, outputLang, "full", false);
         const ch = parseInt(c.source.substring(2, 5));
         const vs = parseInt(c.source.substring(5, 8));
-        const tempDiv = activeDocument.createElement("div");
+        const tempDiv = createDiv();
         const parsedContent = new DOMParser().parseFromString(c.content, "text/html");
         parsedContent.body.querySelectorAll("a").forEach((a) => a.replaceWith(a.textContent || ""));
         for (const child of Array.from(parsedContent.body.childNodes)) {
@@ -992,16 +992,16 @@ ${noteText}
     });
     paneHeader.appendChild(paneCopyBtn);
     pane.appendChild(paneHeader);
-    const paneContent = activeDocument.createElement("div");
+    const paneContent = createDiv();
     paneContent.className = "traverture-modal-commentary-content";
     for (const c of commentaries) {
-      const note = activeDocument.createElement("div");
+      const note = createDiv();
       note.className = "traverture-modal-commentary-note";
       const bookNum = parseInt(c.source.substring(0, 2));
       const bookName = getBookName(bookNum, outputLang, "full", false);
       const ch = parseInt(c.source.substring(2, 5));
       const vs = parseInt(c.source.substring(5, 8));
-      const citation = activeDocument.createElement("div");
+      const citation = createDiv();
       citation.className = "traverture-modal-commentary-citation";
       citation.textContent = `${bookName} ${ch}:${vs}`;
       note.appendChild(citation);
@@ -1020,7 +1020,7 @@ ${noteText}
     return (parsed.body.textContent || "").replace(/\s+/g, " ").trim();
   }
   createHeaderButton(text) {
-    const btn = activeDocument.createElement("button");
+    const btn = createEl("button");
     btn.className = "traverture-modal-btn";
     btn.textContent = text;
     return btn;
@@ -1682,7 +1682,7 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
       });
     }
     if (this.settings.autoDetect && this.engine) {
-      const tempDiv = activeDocument.createElement("div");
+      const tempDiv = createDiv();
       const parsedHtml = new DOMParser().parseFromString(html, "text/html");
       for (const child of Array.from(parsedHtml.body.childNodes)) {
         tempDiv.appendChild(child.cloneNode(true));
@@ -1710,8 +1710,8 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
         if (clauses.length === 0) continue;
         const linked = this.insertLinks(text, clauses);
         if (linked !== text) {
-          const fragment = activeDocument.createDocumentFragment();
-          const span = activeDocument.createElement("span");
+          const fragment = createFragment();
+          const span = createSpan();
           const parsedLinked = new DOMParser().parseFromString(linked, "text/html");
           for (const child of Array.from(parsedLinked.body.childNodes)) {
             fragment.appendChild(child.cloneNode(true));
@@ -2080,7 +2080,7 @@ var TraverturePlugin = class extends import_obsidian5.Plugin {
         const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
         if (verseData) {
           let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, " ").replace(/<span class="newblock"><\/span>/g, " ");
-          const tempDiv = activeDocument.createElement("div");
+          const tempDiv = createDiv();
           const parsedHtml = new DOMParser().parseFromString(html, "text/html");
           for (const child of Array.from(parsedHtml.body.childNodes)) {
             tempDiv.appendChild(child.cloneNode(true));

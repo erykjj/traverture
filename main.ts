@@ -147,7 +147,7 @@ export default class TraverturePlugin extends Plugin {
 
         // Auto-detect references in remaining text
         if (this.settings.autoDetect && this.engine) {
-            const tempDiv = activeDocument.createElement('div');
+            const tempDiv = createDiv();
             const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
             for (const child of Array.from(parsedHtml.body.childNodes)) {
                 tempDiv.appendChild(child.cloneNode(true));
@@ -175,8 +175,8 @@ export default class TraverturePlugin extends Plugin {
 
                 const linked = this.insertLinks(text, clauses);
                 if (linked !== text) {
-                    const fragment = activeDocument.createDocumentFragment();
-                    const span = activeDocument.createElement('span');
+                    const fragment = createFragment();
+                    const span = createSpan();
                     const parsedLinked = new DOMParser().parseFromString(linked, 'text/html');
                     for (const child of Array.from(parsedLinked.body.childNodes)) {
                         fragment.appendChild(child.cloneNode(true));
@@ -574,7 +574,7 @@ export default class TraverturePlugin extends Plugin {
                 const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
                 if (verseData) {
                     let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
-                    const tempDiv = activeDocument.createElement('div');
+                    const tempDiv = createDiv();
                     const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
                     for (const child of Array.from(parsedHtml.body.childNodes)) {
                         tempDiv.appendChild(child.cloneNode(true));
