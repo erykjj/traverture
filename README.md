@@ -16,9 +16,9 @@ See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
 
 - **Automatic reference detection** – Scripture references are automatically detected in both View and Edit modes. Works with most book name variants and common abbreviations (e.g., "2 Sam.", "II Samuel", "2Sa"). References can also be force-detected by wrapping them in `{{ }}` (e.g., `{{Song of Solomon 1:1}}`). See [Known Limitations](#known-limitations) for edge cases.
 
-- **Verse preview modal** – Click any reference to open a modal with the full scripture text[^1] (with cross-reference and footnote tooltips), a study-note pane (where available) and buttons to copy the text, or open in *JW Library*[^2] or [*JW.ORG*](https://jw.org)[^3]. `Ctrl/Cmd`+click opens references directly in *JW Library* (if installed).
+- **Verse preview modal** – Click any reference to open a modal with the full scripture text[^1] (with cross-reference and footnote tooltips), a study-note pane (where available) and buttons to copy the text, or open in *JW Library*[^2] or [*JW.ORG*](https://jw.org)[^3]; `Ctrl/Cmd`+click opens references directly in *JW Library* (if installed)
 
-- **Sidebar table** – Parse a selection or entire document into a searchable, sortable table with columns for Original, Full, Standard, and Official name formats, BCV codes, and chapter and verse numbers. Features include:
+- **Sidebar table** – Parse a selection or entire document into a searchable, sortable table with columns for Original, Full, Standard, and Official name formats, BCV codes, and chapter and verse numbers; features include:
   - Accent-insensitive search/filter
   - Sort by any column (ascending/descending/original order)
   - Column visibility toggles
@@ -27,15 +27,15 @@ See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
   - Option to filter out duplicate entries
   - Copy table (with current filter/sort, etc.) to clipboard (TSV format)
 
-- **Insert citation** – Replace a scripture reference with the full verse text[^1]. Two formats available:
+- **Insert citation** – Replace a scripture reference with the full verse text[^1]; two formats available:
   - `Reference: "verse"` – preserves verse numbers
   - `"verse" (Reference)` – plain text without verse numbers
 
-- **Reformat references** – Convert references between Full (e.g., "1 Corinthians"), Standard (e.g., "1 Cor."), and Official (e.g., "1Co") name formats. Works on selections or entire documents.
+- **Reformat references** – Convert references between Full (e.g., "1 Corinthians"), Standard (e.g., "1 Cor."), and Official (e.g., "1Co") name formats; works on selections or entire documents
 
-- **Multi-language support** – Parse references in any supported language, and display or fetch verse text in a different language.
+- **Multi-language support** – Parse references in any supported language, and display or fetch verse text in a different language
   - Supported languages: ASL, Cebuano, Danish, Dutch, English, Estonian, French, German, Haitian Creole, Hungarian, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Romanian, Russian, Spanish, Swedish, Tagalog, Ukrainian
-    - ASL (American Sign Language) is available as an output language only; links open directly to the video segment for the verse range.
+    - ASL (American Sign Language) is available as an output language only; links open directly to the video segment for the verse range
 
 - **Desktop and mobile support**
 
@@ -48,7 +48,7 @@ See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
 - **Source language** – Language of the scripture references in your notes
 - **Output language** – Language for displaying book names and fetching verse text
 - **Modal title format** – How references are displayed in the verse preview title (Full, Standard, Official)
-- **Link color** – Color for reference links. "Theme default" uses the vault's external-link color. Changing this requires restarting Obsidian.
+- **Link color** – Color for reference links ("Theme default" uses the vault's external-link color); changing this requires restarting Obsidian
 - **Auto-detect references** – Toggle automatic detection without `{{ }}` markers
 
 ---
@@ -56,14 +56,14 @@ See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
 ## Known Limitations
 
 - **Whole books** (like "James") are not detected unless preceded by a number (e.g., "1 John"). Use braces if detection is desired (e.g., `{{Obadiah}}`)
-- **"Song of Solomon"** and its variants are not auto-detected. Use `{{Song of Solomon 1:1}}` to force detection.
-- **Ambiguous references** like "1 John 5:3; 2 John 4" may parse incorrectly as "1 John 5:3; 2" (as in, 1 John chapter 2) and "John 4". Force detection with braces: `1 John 5:3; {{2 John 4}}`.
+- **"Song of Solomon"** and its variants are not auto-detected. Use `{{Song of Solomon 1:1}}` to force detection
+- **Ambiguous references** like "1 John 5:3; 2 John 4" may parse incorrectly as "1 John 5:3; 2" (as in, 1 John chapter 2) and "John 4". Force detection with braces: `1 John 5:3; {{2 John 4}}`
 
 ---
 
 ## Performance
 
-Depending on the length of the scripture passage and the device, initial verse lookup requires a network request and may take a moment. Parsing large documents on mobile may take a few seconds.
+Depending on the length of the scripture passage and the device, initial verse lookup requires a network request and may take a moment; parsing large documents on mobile may take a few seconds
 
 ---
 
@@ -78,7 +78,7 @@ Depending on the length of the scripture passage and the device, initial verse l
 
 ## Feedback, etc.
 
-Feel free to get in touch and post any [issues and/or suggestions](https://github.com/erykjj/traverture/issues).
+Feel free to get in touch and post any [issues and/or suggestions](https://github.com/erykjj/traverture/issues)
 
 My other Obsidian plugins:
 
@@ -87,8 +87,8 @@ My other Obsidian plugins:
 
 ______
 
-[^1]: Bible citation text is taken from [*New World Translation of the Holy Scriptures*](https://www.jw.org/en/library/bible/study-bible/books/) (*NWT*) (© Watch Tower Bible and Tract Society of Pennsylvania).
+[^1]: Bible citation text is taken from [*New World Translation of the Holy Scriptures*](https://www.jw.org/en/library/bible/study-bible/books/) (*NWT*) (© Watch Tower Bible and Tract Society of Pennsylvania)
 
-[^2]: [*JW Library*](https://www.jw.org/en/online-help/jw-library/) is a registered trademark of Watch Tower Bible and Tract Society of Pennsylvania.
+[^2]: [*JW Library*](https://www.jw.org/en/online-help/jw-library/) is a registered trademark of Watch Tower Bible and Tract Society of Pennsylvania
 
-[^3]: *JW Library* may intercept these links by default.
+[^3]: *JW Library* may intercept these links by default
