@@ -48,6 +48,7 @@ See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
 - **Source language** – Language of the scripture references in your notes
 - **Output language** – Language for displaying book names and fetching verse text
 - **Modal title format** – How references are displayed in the verse preview title (Full, Standard, Official)
+- **Link color** – Color for reference links. "Theme default" uses the vault's external-link color. Changing this requires restarting Obsidian.
 - **Auto-detect references** – Toggle automatic detection without `{{ }}` markers
 
 ---
@@ -79,7 +80,10 @@ Depending on the length of the scripture passage and the device, initial verse l
 
 Feel free to get in touch and post any [issues and/or suggestions](https://github.com/erykjj/traverture/issues).
 
-My other Obsidian plugin: **con[VER]sum**: [GitHub repo](https://github.com/erykjj/conversum),  [Obsidian Community](https://community.obsidian.md/plugins/conversum)
+My other Obsidian plugins:
+
+- **con[VER]sum**: [GitHub repo](https://github.com/erykjj/conversum), [Obsidian Community](https://community.obsidian.md/plugins/conversum)
+- **in(REF)ens**: [GitHub repo](https://github.com/erykjj/inrefens), [Obsidian Community](https://community.obsidian.md/plugins/inrefens)
 
 ______
 
