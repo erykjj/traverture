@@ -11,7 +11,7 @@
 ### Removed
 
 ____
-## [3.9.1] - 2026-09-16
+## [3.9.2] - 2026-09-16
 ### Changed
 
 - Adjustments to silence linter warnings
@@ -154,7 +154,7 @@ ____
 - Initial Obidian Community release
 
 ____
-[3.9.1]:https://github.com/erykjj/traverture/releases/tag/3.9.1
+[3.9.2]:https://github.com/erykjj/traverture/releases/tag/3.9.2
 [3.9.0]:https://github.com/erykjj/traverture/releases/tag/3.9.0
 [3.8.1]:https://github.com/erykjj/traverture/releases/tag/3.8.1
 [3.8.0]:https://github.com/erykjj/traverture/releases/tag/3.8.0
