@@ -151,7 +151,7 @@ export class TravertureSidebarView extends ItemView {
             clearX.addEventListener('click', () => { this.searchQuery = ''; this.render(); });
         }
 
-        topRow.createEl('span', { text: `${refs.length} results`, cls: 'traverture-sidebar-count' });
+        topRow.createSpan({ text: `${refs.length} results`, cls: 'traverture-sidebar-count' });
         topRow.createDiv({ cls: 'traverture-sidebar-spacer' });
 
         const langSelect = topRow.createEl('select', { cls: 'traverture-sidebar-lang-select' });
@@ -172,13 +172,13 @@ export class TravertureSidebarView extends ItemView {
         const capsCb = capsLabel.createEl('input', { type: 'checkbox' });
         capsCb.checked = this.capitalize;
         capsCb.addEventListener('change', () => { this.capitalize = capsCb.checked; this.render(); });
-        capsLabel.createEl('span', { text: 'CAPS' });
+        capsLabel.createSpan({ text: 'CAPS' });
 
         const uniqueLabel = topRow.createEl('label', { cls: 'traverture-sidebar-caps-label' });
         const uniqueCb = uniqueLabel.createEl('input', { type: 'checkbox' });
         uniqueCb.checked = this.uniqueOnly;
         uniqueCb.addEventListener('change', () => { this.uniqueOnly = uniqueCb.checked; this.render(); });
-        uniqueLabel.createEl('span', { text: 'UNIQUE' });
+        uniqueLabel.createSpan({ text: 'UNIQUE' });
 
         const copyBtn = topRow.createEl('button', { text: 'COPY', cls: 'traverture-sidebar-copy-btn' });
         copyBtn.addEventListener('click', () => {
@@ -190,7 +190,7 @@ export class TravertureSidebarView extends ItemView {
         });
 
         const colRow = toolbar.createDiv({ cls: 'traverture-sidebar-col-row' });
-        colRow.createEl('span', { text: 'Columns:', cls: 'traverture-sidebar-col-label' });
+        colRow.createSpan({ text: 'Columns:', cls: 'traverture-sidebar-col-label' });
 
         const allBtn = colRow.createEl('button', { text: 'ALL', cls: 'traverture-sidebar-col-btn' });
         allBtn.addEventListener('click', () => { this.visibleColumns = new Set(SIDEBAR_COLUMNS.map(c => c.key)); this.render(); });
@@ -215,7 +215,7 @@ export class TravertureSidebarView extends ItemView {
                 }
                 this.render();
             });
-            label.createEl('span', { text: col.label });
+            label.createSpan({ text: col.label });
         }
 
         const tableWrapper = this.contentEl.createDiv({ cls: 'traverture-sidebar-table-wrapper' });
