@@ -1,11 +1,15 @@
 /* --- Reference Links --- */
 .traverture-ref-link {
-  color: #4a6da7;
-  text-decoration: none;
-  cursor: pointer;
+    color: var(--traverture-link-color, var(--link-external-color));
+    text-decoration: none;
+    cursor: pointer;
 }
 .traverture-ref-link:hover {
-  text-decoration: underline;
+    text-decoration: underline;
+}
+
+.traverture-hidden {
+    display: none;
 }
 
 /* --- Tooltip Container --- */
@@ -410,12 +414,11 @@
 
 /* --- Editor (Live Preview) Reference Links --- */
 .cm-traverture-ref {
-  color: #4a6da7;
-  cursor: pointer;
-  font-weight: inherit;
+    color: var(--traverture-link-color, var(--link-external-color));
+    cursor: pointer;
 }
 .cm-traverture-ref:hover {
-  text-decoration: underline;
+    text-decoration: underline;
 }
 
 /* --- Modal Content Layout --- */
