@@ -263,8 +263,19 @@ export default class TraverturePlugin extends Plugin {
         return result;
     }
 
+    applyLinkColor(): void {
+        const color = this.settings.linkColor;
+        const root = activeDocument.documentElement;
+        if (color && color.trim() !== '') {
+            root.style.setProperty('--traverture-link-color', color.trim());
+        } else {
+            root.style.removeProperty('--traverture-link-color');
+        }
+    }
+
     async onload() {
         await this.loadSettings();
+        this.applyLinkColor();
 
         try { await initEngine(this.app); this.createEngine(); }
         catch (e) { console.error('tra.VER:ture: WASM error:', e); }

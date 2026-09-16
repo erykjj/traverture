@@ -5,6 +5,7 @@ export interface TravertureSettings {
     outputLanguage: string;
     autoDetect: boolean;
     titleFormat: 'full' | 'standard' | 'official';
+    linkColor: string;
 }
 
 export const DEFAULT_SETTINGS: TravertureSettings = {
@@ -12,6 +13,7 @@ export const DEFAULT_SETTINGS: TravertureSettings = {
     outputLanguage: 'en',
     autoDetect: true,
     titleFormat: 'full',
+    linkColor: '',
 };
 
 export interface LanguageInfo {

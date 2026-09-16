@@ -5,6 +5,18 @@ import { getEngineVersion, getAvailableLanguagesCached as getAvailableLanguages 
 import { NameFormat } from './types';
 import TraverturePlugin from './main';
 
+/// Preset color choices for the "Link color" dropdown.
+/// The empty string means "use the theme's external link color".
+const LINK_COLOR_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: '',            label: 'Theme default' },
+    { value: '#eab308',     label: 'Yellow' },
+    { value: '#4a6da7',     label: 'Blue' },
+    { value: '#059669',     label: 'Green' },
+    { value: '#7c3aed',     label: 'Purple' },
+    { value: '#dc2626',     label: 'Red' },
+    { value: 'custom',      label: 'Custom (hex)' },
+];
+
 export class TravertureSettingTab extends PluginSettingTab {
     plugin: TraverturePlugin;
 
@@ -72,6 +84,56 @@ export class TravertureSettingTab extends PluginSettingTab {
                     });
             });
 
+        // ──────────────────────────────────────────
+        // Link color
+        // ──────────────────────────────────────────
+        const savedColor = this.plugin.settings.linkColor ?? '';
+        const isPreset = LINK_COLOR_OPTIONS.some(o => o.value === savedColor);
+        const dropdownValue = isPreset ? savedColor : 'custom';
+
+        let customTextEl: HTMLInputElement | null = null;
+
+        new Setting(containerEl)
+            .setName('Link color')
+            .setDesc('Color for citation links. "Theme default" uses the vault\u2019s external-link color. Changing this requires restarting Obsidian.')
+            .addDropdown(dropdown => {
+                for (const opt of LINK_COLOR_OPTIONS) {
+                    dropdown.addOption(opt.value, opt.label);
+                }
+                dropdown
+                    .setValue(dropdownValue)
+                    .onChange(async (value) => {
+                        if (value === 'custom') {
+                            this.plugin.settings.linkColor = this.plugin.settings.linkColor || '';
+                        } else {
+                            this.plugin.settings.linkColor = value;
+                        }
+                        await this.plugin.saveSettings();
+                        this.plugin.applyLinkColor();
+                        if (customTextEl) {
+                            if (value === 'custom') {
+                                customTextEl.removeClass('traverture-hidden');
+                            } else {
+                                customTextEl.addClass('traverture-hidden');
+                            }
+                        }
+                    });
+            })
+            .addText(text => {
+                customTextEl = text.inputEl;
+                text.inputEl.placeholder = '#4a6da7';
+                text.setValue(isPreset ? '' : savedColor);
+                text.setDisabled(!isPreset && dropdownValue !== 'custom');
+                if (dropdownValue !== 'custom') {
+                    text.inputEl.addClass('traverture-hidden');
+                }
+                text.onChange(async (value) => {
+                    this.plugin.settings.linkColor = value.trim();
+                    await this.plugin.saveSettings();
+                    this.plugin.applyLinkColor();
+                });
+            });
+
         new Setting(containerEl)
             .setName('Auto-detect references')
             .setDesc('Automatically detect scripture references in View mode without {{ }} markers.')
@@ -84,7 +146,7 @@ export class TravertureSettingTab extends PluginSettingTab {
 
         const footerEl = containerEl.createDiv({ cls: 'traverture-settings-footer' });
         const footerText = footerEl.createSpan();
-        footerText.appendChild(activeDocument.createTextNode('My other Obsidian plugin: '));
+        footerText.appendChild(activeDocument.createTextNode('My other Obsidian plugins: '));
 
         const conversumStrong = footerText.createEl('strong');
         const conversumLink = conversumStrong.createEl('a', {
@@ -96,12 +158,12 @@ export class TravertureSettingTab extends PluginSettingTab {
 
         footerText.appendChild(activeDocument.createTextNode(', '));
 
-        const travertureStrong = footerText.createEl('strong');
-        const travertureLink = travertureStrong.createEl('a', {
+        const inrefensStrong = footerText.createEl('strong');
+        const inrefensLink = inrefensStrong.createEl('a', {
             text: 'in(REF)ens',
             href: 'https://github.com/erykjj/inrefens',
         });
-        travertureLink.setAttribute('target', '_blank');
-        travertureLink.setAttribute('rel', 'noopener noreferrer');
+        inrefensLink.setAttribute('target', '_blank');
+        inrefensLink.setAttribute('rel', 'noopener noreferrer');
     }
 }
