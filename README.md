@@ -84,6 +84,7 @@ My other Obsidian plugins:
 
 - **con[VER]sum**: [GitHub repo](https://github.com/erykjj/conversum), [Obsidian Community](https://community.obsidian.md/plugins/conversum)
 - **in(REF)ens**: [GitHub repo](https://github.com/erykjj/inrefens), [Obsidian Community](https://community.obsidian.md/plugins/inrefens)
+- **mu/TEX/tum**: [GitHub repo](https://github.com/erykjj/mutextum), [Obsidian Community](https://community.obsidian.md/plugins/mutextum)
 
 ______
 
