@@ -8,14 +8,17 @@
 
 ### Changed
 
-- Updated engine to v3.3.1
-  - Refined custom variats
-
 ### Fixed
 
 ### Removed
 
 ____
+## [4.0.2] - 2026-09-21
+### Changed
+
+- Updated engine to v3.3.1
+  - Refined custom variants
+
 ## [4.0.0] - 2026-09-16
 ### Added
 
@@ -164,6 +167,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[4.0.2]:https://github.com/erykjj/traverture/releases/tag/4.0.2
 [4.0.0]:https://github.com/erykjj/traverture/releases/tag/4.0.0
 [3.9.2]:https://github.com/erykjj/traverture/releases/tag/3.9.2
 [3.9.0]:https://github.com/erykjj/traverture/releases/tag/3.9.0
