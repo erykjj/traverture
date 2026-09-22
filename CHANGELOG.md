@@ -13,7 +13,7 @@
 ### Removed
 
 ____
-## [4.0.2] - 2026-09-22
+## [4.0.3] - 2026-09-22
 ### Changed
 
 - Added link to new plugin
