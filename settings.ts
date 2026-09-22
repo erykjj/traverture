@@ -165,5 +165,15 @@ export class TravertureSettingTab extends PluginSettingTab {
         });
         inrefensLink.setAttribute('target', '_blank');
         inrefensLink.setAttribute('rel', 'noopener noreferrer');
+
+        footerText.appendChild(activeDocument.createTextNode(', '));
+
+        const mutextumStrong = footerText.createEl('strong');
+        const mutextumLink = mutextumStrong.createEl('a', {
+            text: 'mu/TEX/tum',
+            href: 'https://github.com/erykjj/mutextum',
+        });
+        mutextumLink.setAttribute('target', '_blank');
+        mutextumLink.setAttribute('rel', 'noopener noreferrer');
     }
 }
