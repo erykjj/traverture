@@ -13,6 +13,11 @@
 ### Removed
 
 ____
+## [4.0.2] - 2026-09-22
+### Changed
+
+- Added link to new plugin
+
 ## [4.0.2] - 2026-09-21
 ### Changed
 
@@ -167,6 +172,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[4.0.3]:https://github.com/erykjj/traverture/releases/tag/4.0.3
 [4.0.2]:https://github.com/erykjj/traverture/releases/tag/4.0.2
 [4.0.0]:https://github.com/erykjj/traverture/releases/tag/4.0.0
 [3.9.2]:https://github.com/erykjj/traverture/releases/tag/3.9.2
