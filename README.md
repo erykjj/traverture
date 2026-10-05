@@ -14,7 +14,7 @@ See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
 
 ## Features
 
-- **Automatic reference detection** – Scripture references are automatically detected in both View and Edit modes. Works with most book name variants and common abbreviations (e.g., "2 Sam.", "II Samuel", "2Sa"). References can also be force-detected by wrapping them in `{{ }}` (e.g., `{{Song of Solomon 1:1}}`). See [Known Limitations](#known-limitations) for edge cases.
+- **Automatic reference detection** – Scripture references are automatically detected in both View and Edit modes; works with most book name variants and common abbreviations (e.g., "2 Sam.", "II Samuel", "2Sa"); references can also be force-detected by wrapping them in `{{ }}` (e.g., `{{Song of Solomon 1:1}}`); see [Known Limitations](#known-limitations) for edge cases
 
 - **Verse preview modal** – Click any reference to open a modal with the full scripture text[^1] (with cross-reference and footnote tooltips), a study-note pane (where available) and buttons to copy the text, or open in *JW Library*[^2] or [*JW.ORG*](https://jw.org)[^3]; `Ctrl/Cmd`+click opens references directly in *JW Library* (if installed)
 
@@ -37,6 +37,8 @@ See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
   - Supported languages: ASL, Cebuano, Danish, Dutch, English, Estonian, French, German, Haitian Creole, Hungarian, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Romanian, Russian, Spanish, Swedish, Tagalog, Ukrainian
     - ASL (American Sign Language) is available as an output language only; links open directly to the video segment for the verse range
 
+- **Per-note language override** – Set a `language` property in a note's frontmatter to override the source language for that note alone (e.g. `language: de`); accepts the language code, symbol, vernacular name, or English name
+
 - **Desktop and mobile support**
 
 ![preview](traverture.gif)
@@ -46,6 +48,7 @@ See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
 ## Settings
 
 - **Source language** – Language of the scripture references in your notes
+  - Can be overridden per-note (see above)
 - **Output language** – Language for displaying book names and fetching verse text
 - **Modal title format** – How references are displayed in the verse preview title (Full, Standard, Official)
 - **Link color** – Color for reference links ("Theme default" uses the vault's external-link color); changing this requires restarting Obsidian
@@ -58,6 +61,7 @@ See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
 - **Whole books** (like "James") are not detected unless preceded by a number (e.g., "1 John"). Use braces if detection is desired (e.g., `{{Obadiah}}`)
 - **"Song of Solomon"** and its variants are not auto-detected. Use `{{Song of Solomon 1:1}}` to force detection
 - **Ambiguous references** like "1 John 5:3; 2 John 4" may parse incorrectly as "1 John 5:3; 2" (as in, 1 John chapter 2) and "John 4". Force detection with braces: `1 John 5:3; {{2 John 4}}`
+- **Changing the source language** in settings affects all open Reading Views of notes *without* a frontmatter override, and **changing a note's `language` frontmatter** affects that note's Reading View; in both cases the affected view is re-rendered, which may cause a brief flicker
 
 ---
 
@@ -92,4 +96,4 @@ ______
 
 [^2]: [*JW Library*](https://www.jw.org/en/online-help/jw-library/) is a registered trademark of Watch Tower Bible and Tract Society of Pennsylvania
 
-[^3]: *JW Library* may intercept these links by default
+[^3]: *JW Library* may intercept `jw.org` links by default
