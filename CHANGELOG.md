@@ -4,6 +4,8 @@
 
 ### Added
 
+- Handle `language` frontmatter property over-ride
+
 ### Changed
 
 ### Changed
