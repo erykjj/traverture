@@ -227,7 +227,8 @@ export class TravertureSidebarView extends ItemView {
             th.style.width = col.width; th.style.minWidth = col.width; th.style.textAlign = col.align;
             let arrow = '';
             if (this.sortColumn === col.key) arrow = this.sortDir === 1 ? ' ▲' : (this.sortDir === -1 ? ' ▼' : '');
-            th.textContent = col.key === 'scripture' ? `${col.label} (${this.plugin.settings.sourceLanguage})${arrow}` : col.label + arrow;
+            const headerLang = this.allRefs[0]?.sourceLanguage || this.plugin.settings.sourceLanguage;
+            th.textContent = col.key === 'scripture' ? `${col.label} (${headerLang})${arrow}` : col.label + arrow;
             th.addEventListener('click', () => {
                 if (this.sortColumn === col.key) {
                     if (this.sortDir === 1) this.sortDir = -1;

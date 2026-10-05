@@ -51,6 +51,7 @@ export class TravertureSettingTab extends PluginSettingTab {
                         this.plugin.settings.sourceLanguage = value;
                         await this.plugin.saveSettings();
                         this.plugin.createEngine();
+                        this.plugin.onSourceLanguageChanged();
                     });
             });
 

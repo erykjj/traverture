@@ -45,6 +45,7 @@ export interface SidebarRef {
     startVerse: number;
     endVerse: number;
     bookNum: number;
+    sourceLanguage: string;
 }
 
 // ──────────────────────────────────────────────
