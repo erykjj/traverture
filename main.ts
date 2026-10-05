@@ -59,7 +59,7 @@ export default class TraverturePlugin extends Plugin {
             if (fromDoc) return fromDoc;
         } else if (file) {
             const cached = this.app.metadataCache.getFileCache(file);
-            const raw = cached?.frontmatter?.language;
+            const raw: unknown = cached?.frontmatter?.language;
             if (typeof raw === 'string' && raw.trim()) {
                 const resolved = parseFrontmatterLanguage(`---\nlanguage: ${raw}\n---`);
                 if (resolved) return resolved;
