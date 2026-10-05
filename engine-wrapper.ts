@@ -229,6 +229,47 @@ export function getAvailableLanguagesCached(): LanguageInfo[] {
     return cachedLanguages ?? [];
 }
 
+export function resolveLanguage(input: string): string | null {
+    const languages = getAvailableLanguagesCached();
+    if (languages.length === 0) return null;
+    if (!input || typeof input !== 'string') return null;
+    const cleanInput = input.trim().replace(/^["']|["']$/g, '').toLowerCase();
+    for (const lang of languages) {
+        if (lang.code && lang.code.toLowerCase() === cleanInput) {
+            return lang.code;
+        }
+        if (lang.vernacularName && lang.vernacularName.toLowerCase() === cleanInput) {
+            return lang.code;
+        }
+        if (lang.englishName && lang.englishName.toLowerCase() === cleanInput) {
+            return lang.code;
+        }
+    }
+    return null;
+}
+
+export function parseFrontmatterLanguage(text: string): string | null {
+    if (!text || !text.startsWith('---')) return null;
+    const end = text.indexOf('---', 3);
+    if (end === -1) return null;
+    const frontmatter = text.substring(3, end);
+    for (const line of frontmatter.split('\n')) {
+        const match = line.match(/^([^:]+):\s*(.+)$/);
+        if (!match) continue;
+        const key = match[1].trim().toLowerCase();
+        if (key !== 'language') continue;
+        let value = match[2].trim();
+        if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+        ) {
+            value = value.slice(1, -1);
+        }
+        return resolveLanguage(value);
+    }
+    return null;
+}
+
 export function getLangSuffix(langCode: string): string {
     if (!engineInitialized) {
         return 'en/library/bible/study-bible/books/';
