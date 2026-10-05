@@ -13,7 +13,7 @@
 ### Removed
 
 ____
-## [5.0.0] - 2026-10-04
+## [5.0.1] - 2026-10-04
 ### Added
 
 - Handle `language` frontmatter property over-ride
@@ -181,7 +181,7 @@ ____
 - Initial Obidian Community release
 
 ____
-[5.0.0]:https://github.com/erykjj/traverture/releases/tag/5.0.0
+[5.0.1]:https://github.com/erykjj/traverture/releases/tag/5.0.0
 [4.0.3]:https://github.com/erykjj/traverture/releases/tag/4.0.3
 [4.0.2]:https://github.com/erykjj/traverture/releases/tag/4.0.2
 [4.0.0]:https://github.com/erykjj/traverture/releases/tag/4.0.0
