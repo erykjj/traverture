@@ -13,7 +13,7 @@
 ### Removed
 
 ____
-## [5.1.0] - 2026-10-08
+## [5.1.1] - 2026-10-08
 ### Changed
 
 - Adapt to declarative settings API
@@ -186,7 +186,7 @@ ____
 - Initial Obidian Community release
 
 ____
-[5.1.0]:https://github.com/erykjj/traverture/releases/tag/5.1.0
+[5.1.1]:https://github.com/erykjj/traverture/releases/tag/5.1.1
 [5.0.1]:https://github.com/erykjj/traverture/releases/tag/5.0.1
 [4.0.3]:https://github.com/erykjj/traverture/releases/tag/4.0.3
 [4.0.2]:https://github.com/erykjj/traverture/releases/tag/4.0.2
