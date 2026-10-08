@@ -1,6 +1,6 @@
 // settings.ts
 
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, SettingDefinitionItem } from 'obsidian';
 import { getEngineVersion, getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
 import { NameFormat } from './types';
 import TraverturePlugin from './main';
@@ -25,156 +25,206 @@ export class TravertureSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    display(): void {
-        const { containerEl } = this;
-        containerEl.empty();
+    async setControlValue(key: string, value: unknown): Promise<void> {
+        const s = this.plugin.settings as unknown as Record<string, unknown>;
 
-        const headerEl = containerEl.createDiv({ cls: 'traverture-settings-header' });
-        headerEl.createSpan({ text: 'tra.VER:ture', cls: 'traverture-settings-title' });
-        const engineVersion = getEngineVersion();
-        headerEl.createSpan({ 
-            text: `v${this.plugin.manifest.version} – ${engineVersion}`,
-            cls: 'traverture-version-info'
-        });
+        switch (key) {
+            case 'sourceLanguage': {
+                s.sourceLanguage = value;
+                await this.plugin.saveSettings();
+                this.plugin.createEngine();
+                this.plugin.onSourceLanguageChanged();
+                break;
+            }
+            case 'outputLanguage': {
+                s.outputLanguage = value;
+                await this.plugin.saveSettings();
+                this.plugin.createEngine();
+                break;
+            }
+            case 'titleFormat': {
+                s.titleFormat = value as NameFormat;
+                await this.plugin.saveSettings();
+                break;
+            }
+            case 'autoDetect': {
+                s.autoDetect = value;
+                await this.plugin.saveSettings();
+                break;
+            }
+        }
+    }
 
+    getSettingDefinitions(): SettingDefinitionItem[] {
         const languages = getAvailableLanguages();
 
-        new Setting(containerEl)
-            .setName('Source language')
-            .setDesc('Language of the scripture references in your notes')
-            .addDropdown(dropdown => {
-                for (const lang of languages.filter(l => l.code !== 'ase')) {
-                    dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
-                }
-                dropdown.setValue(this.plugin.settings.sourceLanguage)
-                    .onChange(async (value) => {
-                        this.plugin.settings.sourceLanguage = value;
-                        await this.plugin.saveSettings();
-                        this.plugin.createEngine();
-                        this.plugin.onSourceLanguageChanged();
-                    });
-            });
+        const sourceLangOptions: Record<string, string> = {};
+        for (const lang of languages.filter(l => l.code !== 'ase')) {
+            sourceLangOptions[lang.code] = `${lang.vernacularName} (${lang.code})`;
+        }
 
-        new Setting(containerEl)
-            .setName('Output language')
-            .setDesc('Language for displaying and fetching scripture text')
-            .addDropdown(dropdown => {
-                for (const lang of languages) {
-                    dropdown.addOption(lang.code, `${lang.vernacularName} (${lang.code})`);
-                }
-                dropdown.setValue(this.plugin.settings.outputLanguage)
-                    .onChange(async (value) => {
-                        this.plugin.settings.outputLanguage = value;
-                        await this.plugin.saveSettings();
-                        this.plugin.createEngine();
-                    });
-            });
+        const outputLangOptions: Record<string, string> = {};
+        for (const lang of languages) {
+            outputLangOptions[lang.code] = `${lang.vernacularName} (${lang.code})`;
+        }
 
-        new Setting(containerEl)
-            .setName('Modal title format')
-            .setDesc('How scripture references are displayed in the modal title')
-            .addDropdown(dropdown => {
-                dropdown.addOption('full', 'Full (1 Corinthians)');
-                dropdown.addOption('standard', 'Standard (1 Cor.)');
-                dropdown.addOption('official', 'Official (1Co)');
-                dropdown
-                    .setValue(this.plugin.settings.titleFormat)
-                    .onChange(async (value: string) => {
-                        this.plugin.settings.titleFormat = value as NameFormat;
-                        await this.plugin.saveSettings();
-                    });
-            });
+        return [
+            // ─── Header section ───
+            {
+                type: 'group',
+                heading: '',
+                items: [
+                    {
+                        name: '',
+                        render: (setting) => {
+                            setting.settingEl.empty();
+                            setting.settingEl.addClass('traverture-settings-header');
+                            const headerEl = setting.settingEl.createDiv();
+                            headerEl.createSpan({
+                                text: 'tra.VER:ture  ',
+                                cls: 'traverture-settings-title',
+                            });
+                            headerEl.createSpan({
+                                text: `v${this.plugin.manifest.version} \u2013 ${getEngineVersion()}`,
+                                cls: 'traverture-version-info',
+                            });
+                        },
+                    },
+                ],
+            },
 
-        // ──────────────────────────────────────────
-        // Link color
-        // ──────────────────────────────────────────
-        const savedColor = this.plugin.settings.linkColor ?? '';
-        const isPreset = LINK_COLOR_OPTIONS.some(o => o.value === savedColor);
-        const dropdownValue = isPreset ? savedColor : 'custom';
+            // ─── Options section ───
+            {
+                type: 'group',
+                heading: '',
+                items: [
+                    {
+                        name: 'Source language',
+                        desc: 'Language of the scripture references in your notes',
+                        control: {
+                            type: 'dropdown',
+                            key: 'sourceLanguage',
+                            options: sourceLangOptions,
+                        },
+                    },
+                    {
+                        name: 'Output language',
+                        desc: 'Language for displaying and fetching scripture text',
+                        control: {
+                            type: 'dropdown',
+                            key: 'outputLanguage',
+                            options: outputLangOptions,
+                        },
+                    },
+                    {
+                        name: 'Modal title format',
+                        desc: 'How scripture references are displayed in the modal title',
+                        control: {
+                            type: 'dropdown',
+                            key: 'titleFormat',
+                            options: {
+                                full: 'Full (1 Corinthians)',
+                                standard: 'Standard (1 Cor.)',
+                                official: 'Official (1Co)',
+                            },
+                        },
+                    },
+                    {
+                        name: 'Link color',
+                        desc: 'Color for citation links. "Theme default" uses the vault\u2019s external-link color. Changing this requires restarting Obsidian.',
+                        render: (setting) => {
+                            const savedColor = this.plugin.settings.linkColor ?? '';
+                            const isPreset = LINK_COLOR_OPTIONS.some(o => o.value === savedColor);
+                            const dropdownValue = isPreset ? savedColor : 'custom';
 
-        let customTextEl: HTMLInputElement | null = null;
+                            let customTextEl: HTMLInputElement | null = null;
 
-        new Setting(containerEl)
-            .setName('Link color')
-            .setDesc('Color for citation links. "Theme default" uses the vault\u2019s external-link color. Changing this requires restarting Obsidian.')
-            .addDropdown(dropdown => {
-                for (const opt of LINK_COLOR_OPTIONS) {
-                    dropdown.addOption(opt.value, opt.label);
-                }
-                dropdown
-                    .setValue(dropdownValue)
-                    .onChange(async (value) => {
-                        if (value === 'custom') {
-                            this.plugin.settings.linkColor = this.plugin.settings.linkColor || '';
-                        } else {
-                            this.plugin.settings.linkColor = value;
-                        }
-                        await this.plugin.saveSettings();
-                        this.plugin.applyLinkColor();
-                        if (customTextEl) {
-                            if (value === 'custom') {
-                                customTextEl.removeClass('traverture-hidden');
-                            } else {
-                                customTextEl.addClass('traverture-hidden');
-                            }
-                        }
-                    });
-            })
-            .addText(text => {
-                customTextEl = text.inputEl;
-                text.inputEl.placeholder = '#4a6da7';
-                text.setValue(isPreset ? '' : savedColor);
-                text.setDisabled(!isPreset && dropdownValue !== 'custom');
-                if (dropdownValue !== 'custom') {
-                    text.inputEl.addClass('traverture-hidden');
-                }
-                text.onChange(async (value) => {
-                    this.plugin.settings.linkColor = value.trim();
-                    await this.plugin.saveSettings();
-                    this.plugin.applyLinkColor();
-                });
-            });
+                            setting
+                                .addDropdown(dropdown => {
+                                    for (const opt of LINK_COLOR_OPTIONS) {
+                                        dropdown.addOption(opt.value, opt.label);
+                                    }
+                                    dropdown
+                                        .setValue(dropdownValue)
+                                        .onChange(async (value) => {
+                                            if (value === 'custom') {
+                                                this.plugin.settings.linkColor = this.plugin.settings.linkColor || '';
+                                            } else {
+                                                this.plugin.settings.linkColor = value;
+                                            }
+                                            await this.plugin.saveSettings();
+                                            this.plugin.applyLinkColor();
+                                            if (customTextEl) {
+                                                if (value === 'custom') {
+                                                    customTextEl.removeClass('traverture-hidden');
+                                                } else {
+                                                    customTextEl.addClass('traverture-hidden');
+                                                }
+                                            }
+                                        });
+                                })
+                                .addText(text => {
+                                    customTextEl = text.inputEl;
+                                    text.inputEl.placeholder = '#4a6da7';
+                                    text.setValue(isPreset ? '' : savedColor);
+                                    text.setDisabled(!isPreset && dropdownValue !== 'custom');
+                                    if (dropdownValue !== 'custom') {
+                                        text.inputEl.addClass('traverture-hidden');
+                                    }
+                                    text.onChange(async (value) => {
+                                        this.plugin.settings.linkColor = value.trim();
+                                        await this.plugin.saveSettings();
+                                        this.plugin.applyLinkColor();
+                                    });
+                                });
+                        },
+                    },
+                    {
+                        name: 'Auto-detect references',
+                        desc: 'Automatically detect scripture references in View mode without {{ }} markers.',
+                        control: {
+                            type: 'toggle',
+                            key: 'autoDetect',
+                            defaultValue: true,
+                        },
+                    },
+                ],
+            },
 
-        new Setting(containerEl)
-            .setName('Auto-detect references')
-            .setDesc('Automatically detect scripture references in View mode without {{ }} markers.')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.autoDetect)
-                .onChange(async (value) => {
-                    this.plugin.settings.autoDetect = value;
-                    await this.plugin.saveSettings();
-                }));
+            // ─── Footer section ───
+            {
+                type: 'group',
+                heading: '',
+                items: [
+                    {
+                        name: '',
+                        render: (setting) => {
+                            setting.settingEl.empty();
+                            setting.settingEl.addClass('traverture-settings-footer-row');
+                            const footerEl = setting.settingEl.createDiv({ cls: 'traverture-settings-footer' });
+                            footerEl.appendChild(
+                                document.createTextNode('My other Obsidian plugins: ')
+                            );
 
-        const footerEl = containerEl.createDiv({ cls: 'traverture-settings-footer' });
-        const footerText = footerEl.createSpan();
-        footerText.appendChild(activeDocument.createTextNode('My other Obsidian plugins: '));
+                            const entries: Array<[string, string]> = [
+                                ['con[VER]sum', 'https://github.com/erykjj/conversum'],
+                                ['in(REF)ens', 'https://github.com/erykjj/inrefens'],
+                                ['mu/TEX/tum', 'https://github.com/erykjj/mutextum'],
+                            ];
 
-        const conversumStrong = footerText.createEl('strong');
-        const conversumLink = conversumStrong.createEl('a', {
-            text: 'con[VER]sum',
-            href: 'https://github.com/erykjj/conversum',
-        });
-        conversumLink.setAttribute('target', '_blank');
-        conversumLink.setAttribute('rel', 'noopener noreferrer');
-
-        footerText.appendChild(activeDocument.createTextNode(', '));
-
-        const inrefensStrong = footerText.createEl('strong');
-        const inrefensLink = inrefensStrong.createEl('a', {
-            text: 'in(REF)ens',
-            href: 'https://github.com/erykjj/inrefens',
-        });
-        inrefensLink.setAttribute('target', '_blank');
-        inrefensLink.setAttribute('rel', 'noopener noreferrer');
-
-        footerText.appendChild(activeDocument.createTextNode(', '));
-
-        const mutextumStrong = footerText.createEl('strong');
-        const mutextumLink = mutextumStrong.createEl('a', {
-            text: 'mu/TEX/tum',
-            href: 'https://github.com/erykjj/mutextum',
-        });
-        mutextumLink.setAttribute('target', '_blank');
-        mutextumLink.setAttribute('rel', 'noopener noreferrer');
+                            entries.forEach(([text, href], i) => {
+                                const strong = footerEl.createEl('strong');
+                                const link = strong.createEl('a', { text, href });
+                                link.setAttribute('target', '_blank');
+                                link.setAttribute('rel', 'noopener noreferrer');
+                                if (i < entries.length - 1) {
+                                    footerEl.appendChild(document.createTextNode(', '));
+                                }
+                            });
+                        },
+                    },
+                ],
+            },
+        ];
     }
 }
