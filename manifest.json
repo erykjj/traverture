@@ -1,8 +1,8 @@
 {
   "id": "traverture",
   "name": "traVERture",
-  "version": "5.0.1",
-  "minAppVersion": "1.10.0",
+  "version": "5.1.0",
+  "minAppVersion": "1.13.0",
   "description": "Parse, convert, and preview scripture references; insert citations from NWT Bible, and launch in JW Library and JW.ORG.",
   "author": "Eryk J.",
   "authorUrl": "https://github.com/erykjj",
