@@ -8,7 +8,7 @@ A scripture reference parser, formatter, and viewer for Obsidian. Automatically 
 
 ## Security and Privacy
 
-See [SECURITY](https://github.com/erykjj/traverture?tab=security-ov-file).
+See [the security and privacy notes](https://github.com/erykjj/traverture?tab=security-ov-file) for information on what this plugin does and does not do behind the scenes.
 
 ---
 
