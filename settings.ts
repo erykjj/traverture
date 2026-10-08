@@ -2,7 +2,6 @@
 
 import { App, PluginSettingTab, SettingDefinitionItem } from 'obsidian';
 import { getEngineVersion, getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
-import { NameFormat } from './types';
 import TraverturePlugin from './main';
 
 /// Preset color choices for the "Link color" dropdown.
@@ -43,7 +42,7 @@ export class TravertureSettingTab extends PluginSettingTab {
                 break;
             }
             case 'titleFormat': {
-                s.titleFormat = value as NameFormat;
+                s.titleFormat = value;
                 await this.plugin.saveSettings();
                 break;
             }
