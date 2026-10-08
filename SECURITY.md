@@ -8,6 +8,21 @@ No other network requests are made. **No telemetry, tracking, or third-party ser
 
 ---
 
+## File Access
+
+The plugin reads the active note and it inserts or reformats text via the editor when you invoke those actions. All file operations go through Obsidian's API and are limited to your vault.
+
+### What the plugin does:
+- **Reads the active note** to detect references in Reading View and to fetch frontmatter language overrides
+- **Writes to the active note** only when you invoke "Insert citation" or "Reformat" actions via the context menu or command palette
+
+### What the plugin does not do:
+- Modify files without your explicit action
+- Access files outside your vault
+- Transmit file content anywhere
+
+---
+
 ## Privacy
 
 This plugin writes to the system clipboard only when you click a COPY button (to copy scripture text or table data). **No clipboard data is ever read. No data is collected, stored, or transmitted**.
