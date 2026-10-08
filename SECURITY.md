@@ -22,9 +22,3 @@ The WASM module:
 - Does not make any network requests
 - Does not access the file system
 - Does not read or modify DOM directly
-
----
-
-## TypeScript Warnings
-
-The plugin source contains some TypeScript strictness warnings inherent to JavaScript interop (e.g., `JSON.parse` returning `any`, WASM module type casting). **These warnings are cosmetic and do not affect functionality or security**. All external data (API responses) is validated before use.
