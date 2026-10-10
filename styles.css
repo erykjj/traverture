@@ -452,7 +452,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 0.5rem 0.75rem;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   line-height: 1.5;
 }
 .traverture-modal-commentary-note {
@@ -601,6 +601,7 @@
 .traverture-scripture-pane .traverture-modal-body {
     font-size: 1rem;
     line-height: 1.6;
+    font-weight: 600;
 }
 
 .traverture-scripture-pane .traverture-modal-commentary {
@@ -619,4 +620,6 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    font-size: 0.85rem;
+    line-height: 1.5;
 }
