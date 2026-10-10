@@ -16,7 +16,7 @@
 #verse-tooltip {
   font-weight: normal;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 /* --- Tooltip Content Blocks --- */
@@ -386,7 +386,7 @@
   padding: 1rem 1.25rem;
   overflow-y: auto;
   flex: 1;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 .traverture-modal-close {
   color: var(--text-muted, #6b7280);
@@ -600,7 +600,7 @@
 
 .traverture-scripture-pane .traverture-modal-body {
     font-size: 1rem;
-    line-height: 1.6;
+    line-height: 1.5;
     font-weight: 600;
 }
 
