@@ -51,6 +51,11 @@ export class TravertureSettingTab extends PluginSettingTab {
                 await this.plugin.saveSettings();
                 break;
             }
+            case 'scriptureDisplay': {
+                s.scriptureDisplay = value;
+                await this.plugin.saveSettings();
+                break;
+            }
         }
     }
 
@@ -116,7 +121,19 @@ export class TravertureSettingTab extends PluginSettingTab {
                         },
                     },
                     {
-                        name: 'Modal title format',
+                        name: 'Scripture display',
+                        desc: 'How scripture text is shown when clicking a reference in a note.',
+                        control: {
+                            type: 'dropdown',
+                            key: 'scriptureDisplay',
+                            options: {
+                                modal: 'Modal',
+                                sidebar: 'Sidebar',
+                            },
+                        },
+                    },
+                    {
+                        name: 'Title format',
                         desc: 'How scripture references are displayed in the modal title',
                         control: {
                             type: 'dropdown',
