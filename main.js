@@ -1591,7 +1591,21 @@ var DEFAULT_SETTINGS = {
   autoDetect: true,
   titleFormat: "full",
   linkColor: "",
-  scriptureDisplay: "modal"
+  scriptureDisplay: "modal",
+  sidebarColumns: [
+    "scripture",
+    "fullRef",
+    "standardRef",
+    "officialRef",
+    "startBcv",
+    "endBcv",
+    "startCh",
+    "endCh",
+    "startVerse",
+    "endVerse"
+  ],
+  sidebarCapitalize: false,
+  sidebarUniqueOnly: false
 };
 var VIEW_TYPE_TRAVERTURE_SIDEBAR = "traverture-sidebar-view";
 
@@ -1625,6 +1639,9 @@ var TravertureSidebarView = class extends import_obsidian4.ItemView {
     this.scripturePane = null;
     this.plugin = plugin;
     this.outputLang = plugin.settings.outputLanguage;
+    this.visibleColumns = new Set(plugin.settings.sidebarColumns);
+    this.capitalize = plugin.settings.sidebarCapitalize;
+    this.uniqueOnly = plugin.settings.sidebarUniqueOnly;
   }
   getViewType() {
     return VIEW_TYPE_TRAVERTURE_SIDEBAR;
@@ -1655,23 +1672,15 @@ var TravertureSidebarView = class extends import_obsidian4.ItemView {
   }
   async setState(state, _result) {
     const restoringAtStartup = !this.plugin.sessionRestored;
-    if (state) {
-      if (typeof state.outputLang === "string") this.outputLang = state.outputLang;
-      if (typeof state.capitalize === "boolean") this.capitalize = state.capitalize;
-      if (typeof state.uniqueOnly === "boolean") this.uniqueOnly = state.uniqueOnly;
-      if (Array.isArray(state.visibleColumns)) {
-        this.visibleColumns = new Set(state.visibleColumns);
-      }
-      if (!restoringAtStartup) {
-        if (state.mode === "table" || state.mode === "scripture") this.mode = state.mode;
-        if (Array.isArray(state.allRefs)) this.allRefs = state.allRefs;
-        if (typeof state.searchQuery === "string") this.searchQuery = state.searchQuery;
-        if (typeof state.sortColumn === "string" || state.sortColumn === null) this.sortColumn = state.sortColumn;
-        if (typeof state.sortDir === "number") this.sortDir = state.sortDir;
-        if (typeof state.scriptureBcv === "string") this.scriptureBcv = state.scriptureBcv;
-        if (typeof state.scriptureDisplayText === "string") this.scriptureDisplayText = state.scriptureDisplayText;
-        if (typeof state.scriptureTimecodes === "string") this.scriptureTimecodes = state.scriptureTimecodes;
-      }
+    if (state && !restoringAtStartup) {
+      if (state.mode === "table" || state.mode === "scripture") this.mode = state.mode;
+      if (Array.isArray(state.allRefs)) this.allRefs = state.allRefs;
+      if (typeof state.searchQuery === "string") this.searchQuery = state.searchQuery;
+      if (typeof state.sortColumn === "string" || state.sortColumn === null) this.sortColumn = state.sortColumn;
+      if (typeof state.sortDir === "number") this.sortDir = state.sortDir;
+      if (typeof state.scriptureBcv === "string") this.scriptureBcv = state.scriptureBcv;
+      if (typeof state.scriptureDisplayText === "string") this.scriptureDisplayText = state.scriptureDisplayText;
+      if (typeof state.scriptureTimecodes === "string") this.scriptureTimecodes = state.scriptureTimecodes;
     }
     await super.setState(state, _result);
     if (this.contentEl.isConnected) {
@@ -1689,10 +1698,6 @@ var TravertureSidebarView = class extends import_obsidian4.ItemView {
     const state = super.getState();
     return {
       ...state,
-      outputLang: this.outputLang,
-      capitalize: this.capitalize,
-      uniqueOnly: this.uniqueOnly,
-      visibleColumns: [...this.visibleColumns],
       mode: this.mode,
       allRefs: this.allRefs,
       searchQuery: this.searchQuery,
@@ -1813,6 +1818,7 @@ var TravertureSidebarView = class extends import_obsidian4.ItemView {
     }
     const refs = this.getFilteredSortedRefs();
     const visibleCols = SIDEBAR_COLUMNS.filter((c) => this.visibleColumns.has(c.key));
+    this.app.workspace.requestSaveLayout();
     const languages = getAvailableLanguagesCached();
     const toolbar = this.contentEl.createDiv({ cls: "traverture-sidebar-toolbar" });
     const topRow = toolbar.createDiv({ cls: "traverture-sidebar-top-row" });
@@ -1851,6 +1857,8 @@ var TravertureSidebarView = class extends import_obsidian4.ItemView {
     capsCb.checked = this.capitalize;
     capsCb.addEventListener("change", () => {
       this.capitalize = capsCb.checked;
+      this.plugin.settings.sidebarCapitalize = this.capitalize;
+      void this.plugin.saveSettings();
       this.render();
     });
     capsLabel.createSpan({ text: "CAPS" });
@@ -1859,6 +1867,8 @@ var TravertureSidebarView = class extends import_obsidian4.ItemView {
     uniqueCb.checked = this.uniqueOnly;
     uniqueCb.addEventListener("change", () => {
       this.uniqueOnly = uniqueCb.checked;
+      this.plugin.settings.sidebarUniqueOnly = this.uniqueOnly;
+      void this.plugin.saveSettings();
       this.render();
     });
     uniqueLabel.createSpan({ text: "UNIQUE" });
@@ -1878,11 +1888,15 @@ ${body}`);
     const allBtn = colRow.createEl("button", { text: "ALL", cls: "traverture-sidebar-col-btn" });
     allBtn.addEventListener("click", () => {
       this.visibleColumns = new Set(SIDEBAR_COLUMNS.map((c) => c.key));
+      this.plugin.settings.sidebarColumns = [...this.visibleColumns];
+      void this.plugin.saveSettings();
       this.render();
     });
     const listBtn = colRow.createEl("button", { text: "REFS", cls: "traverture-sidebar-col-btn" });
     listBtn.addEventListener("click", () => {
       this.visibleColumns = /* @__PURE__ */ new Set(["scripture", "fullRef", "standardRef", "officialRef"]);
+      this.plugin.settings.sidebarColumns = [...this.visibleColumns];
+      void this.plugin.saveSettings();
       this.render();
     });
     for (const col of SIDEBAR_COLUMNS) {
@@ -1900,6 +1914,8 @@ ${body}`);
           }
           this.visibleColumns.delete(col.key);
         }
+        this.plugin.settings.sidebarColumns = [...this.visibleColumns];
+        void this.plugin.saveSettings();
         this.render();
       });
       label.createSpan({ text: col.label });
@@ -1971,7 +1987,6 @@ ${body}`);
       const len = this.searchInputEl.value.length;
       this.searchInputEl.setSelectionRange(len, len);
     }
-    this.app.workspace.requestSaveLayout();
   }
 };
 
