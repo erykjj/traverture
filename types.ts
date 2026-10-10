@@ -7,6 +7,9 @@ export interface TravertureSettings {
     titleFormat: 'full' | 'standard' | 'official';
     linkColor: string;
     scriptureDisplay: 'modal' | 'sidebar';
+    sidebarColumns: string[];
+    sidebarCapitalize: boolean;
+    sidebarUniqueOnly: boolean;
 }
 
 export const DEFAULT_SETTINGS: TravertureSettings = {
@@ -16,6 +19,12 @@ export const DEFAULT_SETTINGS: TravertureSettings = {
     titleFormat: 'full',
     linkColor: '',
     scriptureDisplay: 'modal',
+    sidebarColumns: [
+        'scripture', 'fullRef', 'standardRef', 'officialRef',
+        'startBcv', 'endBcv', 'startCh', 'endCh', 'startVerse', 'endVerse',
+    ],
+    sidebarCapitalize: false,
+    sidebarUniqueOnly: false,
 };
 
 export interface LanguageInfo {

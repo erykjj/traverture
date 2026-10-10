@@ -48,6 +48,9 @@ export class TravertureSidebarView extends ItemView {
         super(leaf);
         this.plugin = plugin;
         this.outputLang = plugin.settings.outputLanguage;
+        this.visibleColumns = new Set(plugin.settings.sidebarColumns);
+        this.capitalize = plugin.settings.sidebarCapitalize;
+        this.uniqueOnly = plugin.settings.sidebarUniqueOnly;
     }
 
     getViewType(): string { return VIEW_TYPE_TRAVERTURE_SIDEBAR; }
@@ -77,39 +80,25 @@ export class TravertureSidebarView extends ItemView {
     async setState(state: Record<string, unknown>, _result: ViewStateResult): Promise<void> {
         const restoringAtStartup = !this.plugin.sessionRestored;
 
-        if (state) {
-            // Configuration is always restored — it's user preference, not content.
-            if (typeof state.outputLang === 'string') this.outputLang = state.outputLang;
-            if (typeof state.capitalize === 'boolean') this.capitalize = state.capitalize;
-            if (typeof state.uniqueOnly === 'boolean') this.uniqueOnly = state.uniqueOnly;
-            if (Array.isArray(state.visibleColumns)) {
-                this.visibleColumns = new Set(state.visibleColumns as string[]);
-            }
-
-            // Content is restored only if this isn't a startup restore.
-            if (!restoringAtStartup) {
-                if (state.mode === 'table' || state.mode === 'scripture') this.mode = state.mode;
-                if (Array.isArray(state.allRefs)) this.allRefs = state.allRefs as SidebarRef[];
-                if (typeof state.searchQuery === 'string') this.searchQuery = state.searchQuery;
-                if (typeof state.sortColumn === 'string' || state.sortColumn === null) this.sortColumn = state.sortColumn as string | null;
-                if (typeof state.sortDir === 'number') this.sortDir = state.sortDir;
-                if (typeof state.scriptureBcv === 'string') this.scriptureBcv = state.scriptureBcv;
-                if (typeof state.scriptureDisplayText === 'string') this.scriptureDisplayText = state.scriptureDisplayText;
-                if (typeof state.scriptureTimecodes === 'string') this.scriptureTimecodes = state.scriptureTimecodes;
-            }
+        if (state && !restoringAtStartup) {
+            if (state.mode === 'table' || state.mode === 'scripture') this.mode = state.mode;
+            if (Array.isArray(state.allRefs)) this.allRefs = state.allRefs as SidebarRef[];
+            if (typeof state.searchQuery === 'string') this.searchQuery = state.searchQuery;
+            if (typeof state.sortColumn === 'string' || state.sortColumn === null) this.sortColumn = state.sortColumn as string | null;
+            if (typeof state.sortDir === 'number') this.sortDir = state.sortDir;
+            if (typeof state.scriptureBcv === 'string') this.scriptureBcv = state.scriptureBcv;
+            if (typeof state.scriptureDisplayText === 'string') this.scriptureDisplayText = state.scriptureDisplayText;
+            if (typeof state.scriptureTimecodes === 'string') this.scriptureTimecodes = state.scriptureTimecodes;
         }
 
         await super.setState(state, _result);
 
-        // Refresh after restore if the view is already mounted.
         if (this.contentEl.isConnected) {
             if (this.mode === 'scripture') {
                 this.renderScripture();
             } else if (this.allRefs.length > 0) {
                 this.render();
             } else {
-                // Blank sidebar. No "No references found" message —
-                // that message is reserved for an actual empty parse result.
                 this.contentEl.empty();
                 this.contentEl.addClass('traverture-sidebar');
             }
@@ -120,10 +109,6 @@ export class TravertureSidebarView extends ItemView {
         const state = super.getState();
         return {
             ...state,
-            outputLang: this.outputLang,
-            capitalize: this.capitalize,
-            uniqueOnly: this.uniqueOnly,
-            visibleColumns: [...this.visibleColumns],
             mode: this.mode,
             allRefs: this.allRefs,
             searchQuery: this.searchQuery,
@@ -289,13 +274,23 @@ export class TravertureSidebarView extends ItemView {
         const capsLabel = topRow.createEl('label', { cls: 'traverture-sidebar-caps-label' });
         const capsCb = capsLabel.createEl('input', { type: 'checkbox' });
         capsCb.checked = this.capitalize;
-        capsCb.addEventListener('change', () => { this.capitalize = capsCb.checked; this.render(); });
+        capsCb.addEventListener('change', () => {
+            this.capitalize = capsCb.checked;
+            this.plugin.settings.sidebarCapitalize = this.capitalize;
+            void this.plugin.saveSettings();
+            this.render();
+        });
         capsLabel.createSpan({ text: 'CAPS' });
 
         const uniqueLabel = topRow.createEl('label', { cls: 'traverture-sidebar-caps-label' });
         const uniqueCb = uniqueLabel.createEl('input', { type: 'checkbox' });
         uniqueCb.checked = this.uniqueOnly;
-        uniqueCb.addEventListener('change', () => { this.uniqueOnly = uniqueCb.checked; this.render(); });
+        uniqueCb.addEventListener('change', () => {
+            this.uniqueOnly = uniqueCb.checked;
+            this.plugin.settings.sidebarUniqueOnly = this.uniqueOnly;
+            void this.plugin.saveSettings();
+            this.render();
+        });
         uniqueLabel.createSpan({ text: 'UNIQUE' });
 
         const copyBtn = topRow.createEl('button', { text: 'COPY', cls: 'traverture-sidebar-copy-btn' });
@@ -311,10 +306,20 @@ export class TravertureSidebarView extends ItemView {
         colRow.createSpan({ text: 'Columns:', cls: 'traverture-sidebar-col-label' });
 
         const allBtn = colRow.createEl('button', { text: 'ALL', cls: 'traverture-sidebar-col-btn' });
-        allBtn.addEventListener('click', () => { this.visibleColumns = new Set(SIDEBAR_COLUMNS.map(c => c.key)); this.render(); });
+        allBtn.addEventListener('click', () => {
+            this.visibleColumns = new Set(SIDEBAR_COLUMNS.map(c => c.key));
+            this.plugin.settings.sidebarColumns = [...this.visibleColumns];
+            void this.plugin.saveSettings();
+            this.render();
+        });
 
         const listBtn = colRow.createEl('button', { text: 'REFS', cls: 'traverture-sidebar-col-btn' });
-        listBtn.addEventListener('click', () => { this.visibleColumns = new Set(['scripture', 'fullRef', 'standardRef', 'officialRef']); this.render(); });
+        listBtn.addEventListener('click', () => {
+            this.visibleColumns = new Set(['scripture', 'fullRef', 'standardRef', 'officialRef']);
+            this.plugin.settings.sidebarColumns = [...this.visibleColumns];
+            void this.plugin.saveSettings();
+            this.render();
+        });
 
         for (const col of SIDEBAR_COLUMNS) {
             const label = colRow.createEl('label', { cls: 'traverture-sidebar-col-toggle' });
@@ -331,6 +336,8 @@ export class TravertureSidebarView extends ItemView {
                     }
                     this.visibleColumns.delete(col.key);
                 }
+                this.plugin.settings.sidebarColumns = [...this.visibleColumns];
+                void this.plugin.saveSettings();
                 this.render();
             });
             label.createSpan({ text: col.label });
