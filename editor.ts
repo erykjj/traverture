@@ -2,9 +2,7 @@
 
 import { ViewPlugin, EditorView, Decoration, DecorationSet, ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
-import { decodeScriptures, getLangSymbol } from './engine-wrapper';
-import { fetchVerseWithExtras, getAslTimecodes } from './cache';
-import { VerseModal } from './modal';
+import { buildJwLibraryUrl, resolveClickContext } from './common';
 import { ParsedReference } from './types';
 import type TraverturePlugin from './main';
 
@@ -163,35 +161,25 @@ export function createTravertureEditorPlugin(plugin: TraverturePlugin) {
                     if (pos === null) return;
                     const bcvs = (plugin as unknown as { _editBcvs: BcvEntry[] })._editBcvs;
                     const entry = bcvs?.find((b: BcvEntry) => pos > b.from && pos < b.to);
-                    if (entry) {
-                        if (e.ctrlKey || e.metaKey) {
-                            const langSymbol = getLangSymbol(plugin.settings.outputLanguage);
-                            window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${entry.bcv}`, '_blank');
-                            return;
-                        }
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void showModal(plugin, entry.bcv);
+                    if (!entry) return;
+
+                    if (e.ctrlKey || e.metaKey) {
+                        window.open(buildJwLibraryUrl(entry.bcv, plugin.settings.outputLanguage), '_blank');
+                        return;
                     }
+
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void showScripture(plugin, entry.bcv);
                 }
             }
         }
     );
 }
 
-async function showModal(plugin: TraverturePlugin, bcv: string): Promise<void> {
-    const parts = bcv.split('-');
-    const startBcv = parts[0];
-    const endBcv = parts.length > 1 ? parts[1] : parts[0];
-    const decoded = decodeScriptures([[startBcv, endBcv]], plugin.settings.outputLanguage, plugin.settings.titleFormat);
-    const displayText = decoded?.[0] || bcv;
-    const timecodes = plugin.settings.outputLanguage === 'ase' 
-        ? await getAslTimecodes(bcv) 
-        : undefined;
-    const modal = new VerseModal();
-    modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText, timecodes);
-    void fetchVerseWithExtras(bcv, plugin.settings.outputLanguage, modal.getSignal()).then(verseData => {
-        if (!modal.isVisible()) return;
-        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayText }, bcv, plugin.settings.outputLanguage, displayText, timecodes);
-    });
+async function showScripture(plugin: TraverturePlugin, bcv: string): Promise<void> {
+    const { refText, timecodes } = await resolveClickContext(
+        bcv, plugin.settings.outputLanguage, plugin.settings.titleFormat,
+    );
+    await plugin.showScripture(bcv, refText, timecodes);
 }

@@ -1,9 +1,11 @@
 // sidebar.ts
 
 import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
-import { getAvailableLanguagesCached as getAvailableLanguages, getBookName, getLangSymbol } from './engine-wrapper';
+import { getAvailableLanguagesCached as getAvailableLanguages, getBookName } from './engine-wrapper';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
+import { buildJwLibraryUrl } from './common';
 import { VerseModal } from './modal';
+import { ScripturePane } from './scripture-pane';
 import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR, NameFormat } from './types';
 import type TraverturePlugin from './main';
 
@@ -23,8 +25,11 @@ export const SIDEBAR_COLUMNS = [
 type SidebarColumn = typeof SIDEBAR_COLUMNS[number];
 type SidebarColumnKey = SidebarColumn['key'];
 
+type SidebarMode = 'table' | 'scripture';
+
 export class TravertureSidebarView extends ItemView {
     plugin: TraverturePlugin;
+    private mode: SidebarMode = 'table';
     private allRefs: SidebarRef[] = [];
     private searchQuery: string = '';
     private sortColumn: string | null = null;
@@ -34,6 +39,10 @@ export class TravertureSidebarView extends ItemView {
     private outputLang: string;
     private capitalize: boolean = false;
     private uniqueOnly: boolean = false;
+    private scriptureBcv: string = '';
+    private scriptureDisplayText: string = '';
+    private scriptureTimecodes: string | undefined;
+    private scripturePane: ScripturePane | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: TraverturePlugin) {
         super(leaf);
@@ -45,25 +54,132 @@ export class TravertureSidebarView extends ItemView {
     getDisplayText(): string { return 'tra.VER:ture References'; }
     getIcon(): string { return 'book-open'; }
 
-    async onOpen() { this.contentEl.empty(); this.contentEl.addClass('traverture-sidebar'); }
-    async onClose() { this.contentEl.empty(); }
+    async onOpen() {
+        this.contentEl.empty();
+        this.contentEl.addClass('traverture-sidebar');
+        if (this.mode === 'scripture') {
+            this.renderScripture();
+        } else if (this.allRefs.length > 0) {
+            this.render();
+        }
+    }
+
+    async onClose() {
+        this.contentEl.empty();
+        this.scripturePane = null;
+        this.mode = 'table';
+        this.allRefs = [];
+        this.scriptureBcv = '';
+        this.scriptureDisplayText = '';
+        this.scriptureTimecodes = undefined;
+    }
 
     async setState(state: Record<string, unknown>, _result: ViewStateResult): Promise<void> {
+        const restoringAtStartup = !this.plugin.sessionRestored;
+
         if (state) {
+            // Configuration is always restored — it's user preference, not content.
             if (typeof state.outputLang === 'string') this.outputLang = state.outputLang;
             if (typeof state.capitalize === 'boolean') this.capitalize = state.capitalize;
             if (typeof state.uniqueOnly === 'boolean') this.uniqueOnly = state.uniqueOnly;
             if (Array.isArray(state.visibleColumns)) {
                 this.visibleColumns = new Set(state.visibleColumns as string[]);
             }
+
+            // Content is restored only if this isn't a startup restore.
+            if (!restoringAtStartup) {
+                if (state.mode === 'table' || state.mode === 'scripture') this.mode = state.mode;
+                if (Array.isArray(state.allRefs)) this.allRefs = state.allRefs as SidebarRef[];
+                if (typeof state.searchQuery === 'string') this.searchQuery = state.searchQuery;
+                if (typeof state.sortColumn === 'string' || state.sortColumn === null) this.sortColumn = state.sortColumn as string | null;
+                if (typeof state.sortDir === 'number') this.sortDir = state.sortDir;
+                if (typeof state.scriptureBcv === 'string') this.scriptureBcv = state.scriptureBcv;
+                if (typeof state.scriptureDisplayText === 'string') this.scriptureDisplayText = state.scriptureDisplayText;
+                if (typeof state.scriptureTimecodes === 'string') this.scriptureTimecodes = state.scriptureTimecodes;
+            }
         }
+
         await super.setState(state, _result);
+
+        // Refresh after restore if the view is already mounted.
+        if (this.contentEl.isConnected) {
+            if (this.mode === 'scripture') {
+                this.renderScripture();
+            } else if (this.allRefs.length > 0) {
+                this.render();
+            } else {
+                // Blank sidebar. No "No references found" message —
+                // that message is reserved for an actual empty parse result.
+                this.contentEl.empty();
+                this.contentEl.addClass('traverture-sidebar');
+            }
+        }
     }
 
     getState(): Record<string, unknown> {
         const state = super.getState();
-        return { ...state, outputLang: this.outputLang, capitalize: this.capitalize, uniqueOnly: this.uniqueOnly, visibleColumns: [...this.visibleColumns] };
+        return {
+            ...state,
+            outputLang: this.outputLang,
+            capitalize: this.capitalize,
+            uniqueOnly: this.uniqueOnly,
+            visibleColumns: [...this.visibleColumns],
+            mode: this.mode,
+            allRefs: this.allRefs,
+            searchQuery: this.searchQuery,
+            sortColumn: this.sortColumn,
+            sortDir: this.sortDir,
+            scriptureBcv: this.scriptureBcv,
+            scriptureDisplayText: this.scriptureDisplayText,
+            scriptureTimecodes: this.scriptureTimecodes,
+        };
     }
+
+    // ──────────────────────────────────────────────
+    // Public entry points
+    // ──────────────────────────────────────────────
+
+    async displayResults(refs: SidebarRef[]) {
+        this.mode = 'table';
+        this.allRefs = refs;
+        this.sortColumn = null;
+        this.sortDir = 0;
+        this.scriptureBcv = '';
+        this.scriptureDisplayText = '';
+        this.scriptureTimecodes = undefined;
+        this.scripturePane = null;
+        this.render();
+    }
+
+    async displayScripture(bcv: string, displayText: string, timecodes?: string): Promise<void> {
+        this.mode = 'scripture';
+        this.scriptureBcv = bcv;
+        this.scriptureDisplayText = displayText;
+        this.scriptureTimecodes = timecodes;
+        this.scripturePane = null;
+        this.renderScripture();
+    }
+
+    isEmpty(): boolean {
+        return this.mode === 'table' && this.allRefs.length === 0 && !this.scriptureBcv;
+    }
+
+    // ──────────────────────────────────────────────
+    // Scripture rendering
+    // ──────────────────────────────────────────────
+
+    private renderScripture(): void {
+        this.contentEl.empty();
+        this.contentEl.addClass('traverture-sidebar');
+
+        const pane = new ScripturePane(this.contentEl, this.plugin);
+        this.scripturePane = pane;
+        void pane.render(this.scriptureBcv, this.scriptureDisplayText, this.scriptureTimecodes);
+    }
+
+    // ──────────────────────────────────────────────
+    // Empty state
+    // ──────────────────────────────────────────────
 
     private renderEmpty(message: string) {
         this.contentEl.empty();
@@ -71,12 +187,9 @@ export class TravertureSidebarView extends ItemView {
         this.contentEl.createEl('p', { text: message, cls: 'traverture-sidebar-empty' });
     }
 
-    async displayResults(refs: SidebarRef[]) {
-        this.allRefs = refs;
-        this.sortColumn = null;
-        this.sortDir = 0;
-        this.render();
-    }
+    // ──────────────────────────────────────────────
+    // Table helpers
+    // ──────────────────────────────────────────────
 
     private normalizeForSearch(text: string): string {
         return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '').toLowerCase();
@@ -127,7 +240,12 @@ export class TravertureSidebarView extends ItemView {
         return refs;
     }
 
+    // ──────────────────────────────────────────────
+    // Table rendering
+    // ──────────────────────────────────────────────
+
     render() {
+        this.mode = 'table';
         const wasFocused = this.searchInputEl && activeDocument.activeElement === this.searchInputEl;
         this.contentEl.empty();
         this.contentEl.addClass('traverture-sidebar');
@@ -160,7 +278,7 @@ export class TravertureSidebarView extends ItemView {
             opt.value = lang.code;
             if (lang.code === this.outputLang) opt.selected = true;
         }
-        langSelect.addEventListener('change', () => { 
+        langSelect.addEventListener('change', () => {
             this.outputLang = langSelect.value;
             this.plugin.settings.outputLanguage = langSelect.value;
             void this.plugin.saveSettings();
@@ -253,15 +371,13 @@ export class TravertureSidebarView extends ItemView {
                     link.setAttribute('data-ref', displayVal);
                     link.addEventListener('click', (e) => { void (async () => {
                         if (e.button !== 0) return;
+                        e.preventDefault(); e.stopPropagation();
                         if (e.ctrlKey || e.metaKey) {
-                            const langSymbol = getLangSymbol(this.outputLang);
-                            window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`, '_blank');
+                            window.open(buildJwLibraryUrl(bcv, this.outputLang), '_blank');
                             return;
                         }
-                        e.preventDefault(); e.stopPropagation();
-                        const timecodes = this.outputLang === 'ase' 
-                            ? await getAslTimecodes(bcv) 
-                            : undefined;
+                        const timecodes = this.outputLang === 'ase' ? await getAslTimecodes(bcv) : undefined;
+                        // Table clicks always use the modal, regardless of scriptureDisplay setting.
                         const modal = new VerseModal();
                         modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal, timecodes);
                         const verseData = await fetchVerseWithExtras(bcv, this.outputLang, modal.getSignal());

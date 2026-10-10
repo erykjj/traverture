@@ -2,8 +2,9 @@
 
 import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, MenuItem, TFile, TAbstractFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
-import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, getLangSymbol, createMainEngine, parseFrontmatterLanguage } from './engine-wrapper';
-import { fetchVerseWithExtras, getAslTimecodes } from './cache';
+import { fetchVerseWithExtras } from './cache';
+import { buildJwLibraryUrl, resolveClickContext } from './common';
+import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, createMainEngine, parseFrontmatterLanguage } from './engine-wrapper';
 import { createTravertureEditorPlugin } from './editor';
 import { VerseModal } from './modal';
 import { TravertureSettingTab } from './settings';
@@ -22,6 +23,7 @@ export default class TraverturePlugin extends Plugin {
     private sourceLangInFlight = new Map<string, Promise<string>>();
     private processedLangCache = new Map<string, string>();
     public editorRefreshGeneration = 0;
+    public sessionRestored = false;
 
     async loadSettings() { 
         const savedData = await this.loadData() as Partial<TravertureSettings> | null;
@@ -289,6 +291,40 @@ export default class TraverturePlugin extends Plugin {
         void (leaf.view as TravertureSidebarView).displayResults(refs);
     }
 
+    async showScripture(bcv: string, displayText: string, timecodes?: string): Promise<void> {
+        if (this.settings.scriptureDisplay === 'sidebar') {
+            const { workspace } = this.app;
+            const leaves = workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
+            let leaf: WorkspaceLeaf | null = leaves[0] ?? null;
+
+            if (!leaf) {
+                leaf = workspace.getRightLeaf(false);
+                if (!leaf) {
+                    this.showScriptureModal(bcv, displayText, timecodes);
+                    return;
+                }
+                await leaf.setViewState({ type: VIEW_TYPE_TRAVERTURE_SIDEBAR, active: true });
+            }
+
+            await leaf.loadIfDeferred();
+            void workspace.revealLeaf(leaf);
+            const view = leaf.view as TravertureSidebarView;
+            void view.displayScripture(bcv, displayText, timecodes);
+            return;
+        }
+
+        this.showScriptureModal(bcv, displayText, timecodes);
+    }
+
+    private showScriptureModal(bcv: string, displayText: string, timecodes?: string): void {
+        const modal = new VerseModal();
+        modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayText }, bcv, this.settings.outputLanguage, displayText, timecodes);
+        void fetchVerseWithExtras(bcv, this.settings.outputLanguage, modal.getSignal()).then(verseData => {
+            if (!modal.isVisible()) return;
+            modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayText }, bcv, this.settings.outputLanguage, displayText, timecodes);
+        });
+    }
+
     // ──────────────────────────────────────────────
     // Reading View post-processor
     // ──────────────────────────────────────────────
@@ -405,21 +441,14 @@ export default class TraverturePlugin extends Plugin {
                 if ((e as MouseEvent).button !== 0) return;
                 const bcv = link.getAttribute('data-bcv')!;
                 if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
-                    const langSymbol = getLangSymbol(this.settings.outputLanguage);
-                    window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`, '_blank');
+                    window.open(buildJwLibraryUrl(bcv, this.settings.outputLanguage), '_blank');
                     return;
                 }
                 e.preventDefault(); e.stopPropagation();
-                const decoded = decodeScriptures([[bcv, bcv]], this.settings.outputLanguage, this.settings.titleFormat);
-                const refText = decoded?.[0] || link.textContent || '';
-                const timecodes = this.settings.outputLanguage === 'ase'
-                    ? await getAslTimecodes(bcv)
-                    : undefined;
-                const modal = new VerseModal();
-                modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText, timecodes);
-                const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage, modal.getSignal());
-                if (!modal.isVisible()) return;
-                modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText, timecodes);
+                const { refText, timecodes } = await resolveClickContext(
+                    bcv, this.settings.outputLanguage, this.settings.titleFormat, link.textContent || undefined,
+                );
+                await this.showScripture(bcv, refText, timecodes);
             })(); });
         });
 
@@ -858,6 +887,20 @@ export default class TraverturePlugin extends Plugin {
                 });
             });
             menu.showAtMouseEvent(evt);
+        });
+
+        this.app.workspace.onLayoutReady(() => {
+            this.sessionRestored = true;
+
+            // Close any sidebar leaf restored from a previous session that came back
+            // empty (its content was suppressed by the startup-restore flag).
+            const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
+            for (const leaf of leaves) {
+                const view = leaf.view as TravertureSidebarView;
+                if (view.isEmpty()) {
+                    leaf.detach();
+                }
+            }
         });
 
         this.addRibbonIcon('scroll', 'tra.VER:ture', () => {

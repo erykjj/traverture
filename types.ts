@@ -6,6 +6,7 @@ export interface TravertureSettings {
     autoDetect: boolean;
     titleFormat: 'full' | 'standard' | 'official';
     linkColor: string;
+    scriptureDisplay: 'modal' | 'sidebar';
 }
 
 export const DEFAULT_SETTINGS: TravertureSettings = {
@@ -14,6 +15,7 @@ export const DEFAULT_SETTINGS: TravertureSettings = {
     autoDetect: true,
     titleFormat: 'full',
     linkColor: '',
+    scriptureDisplay: 'modal',
 };
 
 export interface LanguageInfo {
