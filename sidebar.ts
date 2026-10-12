@@ -92,7 +92,7 @@ export class TravertureSidebarView extends ItemView {
             if (state.mode === 'table' || state.mode === 'scripture') this.mode = state.mode;
             if (Array.isArray(state.allRefs)) this.allRefs = state.allRefs as SidebarRef[];
             if (typeof state.searchQuery === 'string') this.searchQuery = state.searchQuery;
-            if (typeof state.sortColumn === 'string' || state.sortColumn === null) this.sortColumn = state.sortColumn as string | null;
+            if (typeof state.sortColumn === 'string' || state.sortColumn === null) this.sortColumn = state.sortColumn;
             if (typeof state.sortDir === 'number') this.sortDir = state.sortDir;
             if (Array.isArray(state.history)) this.history = state.history as NavView[];
             if (typeof state.historyIndex === 'number') this.historyIndex = state.historyIndex;
@@ -246,7 +246,8 @@ export class TravertureSidebarView extends ItemView {
         container.addClass('traverture-scripture-pane');
 
         const loading = container.createDiv({ cls: 'traverture-pane-body' });
-        loading.innerHTML = '<p><em>Loading...</em></p>';
+        const p = loading.createEl('p');
+        p.createEl('em', { text: 'Loading...' });
 
         const signal = this.scriptureAbort.signal;
 

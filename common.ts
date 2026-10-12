@@ -219,7 +219,7 @@ function relinkAndAppend(
     onNavigate: NavigateCallback,
 ): void {
     source.querySelectorAll('a').forEach(anchor => {
-        const el = anchor as HTMLAnchorElement;
+        const el = anchor;
         const targetVerses = el.getAttribute('data-targetverses');
 
         if (!targetVerses) {
