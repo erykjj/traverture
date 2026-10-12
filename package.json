@@ -1,7 +1,7 @@
 {
   "name": "traverture",
-  "version": "5.1.1",
-  "description": "Parse, convert, and preview scripture references; insert citations from NWT Bible, and launch in JW Library and JW.ORG.",
+  "version": "6.1.0",
+  "description": "Parse and convert scripture references, view Bible text and study notes from the NWT, insert citations, and open in JW Library or JW.ORG.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
