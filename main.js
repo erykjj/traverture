@@ -1674,7 +1674,8 @@ var TravertureSidebarView = class extends import_obsidian4.ItemView {
     container.empty();
     container.addClass("traverture-scripture-pane");
     const loading = container.createDiv({ cls: "traverture-pane-body" });
-    loading.innerHTML = "<p><em>Loading...</em></p>";
+    const p = loading.createEl("p");
+    p.createEl("em", { text: "Loading..." });
     const signal = this.scriptureAbort.signal;
     void fetchVerseWithExtras(view.bcv, this.outputLang, signal).then((verseData) => {
       if (signal.aborted) return;
