@@ -1,11 +1,11 @@
 // sidebar.ts
 
-import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
-import { getAvailableLanguagesCached as getAvailableLanguages, getBookName, getLangSymbol } from './engine-wrapper';
+import { ItemView, WorkspaceLeaf, ViewStateResult, setIcon } from 'obsidian';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
-import { VerseModal } from './modal';
-import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR, NameFormat } from './types';
+import { buildJwLibraryUrl, buildJwOrgUrl, buildVerseBody, buildCopyText, buildCommentaryPane, attachMarkerTooltips } from './common';
+import { getAvailableLanguagesCached as getAvailableLanguages, getBookName, decodeScriptures } from './engine-wrapper';
 import type TraverturePlugin from './main';
+import { SidebarRef, VIEW_TYPE_TRAVERTURE_SIDEBAR, NameFormat, VerseData } from './types';
 
 export const SIDEBAR_COLUMNS = [
     { key: 'scripture', label: 'Original', width: '140px', align: 'left', mono: false },
@@ -23,8 +23,24 @@ export const SIDEBAR_COLUMNS = [
 type SidebarColumn = typeof SIDEBAR_COLUMNS[number];
 type SidebarColumnKey = SidebarColumn['key'];
 
+type SidebarMode = 'table' | 'scripture';
+
+interface ScriptureView {
+    kind: 'scripture';
+    bcv: string;
+    displayText: string;
+    timecodes?: string;
+}
+
+interface TableView {
+    kind: 'table';
+}
+
+type NavView = ScriptureView | TableView;
+
 export class TravertureSidebarView extends ItemView {
     plugin: TraverturePlugin;
+    private mode: SidebarMode = 'table';
     private allRefs: SidebarRef[] = [];
     private searchQuery: string = '';
     private sortColumn: string | null = null;
@@ -34,48 +50,283 @@ export class TravertureSidebarView extends ItemView {
     private outputLang: string;
     private capitalize: boolean = false;
     private uniqueOnly: boolean = false;
+    private history: NavView[] = [];
+    private historyIndex: number = -1;
+    private scriptureAbort: AbortController | null = null;
+    private scriptureVerseData: VerseData | null = null;
+    private scriptureBcv: string = '';
+    private scriptureDisplayText: string = '';
 
     constructor(leaf: WorkspaceLeaf, plugin: TraverturePlugin) {
         super(leaf);
         this.plugin = plugin;
         this.outputLang = plugin.settings.outputLanguage;
+        this.visibleColumns = new Set(plugin.settings.sidebarColumns);
+        this.capitalize = plugin.settings.sidebarCapitalize;
+        this.uniqueOnly = plugin.settings.sidebarUniqueOnly;
     }
 
     getViewType(): string { return VIEW_TYPE_TRAVERTURE_SIDEBAR; }
     getDisplayText(): string { return 'tra.VER:ture References'; }
     getIcon(): string { return 'book-open'; }
 
-    async onOpen() { this.contentEl.empty(); this.contentEl.addClass('traverture-sidebar'); }
-    async onClose() { this.contentEl.empty(); }
+    async onOpen() {
+        this.contentEl.empty();
+        this.contentEl.addClass('traverture-sidebar');
+        this.renderCurrentView();
+    }
+
+    async onClose() {
+        this.abortScriptureFetch();
+        this.contentEl.empty();
+        this.mode = 'table';
+        this.allRefs = [];
+        this.history = [];
+        this.historyIndex = -1;
+    }
 
     async setState(state: Record<string, unknown>, _result: ViewStateResult): Promise<void> {
-        if (state) {
-            if (typeof state.outputLang === 'string') this.outputLang = state.outputLang;
-            if (typeof state.capitalize === 'boolean') this.capitalize = state.capitalize;
-            if (typeof state.uniqueOnly === 'boolean') this.uniqueOnly = state.uniqueOnly;
-            if (Array.isArray(state.visibleColumns)) {
-                this.visibleColumns = new Set(state.visibleColumns as string[]);
-            }
+        const restoringAtStartup = !this.plugin.sessionRestored;
+
+        if (state && !restoringAtStartup) {
+            if (state.mode === 'table' || state.mode === 'scripture') this.mode = state.mode;
+            if (Array.isArray(state.allRefs)) this.allRefs = state.allRefs as SidebarRef[];
+            if (typeof state.searchQuery === 'string') this.searchQuery = state.searchQuery;
+            if (typeof state.sortColumn === 'string' || state.sortColumn === null) this.sortColumn = state.sortColumn as string | null;
+            if (typeof state.sortDir === 'number') this.sortDir = state.sortDir;
+            if (Array.isArray(state.history)) this.history = state.history as NavView[];
+            if (typeof state.historyIndex === 'number') this.historyIndex = state.historyIndex;
         }
+
         await super.setState(state, _result);
+
+        if (this.contentEl.isConnected) {
+            this.renderCurrentView();
+        }
     }
 
     getState(): Record<string, unknown> {
         const state = super.getState();
-        return { ...state, outputLang: this.outputLang, capitalize: this.capitalize, uniqueOnly: this.uniqueOnly, visibleColumns: [...this.visibleColumns] };
+        return {
+            ...state,
+            mode: this.mode,
+            allRefs: this.allRefs,
+            searchQuery: this.searchQuery,
+            sortColumn: this.sortColumn,
+            sortDir: this.sortDir,
+            history: this.history,
+            historyIndex: this.historyIndex,
+        };
     }
 
-    private renderEmpty(message: string) {
-        this.contentEl.empty();
-        this.contentEl.addClass('traverture-sidebar');
-        this.contentEl.createEl('p', { text: message, cls: 'traverture-sidebar-empty' });
+    isEmpty(): boolean {
+        return this.history.length === 0 && this.allRefs.length === 0;
     }
 
     async displayResults(refs: SidebarRef[]) {
         this.allRefs = refs;
         this.sortColumn = null;
         this.sortDir = 0;
-        this.render();
+        this.abortScriptureFetch();
+        this.history = [{ kind: 'table' }];
+        this.historyIndex = 0;
+        this.mode = 'table';
+        this.renderCurrentView();
+    }
+
+    async displayScripture(
+        bcv: string,
+        displayText: string,
+        timecodes?: string,
+        titleOverride?: string,
+    ): Promise<void> {
+        let resolvedTimecodes = timecodes;
+        if (this.outputLang === 'ase' && !resolvedTimecodes) {
+            resolvedTimecodes = await getAslTimecodes(bcv);
+        }
+        let title = titleOverride;
+        if (!title) {
+            const parts = bcv.split('-');
+            const startBcv = parts[0];
+            const endBcv = parts.length > 1 ? parts[1] : parts[0];
+            const decoded = decodeScriptures([[startBcv, endBcv]], this.outputLang, this.plugin.settings.titleFormat);
+            title = decoded?.[0] || displayText;
+        }
+        this.pushView({ kind: 'scripture', bcv, displayText: title, timecodes: resolvedTimecodes });
+    }
+
+    private pushView(view: NavView): void {
+        this.history = this.history.slice(0, this.historyIndex + 1);
+        this.history.push(view);
+        this.historyIndex = this.history.length - 1;
+        this.renderCurrentView();
+    }
+
+    private canGoBack(): boolean { return this.historyIndex > 0; }
+    private canGoForward(): boolean { return this.historyIndex < this.history.length - 1; }
+
+    private goBack(): void {
+        if (!this.canGoBack()) return;
+        this.historyIndex--;
+        this.renderCurrentView();
+    }
+
+    private goForward(): void {
+        if (!this.canGoForward()) return;
+        this.historyIndex++;
+        this.renderCurrentView();
+    }
+
+    private currentView(): NavView | null {
+        if (this.historyIndex < 0 || this.historyIndex >= this.history.length) return null;
+        return this.history[this.historyIndex];
+    }
+
+    private handleNavigate = (bcv: string, displayText: string): void => {
+        void this.displayScripture(bcv, displayText);
+    };
+
+    private renderCurrentView(): void {
+        const view = this.currentView();
+        if (!view) {
+            this.abortScriptureFetch();
+            this.contentEl.empty();
+            this.contentEl.addClass('traverture-sidebar');
+            return;
+        }
+        if (view.kind === 'table') {
+            this.abortScriptureFetch();
+            this.renderTable();
+        } else {
+            this.renderScripture(view);
+        }
+    }
+
+    private renderScripture(view: ScriptureView): void {
+        this.abortScriptureFetch();
+        this.contentEl.empty();
+        this.contentEl.addClass('traverture-sidebar');
+
+        const header = this.contentEl.createDiv({ cls: 'traverture-scripture-header' });
+
+        const left = header.createDiv({ cls: 'traverture-scripture-header-left' });
+
+        left.createSpan({ cls: 'traverture-pane-title', text: view.displayText });
+
+        const nav = left.createDiv({ cls: 'traverture-scripture-nav' });
+        if (this.canGoBack()) {
+            const backBtn = nav.createEl('button', { cls: 'traverture-scripture-nav-btn' });
+            setIcon(backBtn, 'arrow-left');
+            backBtn.setAttribute('aria-label', 'Back');
+            backBtn.addEventListener('click', () => this.goBack());
+        }
+        if (this.canGoForward()) {
+            const fwdBtn = nav.createEl('button', { cls: 'traverture-scripture-nav-btn' });
+            setIcon(fwdBtn, 'arrow-right');
+            fwdBtn.setAttribute('aria-label', 'Forward');
+            fwdBtn.addEventListener('click', () => this.goForward());
+        }
+
+        const buttonGroup = header.createDiv({ cls: 'traverture-scripture-header-buttons' });
+        this.buildScriptureButtons(buttonGroup, view);
+
+        const bodyContainer = this.contentEl.createDiv({ cls: 'traverture-scripture-pane' });
+        this.renderScriptureContent(bodyContainer, view);
+    }
+
+    private renderScriptureContent(container: HTMLElement, view: ScriptureView): void {
+        this.abortScriptureFetch();
+        this.scriptureAbort = new AbortController();
+
+        this.scriptureBcv = view.bcv;
+        this.scriptureDisplayText = view.displayText;
+        this.scriptureVerseData = null;
+
+        container.empty();
+        container.addClass('traverture-scripture-pane');
+
+        const loading = container.createDiv({ cls: 'traverture-pane-body' });
+        loading.innerHTML = '<p><em>Loading...</em></p>';
+
+        const signal = this.scriptureAbort.signal;
+
+        void fetchVerseWithExtras(view.bcv, this.outputLang, signal).then(verseData => {
+            if (signal.aborted) return;
+            this.scriptureVerseData = verseData;
+            this.renderScriptureBody(container, verseData, view);
+        });
+    }
+
+    private renderScriptureBody(container: HTMLElement, verseData: VerseData | null, view: ScriptureView): void {
+        container.empty();
+        container.addClass('traverture-scripture-pane');
+
+        const body = buildVerseBody(verseData);
+        if (verseData) {
+            attachMarkerTooltips(body, verseData, this.outputLang, this.handleNavigate);
+        }
+        container.appendChild(body);
+
+        if (verseData?.commentaries && verseData.commentaries.length > 0) {
+            const pane = buildCommentaryPane(verseData.commentaries, this.outputLang, this.handleNavigate);
+            container.appendChild(pane);
+        }
+
+        this.scriptureBcv = view.bcv;
+        this.scriptureDisplayText = view.displayText;
+        this.scriptureVerseData = verseData;
+    }
+
+    private buildScriptureButtons(parent: HTMLElement, view: ScriptureView): void {
+        const jwlibUrl = buildJwLibraryUrl(view.bcv, this.outputLang, view.timecodes);
+        const jworgUrl = buildJwOrgUrl(view.bcv, this.outputLang, view.timecodes);
+
+        const jwlibBtn = this.createScriptureButton('JW Library');
+        jwlibBtn.addEventListener('click', () => {
+            window.open(jwlibUrl, '_blank');
+            void navigator.clipboard.writeText(jwlibUrl);
+        });
+        parent.appendChild(jwlibBtn);
+
+        const jworgBtn = this.createScriptureButton('JW.ORG');
+        jworgBtn.addEventListener('click', () => {
+            window.open(jworgUrl, '_blank');
+            void navigator.clipboard.writeText(jworgUrl);
+        });
+        parent.appendChild(jworgBtn);
+
+        const copyBtn = this.createScriptureButton('COPY');
+        copyBtn.addEventListener('click', () => {
+            void navigator.clipboard.writeText(
+                buildCopyText(this.scriptureVerseData, this.scriptureDisplayText),
+            );
+            copyBtn.textContent = 'COPIED';
+            window.setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
+        });
+        parent.appendChild(copyBtn);
+    }
+
+    private createScriptureButton(text: string): HTMLButtonElement {
+        const btn = createEl('button');
+        btn.className = 'traverture-pane-btn';
+        btn.textContent = text;
+        return btn;
+    }
+
+    private abortScriptureFetch(): void {
+        if (this.scriptureAbort) {
+            this.scriptureAbort.abort();
+            this.scriptureAbort = null;
+        }
+        this.scriptureVerseData = null;
+        this.scriptureBcv = '';
+        this.scriptureDisplayText = '';
+    }
+
+    private renderEmpty(message: string) {
+        this.contentEl.empty();
+        this.contentEl.addClass('traverture-sidebar');
+        this.contentEl.createEl('p', { text: message, cls: 'traverture-sidebar-empty' });
     }
 
     private normalizeForSearch(text: string): string {
@@ -87,7 +338,7 @@ export class TravertureSidebarView extends ItemView {
         if (!bookName) return ref.fullRef;
         const engBookName = getBookName(ref.bookNum, 'en', 'full', false);
         if (engBookName && ref.fullRef.startsWith(engBookName)) {
-            const rest = ref.fullRef.substring(engBookName.length); // " 3" or " 1:3"
+            const rest = ref.fullRef.substring(engBookName.length);
             return `${bookName}${rest}`;
         }
         return `${bookName}`;
@@ -127,7 +378,7 @@ export class TravertureSidebarView extends ItemView {
         return refs;
     }
 
-    render() {
+    private renderTable() {
         const wasFocused = this.searchInputEl && activeDocument.activeElement === this.searchInputEl;
         this.contentEl.empty();
         this.contentEl.addClass('traverture-sidebar');
@@ -135,7 +386,6 @@ export class TravertureSidebarView extends ItemView {
 
         const refs = this.getFilteredSortedRefs();
         const visibleCols = SIDEBAR_COLUMNS.filter(c => this.visibleColumns.has(c.key));
-        this.app.workspace.requestSaveLayout();
         const languages = getAvailableLanguages();
 
         const toolbar = this.contentEl.createDiv({ cls: 'traverture-sidebar-toolbar' });
@@ -144,11 +394,11 @@ export class TravertureSidebarView extends ItemView {
         const searchWrap = topRow.createDiv({ cls: 'traverture-sidebar-search-wrap' });
         this.searchInputEl = searchWrap.createEl('input', { type: 'text', placeholder: 'Search...', cls: 'traverture-sidebar-search' });
         this.searchInputEl.value = this.searchQuery;
-        this.searchInputEl.addEventListener('input', () => { this.searchQuery = this.searchInputEl!.value; this.render(); });
+        this.searchInputEl.addEventListener('input', () => { this.searchQuery = this.searchInputEl!.value; this.renderTable(); });
         if (this.searchQuery) {
             const clearX = searchWrap.createEl('button', { cls: 'traverture-sidebar-search-clear' });
             clearX.setText('\u2715');
-            clearX.addEventListener('click', () => { this.searchQuery = ''; this.render(); });
+            clearX.addEventListener('click', () => { this.searchQuery = ''; this.renderTable(); });
         }
 
         topRow.createSpan({ text: `${refs.length} results`, cls: 'traverture-sidebar-count' });
@@ -160,24 +410,34 @@ export class TravertureSidebarView extends ItemView {
             opt.value = lang.code;
             if (lang.code === this.outputLang) opt.selected = true;
         }
-        langSelect.addEventListener('change', () => { 
+        langSelect.addEventListener('change', () => {
             this.outputLang = langSelect.value;
             this.plugin.settings.outputLanguage = langSelect.value;
             void this.plugin.saveSettings();
             this.plugin.createEngine();
-            this.render();
+            this.renderTable();
         });
 
         const capsLabel = topRow.createEl('label', { cls: 'traverture-sidebar-caps-label' });
         const capsCb = capsLabel.createEl('input', { type: 'checkbox' });
         capsCb.checked = this.capitalize;
-        capsCb.addEventListener('change', () => { this.capitalize = capsCb.checked; this.render(); });
+        capsCb.addEventListener('change', () => {
+            this.capitalize = capsCb.checked;
+            this.plugin.settings.sidebarCapitalize = this.capitalize;
+            void this.plugin.saveSettings();
+            this.renderTable();
+        });
         capsLabel.createSpan({ text: 'CAPS' });
 
         const uniqueLabel = topRow.createEl('label', { cls: 'traverture-sidebar-caps-label' });
         const uniqueCb = uniqueLabel.createEl('input', { type: 'checkbox' });
         uniqueCb.checked = this.uniqueOnly;
-        uniqueCb.addEventListener('change', () => { this.uniqueOnly = uniqueCb.checked; this.render(); });
+        uniqueCb.addEventListener('change', () => {
+            this.uniqueOnly = uniqueCb.checked;
+            this.plugin.settings.sidebarUniqueOnly = this.uniqueOnly;
+            void this.plugin.saveSettings();
+            this.renderTable();
+        });
         uniqueLabel.createSpan({ text: 'UNIQUE' });
 
         const copyBtn = topRow.createEl('button', { text: 'COPY', cls: 'traverture-sidebar-copy-btn' });
@@ -193,10 +453,20 @@ export class TravertureSidebarView extends ItemView {
         colRow.createSpan({ text: 'Columns:', cls: 'traverture-sidebar-col-label' });
 
         const allBtn = colRow.createEl('button', { text: 'ALL', cls: 'traverture-sidebar-col-btn' });
-        allBtn.addEventListener('click', () => { this.visibleColumns = new Set(SIDEBAR_COLUMNS.map(c => c.key)); this.render(); });
+        allBtn.addEventListener('click', () => {
+            this.visibleColumns = new Set(SIDEBAR_COLUMNS.map(c => c.key));
+            this.plugin.settings.sidebarColumns = [...this.visibleColumns];
+            void this.plugin.saveSettings();
+            this.renderTable();
+        });
 
         const listBtn = colRow.createEl('button', { text: 'REFS', cls: 'traverture-sidebar-col-btn' });
-        listBtn.addEventListener('click', () => { this.visibleColumns = new Set(['scripture', 'fullRef', 'standardRef', 'officialRef']); this.render(); });
+        listBtn.addEventListener('click', () => {
+            this.visibleColumns = new Set(['scripture', 'fullRef', 'standardRef', 'officialRef']);
+            this.plugin.settings.sidebarColumns = [...this.visibleColumns];
+            void this.plugin.saveSettings();
+            this.renderTable();
+        });
 
         for (const col of SIDEBAR_COLUMNS) {
             const label = colRow.createEl('label', { cls: 'traverture-sidebar-col-toggle' });
@@ -213,7 +483,9 @@ export class TravertureSidebarView extends ItemView {
                     }
                     this.visibleColumns.delete(col.key);
                 }
-                this.render();
+                this.plugin.settings.sidebarColumns = [...this.visibleColumns];
+                void this.plugin.saveSettings();
+                this.renderTable();
             });
             label.createSpan({ text: col.label });
         }
@@ -235,7 +507,7 @@ export class TravertureSidebarView extends ItemView {
                     else if (this.sortDir === -1) { this.sortDir = 0; this.sortColumn = null; }
                     else this.sortDir = 1;
                 } else { this.sortColumn = col.key; this.sortDir = 1; }
-                this.render();
+                this.renderTable();
             });
         }
         const tbody = table.createEl('tbody');
@@ -253,20 +525,13 @@ export class TravertureSidebarView extends ItemView {
                     link.setAttribute('data-ref', displayVal);
                     link.addEventListener('click', (e) => { void (async () => {
                         if (e.button !== 0) return;
+                        e.preventDefault(); e.stopPropagation();
                         if (e.ctrlKey || e.metaKey) {
-                            const langSymbol = getLangSymbol(this.outputLang);
-                            window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`, '_blank');
+                            window.open(buildJwLibraryUrl(bcv, this.outputLang), '_blank');
                             return;
                         }
-                        e.preventDefault(); e.stopPropagation();
-                        const timecodes = this.outputLang === 'ase' 
-                            ? await getAslTimecodes(bcv) 
-                            : undefined;
-                        const modal = new VerseModal();
-                        modal.show({ html: `<p><em>Loading...</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal, timecodes);
-                        const verseData = await fetchVerseWithExtras(bcv, this.outputLang, modal.getSignal());
-                        if (!modal.isVisible()) return;
-                        modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: displayVal }, bcv, this.outputLang, displayVal, timecodes);
+                        const timecodes = this.outputLang === 'ase' ? await getAslTimecodes(bcv) : undefined;
+                        await this.displayScripture(bcv, displayVal, timecodes, displayVal);
                     })(); });
                 } else { td.setText(displayVal); }
             }

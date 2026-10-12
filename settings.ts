@@ -4,8 +4,6 @@ import { App, PluginSettingTab, SettingDefinitionItem } from 'obsidian';
 import { getEngineVersion, getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
 import TraverturePlugin from './main';
 
-/// Preset color choices for the "Link color" dropdown.
-/// The empty string means "use the theme's external link color".
 const LINK_COLOR_OPTIONS: Array<{ value: string; label: string }> = [
     { value: '',            label: 'Theme default' },
     { value: '#eab308',     label: 'Yellow' },
@@ -116,7 +114,7 @@ export class TravertureSettingTab extends PluginSettingTab {
                         },
                     },
                     {
-                        name: 'Modal title format',
+                        name: 'Title format',
                         desc: 'How scripture references are displayed in the modal title',
                         control: {
                             type: 'dropdown',

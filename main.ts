@@ -2,10 +2,10 @@
 
 import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, MenuItem, TFile, TAbstractFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
-import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, getLangSymbol, createMainEngine, parseFrontmatterLanguage } from './engine-wrapper';
-import { fetchVerseWithExtras, getAslTimecodes } from './cache';
+import { fetchVerseWithExtras } from './cache';
+import { buildJwLibraryUrl, resolveClickContext } from './common';
 import { createTravertureEditorPlugin } from './editor';
-import { VerseModal } from './modal';
+import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, createMainEngine, parseFrontmatterLanguage } from './engine-wrapper';
 import { TravertureSettingTab } from './settings';
 import { TravertureSidebarView } from './sidebar';
 import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef, TravertureEngineInstance, NameFormat, ParsedReference, TravertureSettings } from './types';
@@ -22,10 +22,11 @@ export default class TraverturePlugin extends Plugin {
     private sourceLangInFlight = new Map<string, Promise<string>>();
     private processedLangCache = new Map<string, string>();
     public editorRefreshGeneration = 0;
+    public sessionRestored = false;
 
-    async loadSettings() { 
+    async loadSettings() {
         const savedData = await this.loadData() as Partial<TravertureSettings> | null;
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData); 
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData);
     }
     async saveSettings() { await this.saveData(this.settings); }
 
@@ -160,11 +161,7 @@ export default class TraverturePlugin extends Plugin {
             void this.getSourceLanguageForPath(path).then((lang) => {
                 const lastLang = this.processedLangCache.get(path);
                 if (lastLang === lang) return;
-
-                // Optimistically mark as processed so layout-change events
-                // from the leaf rebuild below do not loop.
                 this.processedLangCache.set(path, lang);
-
                 void this.forceRerenderLeaf(leaf);
             });
         }
@@ -289,6 +286,22 @@ export default class TraverturePlugin extends Plugin {
         void (leaf.view as TravertureSidebarView).displayResults(refs);
     }
 
+    async showScripture(bcv: string, displayText: string, timecodes?: string): Promise<void> {
+        const { workspace } = this.app;
+        let leaves = workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
+        let leaf: WorkspaceLeaf;
+        if (leaves.length > 0) { leaf = leaves[0]; }
+        else {
+            const rightLeaf = workspace.getRightLeaf(false);
+            if (!rightLeaf) return;
+            await rightLeaf.setViewState({ type: VIEW_TYPE_TRAVERTURE_SIDEBAR, active: true });
+            leaf = rightLeaf;
+        }
+        await leaf.loadIfDeferred();
+        void workspace.revealLeaf(leaf);
+        void (leaf.view as TravertureSidebarView).displayScripture(bcv, displayText, timecodes);
+    }
+
     // ──────────────────────────────────────────────
     // Reading View post-processor
     // ──────────────────────────────────────────────
@@ -349,7 +362,6 @@ export default class TraverturePlugin extends Plugin {
             });
         }
 
-        // Auto-detect references in remaining text
         if (this.settings.autoDetect && this.engine) {
             const tempDiv = createDiv();
             const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
@@ -392,34 +404,25 @@ export default class TraverturePlugin extends Plugin {
             html = tempDiv.innerHTML;
         }
 
-        // Replace element content
         const parsed = new DOMParser().parseFromString(html, 'text/html');
         while (el.firstChild) el.removeChild(el.firstChild);
         for (const child of Array.from(parsed.body.childNodes)) {
             el.appendChild(child.cloneNode(true));
         }
 
-        // Re-attach click handlers
         el.querySelectorAll('.traverture-ref-link').forEach(link => {
             link.addEventListener('click', (e) => { void (async () => {
                 if ((e as MouseEvent).button !== 0) return;
                 const bcv = link.getAttribute('data-bcv')!;
                 if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
-                    const langSymbol = getLangSymbol(this.settings.outputLanguage);
-                    window.open(`jwlibrary:///finder?wtlocale=${langSymbol}&bible=${bcv}`, '_blank');
+                    window.open(buildJwLibraryUrl(bcv, this.settings.outputLanguage), '_blank');
                     return;
                 }
                 e.preventDefault(); e.stopPropagation();
-                const decoded = decodeScriptures([[bcv, bcv]], this.settings.outputLanguage, this.settings.titleFormat);
-                const refText = decoded?.[0] || link.textContent || '';
-                const timecodes = this.settings.outputLanguage === 'ase'
-                    ? await getAslTimecodes(bcv)
-                    : undefined;
-                const modal = new VerseModal();
-                modal.show({ html: `<p><em>Loading...</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText, timecodes);
-                const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage, modal.getSignal());
-                if (!modal.isVisible()) return;
-                modal.show(verseData || { html: `<p><em>Verse lookup unavailable</em></p>`, citation: refText }, bcv, this.settings.outputLanguage, refText, timecodes);
+                const { refText, timecodes } = await resolveClickContext(
+                    bcv, this.settings.outputLanguage, this.settings.titleFormat, link.textContent || undefined,
+                );
+                await this.showScripture(bcv, refText, timecodes);
             })(); });
         });
 
@@ -699,6 +702,21 @@ export default class TraverturePlugin extends Plugin {
         this.registerEvent(this.app.vault.on('delete', (file: TAbstractFile) => {
             this.pruneCachesForPath(file.path);
         }));
+
+        this.app.workspace.onLayoutReady(() => {
+            this.sessionRestored = true;
+
+            void (async () => {
+                const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
+                for (const leaf of leaves) {
+                    await leaf.loadIfDeferred();
+                    const view = leaf.view;
+                    if (view instanceof TravertureSidebarView && view.isEmpty()) {
+                        leaf.detach();
+                    }
+                }
+            })();
+        });
 
         this.registerEvent(this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, _view) => {
             const selection = editor.getSelection();

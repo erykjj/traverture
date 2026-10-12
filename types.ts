@@ -6,6 +6,9 @@ export interface TravertureSettings {
     autoDetect: boolean;
     titleFormat: 'full' | 'standard' | 'official';
     linkColor: string;
+    sidebarColumns: string[];
+    sidebarCapitalize: boolean;
+    sidebarUniqueOnly: boolean;
 }
 
 export const DEFAULT_SETTINGS: TravertureSettings = {
@@ -14,6 +17,12 @@ export const DEFAULT_SETTINGS: TravertureSettings = {
     autoDetect: true,
     titleFormat: 'full',
     linkColor: '',
+    sidebarColumns: [
+        'scripture', 'fullRef', 'standardRef', 'officialRef',
+        'startBcv', 'endBcv', 'startCh', 'endCh', 'startVerse', 'endVerse',
+    ],
+    sidebarCapitalize: false,
+    sidebarUniqueOnly: false,
 };
 
 export interface LanguageInfo {
@@ -48,18 +57,9 @@ export interface SidebarRef {
     sourceLanguage: string;
 }
 
-// ──────────────────────────────────────────────
-// Engine (WASM) Types
-// ──────────────────────────────────────────────
-
 export type NameFormat = 'full' | 'standard' | 'official';
 
-export type ParsedReference = [
-    string,          // matched scripture text
-    number,          // start position (char index)
-    number,          // end position (char index)
-    string[][]       // array of [startBcv, endBcv] pairs
-];
+export type ParsedReference = [ string, number, number, string[][] ];
 
 export interface TravertureEngineInstance {
     parse(sourceLang: string, outputLang: string, nameFormat: NameFormat, capitalize: boolean, text: string): string;
