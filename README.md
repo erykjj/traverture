@@ -15,9 +15,7 @@ See [the security and privacy notes](https://github.com/erykjj/traverture?tab=se
 ## Features
 
 - **Automatic reference detection** – Scripture references are automatically detected in both View and Edit modes; works with most book name variants and common abbreviations (e.g., "2 Sam.", "II Samuel", "2Sa"); references can also be force-detected by wrapping them in `{{ }}` (e.g., `{{Song of Solomon 1:1}}`); see [Known Limitations](#known-limitations) for edge cases
-
-- **Verse preview modal** – Click any reference to open a modal with the full scripture text[^1] (with cross-reference and footnote tooltips), a study-note pane (where available) and buttons to copy the text, or open in *JW Library*[^2] or [*JW.ORG*](https://jw.org)[^3]; `Ctrl/Cmd`+click opens references directly in *JW Library* (if installed)
-
+- **Scripture pane** – Click any reference to open the full scripture text[^1] in the sidebar, with cross-reference and footnote tooltips, a study-note pane (where available), and buttons to copy the text or open in *JW Library*[^2] or [*JW.ORG*](https://jw.org)[^3]; `Ctrl/Cmd`+click opens references directly in *JW Library* (if installed)
 - **Sidebar table** – Parse a selection or entire document into a searchable, sortable table with columns for Original, Full, Standard, and Official name formats, BCV codes, and chapter and verse numbers; features include:
   - Accent-insensitive search/filter
   - Sort by any column (ascending/descending/original order)
@@ -26,19 +24,14 @@ See [the security and privacy notes](https://github.com/erykjj/traverture?tab=se
   - Option to render book names in all-caps
   - Option to filter out duplicate entries
   - Copy table (with current filter/sort, etc.) to clipboard (TSV format)
-
 - **Insert citation** – Replace a scripture reference with the full verse text[^1]; two formats available:
   - `Reference: "verse"` – preserves verse numbers
   - `"verse" (Reference)` – plain text without verse numbers
-
 - **Reformat references** – Convert references between Full (e.g., "1 Corinthians"), Standard (e.g., "1 Cor."), and Official (e.g., "1Co") name formats; works on selections or entire documents
-
 - **Multi-language support** – Parse references in any supported language, and display or fetch verse text in a different language
   - Supported languages: ASL, Cebuano, Danish, Dutch, English, Estonian, French, German, Haitian Creole, Hungarian, Italian, Japanese, Korean, Mandarin Chinese (simplified), Norwegian, Polish, Portuguese, Romanian, Russian, Spanish, Swedish, Tagalog, Ukrainian
     - ASL (American Sign Language) is available as an output language only; links open directly to the video segment for the verse range
-
 - **Per-note language override** – Set a `language` property in a note's frontmatter to override the source language for that note alone (e.g. `language: de`); accepts the language code, symbol, vernacular name, or English name
-
 - **Desktop and mobile support**
 
 ![preview](traverture.gif)
@@ -50,8 +43,8 @@ See [the security and privacy notes](https://github.com/erykjj/traverture?tab=se
 - **Source language** – Language of the scripture references in your notes
   - Can be overridden per-note (see above)
 - **Output language** – Language for displaying book names and fetching verse text
-- **Modal title format** – How references are displayed in the verse preview title (Full, Standard, Official)
-- **Link color** – Color for reference links ; choose from presets or enter a custom hex value ("Theme default" uses the vault's external-link color); changing this requires restarting Obsidianchanging this requires restarting Obsidian
+- **Title format** – How references are displayed in the scripture pane title (Full, Standard, Official); clicking a link in the parse-results table uses that column's format instead
+- **Link color** – Color for reference links; choose from presets or enter a custom hex value ("Theme default" uses the vault's external-link color); changing this requires restarting Obsidian
 - **Auto-detect references** – Toggle automatic detection without `{{ }}` markers
 
 ---
