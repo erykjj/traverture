@@ -13,7 +13,7 @@
 ### Removed
 
 ____
-## [6.1.0] - 2026-10-12
+## [6.1.1] - 2026-10-12
 ### Changed
 
 - **Transition from modal to sidebar**
@@ -192,7 +192,7 @@ ____
 - Initial Obidian Community release
 
 ____
-[6.1.0]:https://github.com/erykjj/traverture/releases/tag/6.1.0
+[6.1.1]:https://github.com/erykjj/traverture/releases/tag/6.1.1
 [5.1.1]:https://github.com/erykjj/traverture/releases/tag/5.1.1
 [5.0.1]:https://github.com/erykjj/traverture/releases/tag/5.0.1
 [4.0.3]:https://github.com/erykjj/traverture/releases/tag/4.0.3
