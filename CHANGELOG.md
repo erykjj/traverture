@@ -6,9 +6,6 @@
 
 ### Changed
 
-- **Transition from modal to sidebar**
-- Various fixes and improvements
-
 ### Changed
 
 ### Fixed
@@ -16,10 +13,16 @@
 ### Removed
 
 ____
+## [6.1.0] - 2026-10-12
+### Changed
+
+- **Transition from modal to sidebar**
+- Various fixes and improvements
+
 ## [5.1.1] - 2026-10-08
 ### Changed
 
-- Adapt to declarative settings API
+- Adapt to **declarative settings API**
 
 ## [5.0.1] - 2026-10-04
 ### Added
@@ -44,7 +47,7 @@ ____
 ## [4.0.0] - 2026-09-16
 ### Added
 
-- Added option to set link color (in Settings)
+- Added option to **set link color** (in Settings)
 
 ## [3.9.2] - 2026-09-16
 ### Changed
@@ -189,6 +192,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[6.1.0]:https://github.com/erykjj/traverture/releases/tag/6.1.0
 [5.1.1]:https://github.com/erykjj/traverture/releases/tag/5.1.1
 [5.0.1]:https://github.com/erykjj/traverture/releases/tag/5.0.1
 [4.0.3]:https://github.com/erykjj/traverture/releases/tag/4.0.3
