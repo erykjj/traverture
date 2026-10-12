@@ -6,6 +6,8 @@
 
 ### Changed
 
+- Trasition from modal to sidebar
+
 ### Changed
 
 ### Fixed
