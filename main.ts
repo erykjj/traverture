@@ -673,7 +673,10 @@ export default class TraverturePlugin extends Plugin {
         await this.loadSettings();
         this.applyLinkColor();
 
-        try { await initEngine(this.app); this.createEngine(); }
+        const inrefensOn = (this.app as unknown as {
+            plugins?: { enabledPlugins?: Set<string> };
+        }).plugins?.enabledPlugins?.has('inrefens') ?? false;
+        try { await initEngine(this.app, inrefensOn); this.createEngine(); }
         catch (e) { console.error('tra.VER:ture: WASM error:', e); }
 
         this.addSettingTab(new TravertureSettingTab(this.app, this));
