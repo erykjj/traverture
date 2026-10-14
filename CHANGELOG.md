@@ -11,6 +11,11 @@
 ### Removed
 
 ____
+## [6.2.2] - 2026-10-14
+### Changed
+- Updated engine to v4.1.0
+  - Update singular/plural variants of Psalms in different languages for better detection
+
 ## [6.2.1] - 2026-10-14
 ### Changed
 
