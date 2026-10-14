@@ -5,14 +5,17 @@
 ### Added
 
 ### Changed
-- Updated engine to v4.1.1
-  - Update singular variants of Psalms for display
 
 ### Fixed
 
 ### Removed
 
 ____
+## [6.2.3] - 2026-10-14
+### Changed
+- Updated engine to v4.1.1
+  - Update singular variants of Psalms for display
+
 ## [6.2.2] - 2026-10-14
 ### Changed
 - Updated engine to v4.1.0
@@ -204,6 +207,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[6.2.3]:https://github.com/erykjj/traverture/releases/tag/6.2.3
 [6.2.2]:https://github.com/erykjj/traverture/releases/tag/6.2.2
 [6.2.1]:https://github.com/erykjj/traverture/releases/tag/6.2.1
 [6.1.1]:https://github.com/erykjj/traverture/releases/tag/6.1.1
