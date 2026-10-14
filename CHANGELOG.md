@@ -5,6 +5,8 @@
 ### Added
 
 ### Changed
+- Updated engine to v4.1.1
+  - Update singular variants of Psalms for display
 
 ### Fixed
 
