@@ -695,10 +695,6 @@ export default class TraverturePlugin extends Plugin {
             plugins?: { enabledPlugins?: Set<string> };
         }).plugins?.enabledPlugins?.has('traverture') ?? false;
 
-        console.log(
-            `[tra.VER:ture] inREFens enabled: ${inrefensOn}, tra.VER:ture enabled: ${travertureOn}`
-        );
-
         try { await initEngine(this.app, inrefensOn); this.createEngine(); }
         catch (e) { console.error('tra.VER:ture: WASM error:', e); }
 
