@@ -202,6 +202,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[6.2.2]:https://github.com/erykjj/traverture/releases/tag/6.2.2
 [6.2.1]:https://github.com/erykjj/traverture/releases/tag/6.2.1
 [6.1.1]:https://github.com/erykjj/traverture/releases/tag/6.1.1
 [5.1.1]:https://github.com/erykjj/traverture/releases/tag/5.1.1
