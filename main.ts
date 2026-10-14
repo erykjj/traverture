@@ -14,6 +14,12 @@ function getSubmenu(item: MenuItem): Menu {
     return (item as unknown as { setSubmenu(): Menu }).setSubmenu();
 }
 
+function isInsideTripleEmphasis(node: Node): boolean {
+    const el = node.parentElement;
+    if (!el) return false;
+    return !!el.closest('strong > em, em > strong');
+}
+
 export default class TraverturePlugin extends Plugin {
     settings = DEFAULT_SETTINGS;
     engine: TravertureEngineInstance | null = null;
@@ -384,10 +390,18 @@ export default class TraverturePlugin extends Plugin {
 
             for (const textNode of textNodes) {
                 const text = textNode.nodeValue || '';
-                const parsed = this.safeParseWith(text, sourceLang);
+                const delimited = isInsideTripleEmphasis(textNode);
+                const prefixLen = delimited ? 4 : 0; // '*** '.length
+                const engineInput = delimited ? `*** ${text} ***` : text;
+
+                const parsed = this.safeParseWith(engineInput, sourceLang);
                 if (!parsed) continue;
-                const clauses = JSON.parse(parsed) as ParsedReference[];
+                let clauses = JSON.parse(parsed) as ParsedReference[];
                 if (clauses.length === 0) continue;
+
+                if (prefixLen > 0) {
+                    clauses = clauses.map(c => [c[0], c[1] - prefixLen, c[2] - prefixLen, c[3]] as ParsedReference);
+                }
 
                 const linked = this.insertLinks(text, clauses);
                 if (linked !== text) {
@@ -676,6 +690,15 @@ export default class TraverturePlugin extends Plugin {
         const inrefensOn = (this.app as unknown as {
             plugins?: { enabledPlugins?: Set<string> };
         }).plugins?.enabledPlugins?.has('inrefens') ?? false;
+
+        const travertureOn = (this.app as unknown as {
+            plugins?: { enabledPlugins?: Set<string> };
+        }).plugins?.enabledPlugins?.has('traverture') ?? false;
+
+        console.log(
+            `[tra.VER:ture] inREFens enabled: ${inrefensOn}, tra.VER:ture enabled: ${travertureOn}`
+        );
+
         try { await initEngine(this.app, inrefensOn); this.createEngine(); }
         catch (e) { console.error('tra.VER:ture: WASM error:', e); }
 
