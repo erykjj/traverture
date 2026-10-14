@@ -6,15 +6,18 @@
 
 ### Changed
 
-- Check if in(REF)ens is enabled
-- Updated engine to v4.0.0
-  - Avoid potential conflicts with in(REF)ens (e.g. "re 22" being linked by both)
-
 ### Fixed
 
 ### Removed
 
 ____
+## [6.2.0] - 2026-10-14
+### Changed
+
+- Check if in(REF)ens is enabled
+- Updated engine to v4.0.0
+  - Avoid potential conflicts with in(REF)ens (e.g. `re 22` being linked by both)
+
 ## [6.1.1] - 2026-10-12
 ### Changed
 
