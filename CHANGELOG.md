@@ -11,7 +11,7 @@
 ### Removed
 
 ____
-## [6.2.0] - 2026-10-14
+## [6.2.1] - 2026-10-14
 ### Changed
 
 - Check if in(REF)ens is enabled
@@ -197,6 +197,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[6.2.1]:https://github.com/erykjj/traverture/releases/tag/6.2.1
 [6.1.1]:https://github.com/erykjj/traverture/releases/tag/6.1.1
 [5.1.1]:https://github.com/erykjj/traverture/releases/tag/5.1.1
 [5.0.1]:https://github.com/erykjj/traverture/releases/tag/5.0.1
