@@ -683,9 +683,19 @@ export default class TraverturePlugin extends Plugin {
         }
     }
 
+    applyPaneFontScale(): void {
+        const scale = this.settings.paneFontScale;
+        const clamped = Math.min(1.6, Math.max(0.7, scale));
+        activeDocument.documentElement.style.setProperty(
+            '--traverture-pane-font-scale',
+            String(clamped)
+        );
+    }
+
     async onload() {
         await this.loadSettings();
         this.applyLinkColor();
+        this.applyPaneFontScale();
 
         const inrefensOn = (this.app as unknown as {
             plugins?: { enabledPlugins?: Set<string> };

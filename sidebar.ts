@@ -227,6 +227,40 @@ export class TravertureSidebarView extends ItemView {
             fwdBtn.addEventListener('click', () => this.goForward());
         }
 
+        const fontGroup = header.createDiv({ cls: 'traverture-scripture-font' });
+        const minusBtn = fontGroup.createEl('button', { cls: 'traverture-scripture-font-btn', text: '\u2212' });
+        minusBtn.setAttribute('aria-label', 'Decrease font size');
+        const plusBtn = fontGroup.createEl('button', { cls: 'traverture-scripture-font-btn', text: '+' });
+        plusBtn.setAttribute('aria-label', 'Increase font size');
+
+        const MIN_SCALE = 0.7;
+        const MAX_SCALE = 1.6;
+        const STEP = 0.1;
+
+        const updateFontButtons = (): void => {
+            const s = this.plugin.settings.paneFontScale;
+            minusBtn.disabled = s <= MIN_SCALE + 1e-6;
+            plusBtn.disabled = s >= MAX_SCALE - 1e-6;
+        };
+
+        minusBtn.addEventListener('click', () => {
+            const next = Math.max(MIN_SCALE, Math.round((this.plugin.settings.paneFontScale - STEP) * 100) / 100);
+            this.plugin.settings.paneFontScale = next;
+            void this.plugin.saveSettings();
+            this.plugin.applyPaneFontScale();
+            updateFontButtons();
+        });
+
+        plusBtn.addEventListener('click', () => {
+            const next = Math.min(MAX_SCALE, Math.round((this.plugin.settings.paneFontScale + STEP) * 100) / 100);
+            this.plugin.settings.paneFontScale = next;
+            void this.plugin.saveSettings();
+            this.plugin.applyPaneFontScale();
+            updateFontButtons();
+        });
+
+        updateFontButtons();
+
         const buttonGroup = header.createDiv({ cls: 'traverture-scripture-header-buttons' });
         this.buildScriptureButtons(buttonGroup, view);
 

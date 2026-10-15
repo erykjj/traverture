@@ -9,6 +9,7 @@ export interface TravertureSettings {
     sidebarColumns: string[];
     sidebarCapitalize: boolean;
     sidebarUniqueOnly: boolean;
+    paneFontScale: number;
 }
 
 export const DEFAULT_SETTINGS: TravertureSettings = {
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS: TravertureSettings = {
     ],
     sidebarCapitalize: false,
     sidebarUniqueOnly: false,
+    paneFontScale: 1,
 };
 
 export interface LanguageInfo {
