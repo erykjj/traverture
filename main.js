@@ -1479,7 +1479,8 @@ var DEFAULT_SETTINGS = {
     "endVerse"
   ],
   sidebarCapitalize: false,
-  sidebarUniqueOnly: false
+  sidebarUniqueOnly: false,
+  paneFontScale: 1
 };
 var VIEW_TYPE_TRAVERTURE_SIDEBAR = "traverture-sidebar-view";
 
@@ -1663,6 +1664,34 @@ var TravertureSidebarView = class extends import_obsidian4.ItemView {
       fwdBtn.setAttribute("aria-label", "Forward");
       fwdBtn.addEventListener("click", () => this.goForward());
     }
+    const fontGroup = header.createDiv({ cls: "traverture-scripture-font" });
+    const minusBtn = fontGroup.createEl("button", { cls: "traverture-scripture-font-btn", text: "\u2212" });
+    minusBtn.setAttribute("aria-label", "Decrease font size");
+    const plusBtn = fontGroup.createEl("button", { cls: "traverture-scripture-font-btn", text: "+" });
+    plusBtn.setAttribute("aria-label", "Increase font size");
+    const MIN_SCALE = 0.7;
+    const MAX_SCALE = 1.6;
+    const STEP = 0.1;
+    const updateFontButtons = () => {
+      const s = this.plugin.settings.paneFontScale;
+      minusBtn.disabled = s <= MIN_SCALE + 1e-6;
+      plusBtn.disabled = s >= MAX_SCALE - 1e-6;
+    };
+    minusBtn.addEventListener("click", () => {
+      const next = Math.max(MIN_SCALE, Math.round((this.plugin.settings.paneFontScale - STEP) * 100) / 100);
+      this.plugin.settings.paneFontScale = next;
+      void this.plugin.saveSettings();
+      this.plugin.applyPaneFontScale();
+      updateFontButtons();
+    });
+    plusBtn.addEventListener("click", () => {
+      const next = Math.min(MAX_SCALE, Math.round((this.plugin.settings.paneFontScale + STEP) * 100) / 100);
+      this.plugin.settings.paneFontScale = next;
+      void this.plugin.saveSettings();
+      this.plugin.applyPaneFontScale();
+      updateFontButtons();
+    });
+    updateFontButtons();
     const buttonGroup = header.createDiv({ cls: "traverture-scripture-header-buttons" });
     this.buildScriptureButtons(buttonGroup, view);
     const bodyContainer = this.contentEl.createDiv({ cls: "traverture-scripture-pane" });
@@ -2590,9 +2619,18 @@ language: ${raw}
       root.style.removeProperty("--traverture-link-color");
     }
   }
+  applyPaneFontScale() {
+    const scale = this.settings.paneFontScale;
+    const clamped = Math.min(1.6, Math.max(0.7, scale));
+    activeDocument.documentElement.style.setProperty(
+      "--traverture-pane-font-scale",
+      String(clamped)
+    );
+  }
   async onload() {
     await this.loadSettings();
     this.applyLinkColor();
+    this.applyPaneFontScale();
     const inrefensOn = this.app.plugins?.enabledPlugins?.has("inrefens") ?? false;
     try {
       await initEngine(this.app, inrefensOn);
