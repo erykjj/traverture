@@ -56,6 +56,7 @@ See [the security and privacy notes](https://github.com/erykjj/traverture?tab=se
 - **Ambiguous references** like "1 John 5:3; 2 John 4" may parse incorrectly as "1 John 5:3; 2" (as in, 1 John chapter 2) and "John 4". Force detection with braces: `1 John 5:3; {{2 John 4}}`
 - When the [in(REF)ens](https://github.com/erykjj/inrefens) [plugin](https://community.obsidian.md/plugins/inrefens) is also enabled, a lowercase **colliding abbreviation** (a publication symbol that doubles as a Bible-book abbreviation, e.g. `re`, `pr`, `le`) inside `*** … ***` (e.g. `*** re 21 ***`) is *not* linked (it is left for in(REF)ens); capitalized forms (e.g. `*** Re 21 ***`) link normally
 - **Changing the source language** in settings affects all open Reading Views of notes *without* a frontmatter override, and **changing a note's `language` frontmatter** affects that note's Reading View; in both cases the affected view is re-rendered, which may cause a brief flicker
+- In Edit mode, **references inside callouts** are not linked; they are linked in Reading View
 
 ---
 
