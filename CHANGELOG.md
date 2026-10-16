@@ -11,6 +11,15 @@
 ### Removed
 
 ____
+## [6.3.0] - 2026-10-16
+### Added
+
+- Added font size control on side panel
+
+### Fixed
+
+- Fixed links on headings
+
 ## [6.2.3] - 2026-10-14
 ### Changed
 - Updated engine to v4.1.1
@@ -207,6 +216,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[6.3.0]:https://github.com/erykjj/traverture/releases/tag/6.3.0
 [6.2.3]:https://github.com/erykjj/traverture/releases/tag/6.2.3
 [6.2.2]:https://github.com/erykjj/traverture/releases/tag/6.2.2
 [6.2.1]:https://github.com/erykjj/traverture/releases/tag/6.2.1
