@@ -2283,7 +2283,8 @@ language: ${raw}
   // Reading View post-processor
   // ──────────────────────────────────────────────
   async processElement(el, sourcePath) {
-    if (el.querySelector(".callout, svg")) return;
+    if (el.querySelector(".callout")) return;
+    if (el.querySelector("svg") && !el.querySelector("h1, h2, h3, h4, h5, h6")) return;
     if (this.processingElements.has(el)) return;
     this.processingElements.add(el);
     const sourceLang = await this.getSourceLanguageForPath(sourcePath);
