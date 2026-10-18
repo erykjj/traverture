@@ -7,65 +7,62 @@ import wasmBinary from './engine_bg.wasm';
 import { App } from 'obsidian';
 import { TravertureEngineInstance, TravertureEngineStatic, NameFormat, ParsedReference, LanguageInfo } from './types';
 
+const WASM_START = '/*WASM-START*/';
+const WASM_END = '/*WASM-END*/';
+const H_START = 2166136261;
+const H_END = 16777619;
 const wasmModule = wasmModuleUntyped as unknown as {
     TravertureEngine: TravertureEngineStatic;
     default(options: { module_or_path: unknown }): Promise<void>;
 };
+const enginePool = new Map<string, TravertureEngineInstance>();
 
 let engineInitialized = false;
 let inrefensEnabled = false;
+let engineId = 0;
 
-const enginePool = new Map<string, TravertureEngineInstance>();
 
 function getEngineKey(language: string, format: NameFormat): string {
     return `${language}|${format}`;
 }
 
-function fnv1a(text: string): number {
-    const FNV_OFFSET = 2166136261;
-    const FNV_PRIME = 16777619;
-    let hash = FNV_OFFSET;
-    for (let i = 0; i < text.length; i++) {
-        hash ^= text.charCodeAt(i);
-        hash = Math.imul(hash, FNV_PRIME) >>> 0;
-    }
-    return hash >>> 0;
-}
-
-function findOccurrence(text: string, marker: string): number {
-    const first = text.indexOf(marker);
-    if (first === -1) return -1;
-    return text.indexOf(marker, first + 1);
-}
-
-async function checkHealth(app: App): Promise<number> {
-    const adapter = app.vault.adapter;
-    const configDir = app.vault.configDir;
-    const mainJsPath = `${configDir}/plugins/traverture/main.js`;
-    const mainJsContent = await adapter.read(mainJsPath);
-    const startMarker = '.PluginSettingTab {';
-    const hashLength = 5000;
-    const startPos = findOccurrence(mainJsContent, startMarker);
-    if (startPos === -1) {
-        throw new Error('Integrity check FAILED!');
-    }
-    const integritySection = mainJsContent.substring(startPos, startPos + hashLength);
-    const normalized = integritySection.replace(/\s+/g, '');
-    return fnv1a(normalized);
-}
-
 export async function initEngine(app: App, inrefens: boolean): Promise<void> {
     if (engineInitialized) return;
     inrefensEnabled = inrefens;
-    const generatedHash = await checkHealth(app);
-    await wasmModule.default({ module_or_path: wasmBinary });
-    engineInitialized = true;
-    const engine = new wasmModule.TravertureEngine('en', 'en', 'full', false, inrefensEnabled);
-    if (!engine.verify_integrity(generatedHash)) {
-        engineInitialized = false;
-        throw new Error('Integrity check FAILED!');
+
+    const configDir = app.vault.configDir;
+    const mainJsText = await app.vault.adapter.read(`${configDir}/plugins/traverture/main.js`);
+
+    const wsIdx = mainJsText.indexOf(WASM_START);
+    if (wsIdx === -1) throw new Error('engine: WASM-START marker not found');
+    const weIdx = mainJsText.indexOf(WASM_END, wsIdx);
+    if (weIdx === -1) throw new Error('engine: WASM-END marker not found');
+    const stripped = mainJsText.slice(0, wsIdx) + mainJsText.slice(weIdx + WASM_END.length);
+    const bytes = new TextEncoder().encode(stripped);
+    let h = H_START;
+    for (let i = 0; i < bytes.length; i++) {
+        h ^= bytes[i];
+        h = Math.imul(h, H_END) >>> 0;
     }
-    enginePool.set(getEngineKey('en', 'full'), engine);
+    engineId = h >>> 0;
+
+    const payload = wasmBinary.slice(
+        wasmBinary.indexOf(WASM_START) + WASM_START.length,
+        wasmBinary.indexOf(WASM_END)
+    );
+    const wasmBin = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+    await wasmModule.default({ module_or_path: wasmBin });
+    engineInitialized = true;
+
+    try {
+        const probe = new wasmModule.TravertureEngine(
+            'en', 'en', 'full', false, inrefensEnabled, engineId
+        );
+        enginePool.set(getEngineKey('en', 'full'), probe);
+    } catch (e) {
+        engineInitialized = false;
+        throw e;
+    }
 }
 
 export function createMainEngine(sourceLanguage: string, outputLanguage: string): TravertureEngineInstance | null {
@@ -74,7 +71,9 @@ export function createMainEngine(sourceLanguage: string, outputLanguage: string)
         return null;
     }
     try {
-        return new wasmModule.TravertureEngine(sourceLanguage, outputLanguage, 'full', false, inrefensEnabled);
+        return new wasmModule.TravertureEngine(
+            sourceLanguage, outputLanguage, 'full', false, inrefensEnabled, engineId
+        );
     } catch (e) {
         console.error('tra.VER:ture: Failed to create main engine:', e);
         return null;
@@ -95,7 +94,9 @@ function getOrCreateEngine(
         return enginePool.get(key)!;
     }
     try {
-        const engine = new wasmModule.TravertureEngine(language, language, format, capitalize, inrefensEnabled);
+        const engine = new wasmModule.TravertureEngine(
+            language, language, format, capitalize, inrefensEnabled, engineId
+        );
         enginePool.set(key, engine);
         return engine;
     } catch (e) {
