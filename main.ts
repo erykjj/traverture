@@ -702,8 +702,12 @@ export default class TraverturePlugin extends Plugin {
             plugins?: { enabledPlugins?: Set<string> };
         }).plugins?.enabledPlugins?.has('inrefens') ?? false;
 
-        try { await initEngine(this.app, inrefensOn); this.createEngine(); }
-        catch (e) { console.error('tra.VER:ture: WASM error:', e); }
+        try {
+            await initEngine(this.app, inrefensOn); this.createEngine();
+        } catch (e) {
+            console.error('tra.VER:ture: Failed to initialize engine:', e);
+            new Notice('tra.VER:ture: Failed to initialize engine.');
+        }
 
         this.addSettingTab(new TravertureSettingTab(this.app, this));
         this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
