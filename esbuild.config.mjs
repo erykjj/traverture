@@ -1,5 +1,6 @@
 import esbuild from 'esbuild';
 import process from 'process';
+import { wasmMarkerPlugin } from './esbuild-wasm-marker.mjs';
 
 const prod = process.argv[2] === 'production';
 
@@ -12,7 +13,5 @@ esbuild.build({
     outfile: 'main.js',
     sourcemap: prod ? false : 'inline',
     treeShaking: true,
-    loader: {
-        '.wasm': 'binary'
-    }
+    plugins: [wasmMarkerPlugin],
 }).catch(() => process.exit(1));
