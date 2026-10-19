@@ -8,6 +8,9 @@
 
 ### Fixed
 
+- Fixed parsing inside bullets
+- Fixed study note scripture title format
+
 ### Removed
 
 ____
