@@ -130,13 +130,12 @@ export function buildCopyText(verseData: VerseData | null, displayText: string):
 export function buildCommentaryCopyText(
     commentaries: Array<{ id: number; content: string; source: string }>,
     outputLang: string,
+    titleFormat: NameFormat,
 ): string {
     let text = 'Study Notes\n\n';
     for (const c of commentaries) {
-        const bookNum = parseInt(c.source.substring(0, 2));
-        const bookName = getBookName(bookNum, outputLang, 'full', false);
-        const ch = parseInt(c.source.substring(2, 5));
-        const vs = parseInt(c.source.substring(5, 8));
+        const decoded = decodeScriptures([[c.source, c.source]], outputLang, titleFormat);
+        const citation = decoded?.[0] || c.source;
 
         const tempDiv = createDiv();
         const parsedContent = new DOMParser().parseFromString(c.content, 'text/html');
@@ -155,7 +154,7 @@ export function buildCommentaryCopyText(
             noteText = (tempDiv.textContent || '').replace(/[ \t]+/g, ' ').trim();
         }
 
-        text += `${bookName} ${ch}:${vs}\n\n${noteText}\n\n`;
+        text += `${citation}\n\n${noteText}\n\n`;
     }
     return text.trim();
 }
@@ -163,6 +162,7 @@ export function buildCommentaryCopyText(
 export function buildCommentaryPane(
     commentaries: Array<{ id: number; content: string; source: string }>,
     outputLang: string,
+    titleFormat: NameFormat,
     onNavigate: NavigateCallback,
 ): HTMLElement {
     const pane = createDiv();
@@ -179,7 +179,9 @@ export function buildCommentaryPane(
     paneCopyBtn.className = 'traverture-pane-commentary-copy';
     setIcon(paneCopyBtn, 'copy');
     paneCopyBtn.addEventListener('click', () => {
-        void navigator.clipboard.writeText(buildCommentaryCopyText(commentaries, outputLang));
+        void navigator.clipboard.writeText(
+            buildCommentaryCopyText(commentaries, outputLang, titleFormat)
+        );
         setIcon(paneCopyBtn, 'check');
         window.setTimeout(() => { setIcon(paneCopyBtn, 'copy'); }, 1500);
     });
@@ -193,13 +195,10 @@ export function buildCommentaryPane(
         const note = createDiv();
         note.className = 'traverture-pane-commentary-note';
 
-        const bookNum = parseInt(c.source.substring(0, 2));
-        const bookName = getBookName(bookNum, outputLang, 'full', false);
-        const ch = parseInt(c.source.substring(2, 5));
-        const vs = parseInt(c.source.substring(5, 8));
+        const decoded = decodeScriptures([[c.source, c.source]], outputLang, titleFormat);
         const citation = createDiv();
         citation.className = 'traverture-pane-commentary-citation';
-        citation.textContent = `${bookName} ${ch}:${vs}`;
+        citation.textContent = decoded?.[0] || c.source;
         note.appendChild(citation);
 
         const parsed = new DOMParser().parseFromString(c.content, 'text/html');

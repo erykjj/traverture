@@ -303,7 +303,12 @@ export class TravertureSidebarView extends ItemView {
         container.appendChild(body);
 
         if (verseData?.commentaries && verseData.commentaries.length > 0) {
-            const pane = buildCommentaryPane(verseData.commentaries, this.outputLang, this.handleNavigate);
+            const pane = buildCommentaryPane(
+                verseData.commentaries,
+                this.outputLang,
+                this.plugin.settings.titleFormat,
+                this.handleNavigate,
+            );
             container.appendChild(pane);
         }
 
