@@ -314,7 +314,10 @@ export default class TraverturePlugin extends Plugin {
 
     async processElement(el: HTMLElement, sourcePath?: string) {
         if (el.querySelector('.callout')) return;
-        if (el.querySelector('svg') && !el.querySelector('h1, h2, h3, h4, h5, h6')) return;
+        const hasRealSvg = [...el.querySelectorAll('svg')].some(
+            svg => !svg.closest('.list-bullet')
+        );
+        if (hasRealSvg && !el.querySelector('h1, h2, h3, h4, h5, h6, ul, ol')) return;
         if (this.processingElements.has(el)) return;
         this.processingElements.add(el);
 
