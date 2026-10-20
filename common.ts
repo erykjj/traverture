@@ -2,7 +2,7 @@
 
 import { setIcon } from 'obsidian';
 import { getAslTimecodes } from './cache';
-import { getBookName, decodeScriptures, getLangSymbol } from './engine-wrapper';
+import { decodeScriptures, getLangSymbol } from './engine-wrapper';
 import { VerseData, NameFormat } from './types';
 
 export type NavigateCallback = (bcv: string, displayText: string) => void;

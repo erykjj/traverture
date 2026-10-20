@@ -30,7 +30,6 @@ function stripTrailingCommentsAndBlanks(text: string): string {
     for (;;) {
         while (end > 0) {
             const c = text.charCodeAt(end - 1);
-            // space, \t, \n, \r, \f, \v
             if (c === 0x20 || c === 0x09 || c === 0x0A || c === 0x0D || c === 0x0C || c === 0x0B) {
                 end--;
             } else {
