@@ -25,13 +25,43 @@ function getEngineKey(language: string, format: NameFormat): string {
     return `${language}|${format}`;
 }
 
+function stripTrailingCommentsAndBlanks(text: string): string {
+    let end = text.length;
+    for (;;) {
+        while (end > 0) {
+            const c = text.charCodeAt(end - 1);
+            // space, \t, \n, \r, \f, \v
+            if (c === 0x20 || c === 0x09 || c === 0x0A || c === 0x0D || c === 0x0C || c === 0x0B) {
+                end--;
+            } else {
+                break;
+            }
+        }
+        if (end >= 4 && text.charCodeAt(end - 1) === 0x2F /* / */ && text.charCodeAt(end - 2) === 0x2A /* * */) {
+            const open = text.lastIndexOf('/*', end - 2);
+            if (open !== -1 && !text.slice(open + 2, end - 2).includes('*/')) {
+                end = open;
+                continue;
+            }
+        }
+        const lastNl = text.lastIndexOf('\n', end - 1);
+        const lineStart = lastNl + 1;
+        if (end - lineStart >= 2 && text.charCodeAt(lineStart) === 0x2F && text.charCodeAt(lineStart + 1) === 0x2F) {
+            end = lineStart;
+            continue;
+        }
+        break;
+    }
+    return text.slice(0, end);
+}
+
 export async function initEngine(app: App, inrefens: boolean): Promise<void> {
     if (engineInitialized) return;
     inrefensEnabled = inrefens;
 
     const configDir = app.vault.configDir;
-    const mainJsText = await app.vault.adapter.read(`${configDir}/plugins/traverture/main.js`);
-
+    let mainJsText = await app.vault.adapter.read(`${configDir}/plugins/traverture/main.js`);
+    mainJsText = stripTrailingCommentsAndBlanks(mainJsText);
     const wsIdx = mainJsText.indexOf(WASM_START);
     if (wsIdx === -1) throw new Error('engine: WASM-START marker not found');
     const weIdx = mainJsText.indexOf(WASM_END, wsIdx);
