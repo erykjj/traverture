@@ -147,11 +147,16 @@ export default class TraverturePlugin extends Plugin {
     private refreshEditorViews(): void {
         const leaves = this.app.workspace.getLeavesOfType('markdown');
         for (const leaf of leaves) {
-            const view = leaf.view as MarkdownView;
-            if (!view) continue;
-            const cm = (view.editor as unknown as { cm?: { dispatch?: (spec: unknown) => void } }).cm;
-            if (cm?.dispatch) {
-                cm.dispatch({});
+            const view = leaf.view;
+            if (!(view instanceof MarkdownView)) continue;
+            const cm = (view.editor as unknown as {
+                cm?: {
+                    dispatch?: (spec: unknown) => void;
+                    state?: { selection?: unknown };
+                };
+            }).cm;
+            if (cm?.dispatch && cm.state) {
+                cm.dispatch({ selection: cm.state.selection });
             }
         }
     }
@@ -159,8 +164,9 @@ export default class TraverturePlugin extends Plugin {
     public refreshReadingViews(): void {
         const leaves = this.app.workspace.getLeavesOfType('markdown');
         for (const leaf of leaves) {
-            const view = leaf.view as MarkdownView;
-            if (!view || view.getMode() !== 'preview') continue;
+            const view = leaf.view;
+            if (!(view instanceof MarkdownView)) continue;
+            if (view.getMode() !== 'preview') continue;
             const path = view.file?.path;
             if (!path) continue;
 
