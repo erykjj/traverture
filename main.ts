@@ -327,134 +327,136 @@ export default class TraverturePlugin extends Plugin {
         if (this.processingElements.has(el)) return;
         this.processingElements.add(el);
 
-        const sourceLang = await this.getSourceLanguageForPath(sourcePath);
-        let html = el.innerHTML;
+        try {
+            const sourceLang = await this.getSourceLanguageForPath(sourcePath);
+            let html = el.innerHTML;
 
-        // Process {{ }} blocks (forced parsing)
-        if (/\{\{(.+?)\}\}/g.test(html)) {
-            html = html.replace(/\{\{(.+?)\}\}/g, (_fullMatch: string, inner: string) => {
-                if (!this.engine) return _fullMatch;
+            // Process {{ }} blocks (forced parsing)
+            if (/\{\{(.+?)\}\}/g.test(html)) {
+                html = html.replace(/\{\{(.+?)\}\}/g, (_fullMatch: string, inner: string) => {
+                    if (!this.engine) return _fullMatch;
 
-                const refText = inner.replace(/\*\*/g, '').replace(/\*/g, '');
-                const engineInput = '⟪⟪' + refText + '⟫⟫';
-                const parsed = this.safeParseWith(engineInput, sourceLang);
-                if (!parsed) return inner;
-                const clauses = JSON.parse(parsed) as ParsedReference[];
-                if (clauses.length === 0) return inner;
+                    const refText = inner.replace(/\*\*/g, '').replace(/\*/g, '');
+                    const engineInput = '⟪⟪' + refText + '⟫⟫';
+                    const parsed = this.safeParseWith(engineInput, sourceLang);
+                    if (!parsed) return inner;
+                    const clauses = JSON.parse(parsed) as ParsedReference[];
+                    if (clauses.length === 0) return inner;
 
-                let result = inner;
-                let bookName = '';
-                const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
+                    let result = inner;
+                    let bookName = '';
+                    const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
 
-                for (let i = 0; i < sorted.length; i++) {
-                    const [clauseText, , , ranges] = sorted[i];
-                    const origIndex = clauses.indexOf(sorted[i]);
+                    for (let i = 0; i < sorted.length; i++) {
+                        const [clauseText, , , ranges] = sorted[i];
+                        const origIndex = clauses.indexOf(sorted[i]);
 
-                    if (origIndex === 0) {
-                        const match = clauseText.match(/^(.+?)\s+\d/);
-                        if (match) bookName = match[1];
-                    }
-
-                    let displayText = clauseText;
-                    if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
-                        displayText = `${bookName} ${clauseText}`;
-                    }
-
-                    for (const range of ranges) {
-                        const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
-                        const link = `<a class="traverture-ref-link" data-bcv="${bcv}" data-ref="${displayText}">${clauseText}</a>`;
-                        const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-                        if (/^\d+$/.test(clauseText)) {
-                            const regex = new RegExp(`(^|[\\s,;])${escaped}(?=[\\s,;]|$)`, 'g');
-                            result = result.replace(regex, `$1${link}`);
-                        } else {
-                            result = result.replace(new RegExp(escaped), link);
+                        if (origIndex === 0) {
+                            const match = clauseText.match(/^(.+?)\s+\d/);
+                            if (match) bookName = match[1];
                         }
-                        break;
-                    }
-                }
-                return result;
-            });
-        }
 
-        if (this.settings.autoDetect && this.engine) {
-            const tempDiv = createDiv();
-            const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
-            for (const child of Array.from(parsedHtml.body.childNodes)) {
-                tempDiv.appendChild(child.cloneNode(true));
+                        let displayText = clauseText;
+                        if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
+                            displayText = `${bookName} ${clauseText}`;
+                        }
+
+                        for (const range of ranges) {
+                            const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
+                            const link = `<a class="traverture-ref-link" data-bcv="${bcv}" data-ref="${displayText}">${clauseText}</a>`;
+                            const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                            if (/^\d+$/.test(clauseText)) {
+                                const regex = new RegExp(`(^|[\\s,;])${escaped}(?=[\\s,;]|$)`, 'g');
+                                result = result.replace(regex, `$1${link}`);
+                            } else {
+                                result = result.replace(new RegExp(escaped), link);
+                            }
+                            break;
+                        }
+                    }
+                    return result;
+                });
             }
-            const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
-                acceptNode: (node) => {
-                    const parent = node.parentElement;
-                    if (parent?.tagName === 'A' && parent.classList.contains('traverture-ref-link')) {
-                        return NodeFilter.FILTER_REJECT;
-                    }
-                    return NodeFilter.FILTER_ACCEPT;
+
+            if (this.settings.autoDetect && this.engine) {
+                const tempDiv = createDiv();
+                const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
+                for (const child of Array.from(parsedHtml.body.childNodes)) {
+                    tempDiv.appendChild(child.cloneNode(true));
                 }
+                const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
+                    acceptNode: (node) => {
+                        const parent = node.parentElement;
+                        if (parent?.tagName === 'A' && parent.classList.contains('traverture-ref-link')) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                });
+
+                const textNodes: Text[] = [];
+                let node = walker.nextNode();
+                while (node) { textNodes.push(node as Text); node = walker.nextNode(); }
+
+                for (const textNode of textNodes) {
+                    const text = textNode.nodeValue || '';
+                    const delimited = isInsideTripleEmphasis(textNode);
+                    const prefixLen = delimited ? 4 : 0; // '*** '.length
+                    const engineInput = delimited ? `*** ${text} ***` : text;
+
+                    const parsed = this.safeParseWith(engineInput, sourceLang);
+                    if (!parsed) continue;
+                    let clauses = JSON.parse(parsed) as ParsedReference[];
+                    if (clauses.length === 0) continue;
+
+                    if (prefixLen > 0) {
+                        clauses = clauses.map(c => [c[0], c[1] - prefixLen, c[2] - prefixLen, c[3]] as ParsedReference);
+                    }
+
+                    const linked = this.insertLinks(text, clauses);
+                    if (linked !== text) {
+                        const fragment = createFragment();
+                        const span = createSpan();
+                        const parsedLinked = new DOMParser().parseFromString(linked, 'text/html');
+                        for (const child of Array.from(parsedLinked.body.childNodes)) {
+                            fragment.appendChild(child.cloneNode(true));
+                        }
+                        while (span.firstChild) fragment.appendChild(span.firstChild);
+                        textNode.parentNode?.replaceChild(fragment, textNode);
+                    }
+                }
+                html = tempDiv.innerHTML;
+            }
+
+            const parsed = new DOMParser().parseFromString(html, 'text/html');
+            while (el.firstChild) el.removeChild(el.firstChild);
+            for (const child of Array.from(parsed.body.childNodes)) {
+                el.appendChild(child.cloneNode(true));
+            }
+
+            el.querySelectorAll('.traverture-ref-link').forEach(link => {
+                link.addEventListener('click', (e) => { void (async () => {
+                    if ((e as MouseEvent).button !== 0) return;
+                    const bcv = link.getAttribute('data-bcv')!;
+                    if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
+                        window.open(buildJwLibraryUrl(bcv, this.settings.outputLanguage), '_blank');
+                        return;
+                    }
+                    e.preventDefault(); e.stopPropagation();
+                    const { refText, timecodes } = await resolveClickContext(
+                        bcv, this.settings.outputLanguage, this.settings.titleFormat, link.textContent || undefined,
+                    );
+                    await this.showScripture(bcv, refText, timecodes);
+                })(); });
             });
 
-            const textNodes: Text[] = [];
-            let node = walker.nextNode();
-            while (node) { textNodes.push(node as Text); node = walker.nextNode(); }
-
-            for (const textNode of textNodes) {
-                const text = textNode.nodeValue || '';
-                const delimited = isInsideTripleEmphasis(textNode);
-                const prefixLen = delimited ? 4 : 0; // '*** '.length
-                const engineInput = delimited ? `*** ${text} ***` : text;
-
-                const parsed = this.safeParseWith(engineInput, sourceLang);
-                if (!parsed) continue;
-                let clauses = JSON.parse(parsed) as ParsedReference[];
-                if (clauses.length === 0) continue;
-
-                if (prefixLen > 0) {
-                    clauses = clauses.map(c => [c[0], c[1] - prefixLen, c[2] - prefixLen, c[3]] as ParsedReference);
-                }
-
-                const linked = this.insertLinks(text, clauses);
-                if (linked !== text) {
-                    const fragment = createFragment();
-                    const span = createSpan();
-                    const parsedLinked = new DOMParser().parseFromString(linked, 'text/html');
-                    for (const child of Array.from(parsedLinked.body.childNodes)) {
-                        fragment.appendChild(child.cloneNode(true));
-                    }
-                    while (span.firstChild) fragment.appendChild(span.firstChild);
-                    textNode.parentNode?.replaceChild(fragment, textNode);
-                }
+            if (sourcePath) {
+                this.processedLangCache.set(sourcePath, sourceLang);
             }
-            html = tempDiv.innerHTML;
+        } finally {
+            this.processingElements.delete(el);
         }
-
-        const parsed = new DOMParser().parseFromString(html, 'text/html');
-        while (el.firstChild) el.removeChild(el.firstChild);
-        for (const child of Array.from(parsed.body.childNodes)) {
-            el.appendChild(child.cloneNode(true));
-        }
-
-        el.querySelectorAll('.traverture-ref-link').forEach(link => {
-            link.addEventListener('click', (e) => { void (async () => {
-                if ((e as MouseEvent).button !== 0) return;
-                const bcv = link.getAttribute('data-bcv')!;
-                if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
-                    window.open(buildJwLibraryUrl(bcv, this.settings.outputLanguage), '_blank');
-                    return;
-                }
-                e.preventDefault(); e.stopPropagation();
-                const { refText, timecodes } = await resolveClickContext(
-                    bcv, this.settings.outputLanguage, this.settings.titleFormat, link.textContent || undefined,
-                );
-                await this.showScripture(bcv, refText, timecodes);
-            })(); });
-        });
-
-        if (sourcePath) {
-            this.processedLangCache.set(sourcePath, sourceLang);
-        }
-
-        this.processingElements.delete(el);
     }
 
     private insertLinks(text: string, clauses: ParsedReference[]): string {
