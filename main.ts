@@ -523,14 +523,72 @@ export default class TraverturePlugin extends Plugin {
         else { editor.replaceSelection(processed); }
     }
 
+    private async prefetchCitationVerseText(
+        clauses: ParsedReference[],
+        withRef: boolean,
+        fetchedCache: Map<string, string>,
+    ): Promise<void> {
+        const CONCURRENCY = 4;
+
+        const tasks: Array<{ cacheKey: string; bcv: string }> = [];
+        const seen = new Set<string>();
+        for (const [, , , ranges] of clauses) {
+            if (ranges.length === 0) continue;
+            const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
+            const cacheKey = `${this.settings.outputLanguage}:${bcv}`;
+            if (seen.has(cacheKey)) continue;
+            seen.add(cacheKey);
+            tasks.push({ cacheKey, bcv });
+        }
+
+        const worker = async (): Promise<void> => {
+            for (;;) {
+                const task = tasks.shift();
+                if (!task) return;
+                const verseData = await fetchVerseWithExtras(task.bcv, this.settings.outputLanguage);
+                if (!verseData) {
+                    fetchedCache.set(task.cacheKey, '');
+                    continue;
+                }
+                const html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
+                const tempDiv = createDiv();
+                const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
+                for (const child of Array.from(parsedHtml.body.childNodes)) {
+                    tempDiv.appendChild(child.cloneNode(true));
+                }
+                if (withRef) {
+                    tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
+                } else {
+                    tempDiv.querySelectorAll('.chapterNum').forEach(el => {
+                        const textNode = el.querySelector('a') || el;
+                        if (textNode) textNode.textContent = '1 ';
+                    });
+                }
+                const verseText = (tempDiv.textContent || '')
+                    .replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ')
+                    .replace(/\+/g, '').replace(/\*/g, '')
+                    .replace(/\s+/g, ' ').trim();
+                fetchedCache.set(task.cacheKey, verseText);
+            }
+        };
+
+        const workers: Promise<void>[] = [];
+        const n = Math.min(CONCURRENCY, tasks.length);
+        for (let i = 0; i < n; i++) workers.push(worker());
+        await Promise.all(workers);
+    }
+
     async insertCitation(editor: Editor, text: string, withRef: boolean, sourceLang: string) {
         const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
         const parsed = this.safeParseWith(engineText, sourceLang);
         if (!parsed) { new Notice('No scripture references found.'); return; }
         const clauses = JSON.parse(parsed) as ParsedReference[];
         if (clauses.length === 0) { new Notice('No scripture references found.'); return; }
-        let result = text;
+
         const fetchedCache = new Map<string, string>();
+        await this.prefetchCitationVerseText(clauses, withRef, fetchedCache);
+
+        let result = text;
         for (let i = clauses.length - 1; i >= 0; i--) {
             const [clauseText, , , ranges] = clauses[i];
             if (ranges.length === 0) continue;
@@ -548,30 +606,7 @@ export default class TraverturePlugin extends Plugin {
             }
             const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
             const cacheKey = `${this.settings.outputLanguage}:${bcv}`;
-            let verseText = fetchedCache.get(cacheKey);
-            if (verseText === undefined) {
-                const verseData = await fetchVerseWithExtras(bcv, this.settings.outputLanguage);
-                if (verseData) {
-                    let html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
-                    const tempDiv = createDiv();
-                    const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
-                    for (const child of Array.from(parsedHtml.body.childNodes)) {
-                        tempDiv.appendChild(child.cloneNode(true));
-                    }
-                    if (withRef) {
-                        tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
-                    } else {
-                        tempDiv.querySelectorAll('.chapterNum').forEach(el => {
-                            const textNode = el.querySelector('a') || el;
-                            if (textNode) textNode.textContent = '1 ';
-                        });
-                    }
-                    verseText = (tempDiv.textContent || '').replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ').replace(/\+/g, '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
-                    fetchedCache.set(cacheKey, verseText);
-                } else {
-                    fetchedCache.set(cacheKey, '');
-                }
-            }
+            const verseText = fetchedCache.get(cacheKey);
             if (verseText) {
                 const before = result.substring(0, origStart);
                 const after = result.substring(origStart + origLength);
