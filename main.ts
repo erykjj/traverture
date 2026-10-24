@@ -5,7 +5,7 @@ import { EditorView } from '@codemirror/view';
 import { fetchVerseWithExtras } from './cache';
 import { buildJwLibraryUrl, resolveClickContext } from './common';
 import { createTravertureEditorPlugin } from './editor';
-import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, createMainEngine, parseFrontmatterLanguage } from './engine-wrapper';
+import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, createMainEngine, parseFrontmatterLanguage, resolveLanguage } from './engine-wrapper';
 import { TravertureSettingTab } from './settings';
 import { TravertureSidebarView } from './sidebar';
 import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef, TravertureEngineInstance, NameFormat, ParsedReference, TravertureSettings } from './types';
@@ -88,39 +88,46 @@ export default class TraverturePlugin extends Plugin {
         return this.settings.sourceLanguage;
     }
 
-    async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<string> {
-        if (!sourcePath) return this.settings.sourceLanguage;
+async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<string> {
+    if (!sourcePath) return this.settings.sourceLanguage;
 
-        const cached = this.sourceLangCache.get(sourcePath);
-        if (cached !== undefined) return cached;
+    const cached = this.sourceLangCache.get(sourcePath);
+    if (cached !== undefined) return cached;
 
-        const inFlight = this.sourceLangInFlight.get(sourcePath);
-        if (inFlight !== undefined) return inFlight;
+    const inFlight = this.sourceLangInFlight.get(sourcePath);
+    if (inFlight !== undefined) return inFlight;
 
-        const promise = (async (): Promise<string> => {
-            const file = this.app.vault.getAbstractFileByPath(sourcePath);
-            if (!(file instanceof TFile)) return this.settings.sourceLanguage;
+    const promise = (async (): Promise<string> => {
+        const file = this.app.vault.getAbstractFileByPath(sourcePath);
+        if (!(file instanceof TFile)) return this.settings.sourceLanguage;
 
-            try {
-                const text = await this.app.vault.read(file);
-                const resolved = parseFrontmatterLanguage(text);
-                if (resolved) return resolved;
-            } catch {
-                // fall through
-            }
-
-            return this.settings.sourceLanguage;
-        })();
-
-        this.sourceLangInFlight.set(sourcePath, promise);
-        try {
-            const resolved = await promise;
-            this.sourceLangCache.set(sourcePath, resolved);
-            return resolved;
-        } finally {
-            this.sourceLangInFlight.delete(sourcePath);
+        const fileCache = this.app.metadataCache.getFileCache(file);
+        const raw: unknown = fileCache?.frontmatter?.language;
+        if (typeof raw === 'string' && raw.trim()) {
+            const resolved = resolveLanguage(raw.trim());
+            if (resolved) return resolved;
         }
+
+        try {
+            const text = await this.app.vault.read(file);
+            const resolved = parseFrontmatterLanguage(text);
+            if (resolved) return resolved;
+        } catch {
+            // fall through
+        }
+
+        return this.settings.sourceLanguage;
+    })();
+
+    this.sourceLangInFlight.set(sourcePath, promise);
+    try {
+        const resolved = await promise;
+        this.sourceLangCache.set(sourcePath, resolved);
+        return resolved;
+    } finally {
+        this.sourceLangInFlight.delete(sourcePath);
     }
+}
 
     private invalidateSourceLangCache(sourcePath: string): void {
         this.sourceLangCache.delete(sourcePath);
