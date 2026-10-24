@@ -22,36 +22,6 @@ export class TravertureSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    async setControlValue(key: string, value: unknown): Promise<void> {
-        const s = this.plugin.settings as unknown as Record<string, unknown>;
-
-        switch (key) {
-            case 'sourceLanguage': {
-                s.sourceLanguage = value;
-                await this.plugin.saveSettings();
-                this.plugin.createEngine();
-                this.plugin.onSourceLanguageChanged();
-                break;
-            }
-            case 'outputLanguage': {
-                s.outputLanguage = value;
-                await this.plugin.saveSettings();
-                this.plugin.createEngine();
-                break;
-            }
-            case 'titleFormat': {
-                s.titleFormat = value;
-                await this.plugin.saveSettings();
-                break;
-            }
-            case 'autoDetect': {
-                s.autoDetect = value;
-                await this.plugin.saveSettings();
-                break;
-            }
-        }
-    }
-
     getSettingDefinitions(): SettingDefinitionItem[] {
         const languages = getAvailableLanguages();
 
