@@ -55,11 +55,6 @@ interface AslFile {
     };
 }
 
-interface AslTimecodes {
-    startTime: string;
-    endTime: string;
-}
-
 const verseCache = new Map<string, CacheEntry>();
 
 function isCacheFresh(entry: CacheEntry): boolean {
@@ -187,46 +182,49 @@ export async function fetchVerse(range: string, langCode: string): Promise<Verse
     return null;
 }
 
-const aslMetaCache = new Map<string, AslTimecodes>();
+const aslMarkersCache = new Map<string, AslMarker[]>();
 
 export async function fetchAslTimecodes(bookNum: number, chapter: number, startVerse: number, endVerse: number): Promise<string | null> {
     const cacheKey = `asl:${bookNum}:${chapter}`;
-    const cached = aslMetaCache.get(cacheKey);
-    if (cached) {
-        return `${cached.startTime}-${cached.endTime}`;
-    }
 
-    try {
-        const url = getAslMetadataUrl(bookNum, chapter);
-        const response = await requestUrl({ url });
-        const data = response.json as { files?: { ASL?: AslFile[] } };
-        const fileFormats = data.files?.ASL;
-        if (!fileFormats) return null;
+    let markers = aslMarkersCache.get(cacheKey);
 
-        let markers: AslMarker[] | undefined;
-        for (const file of fileFormats) {
-            if (file.markers?.markers) {
-                markers = file.markers.markers;
-                break;
+    if (!markers) {
+        try {
+            const url = getAslMetadataUrl(bookNum, chapter);
+            const response = await requestUrl({ url });
+            const data = response.json as { files?: { ASL?: { MP4?: AslFile[]; '3GP'?: AslFile[] } } };
+            const allFiles = [
+                ...(data.files?.ASL?.MP4 ?? []),
+                ...(data.files?.ASL?.['3GP'] ?? []),
+            ];
+
+            let found: AslMarker[] | undefined;
+            for (const file of allFiles) {
+                if (file.markers?.markers?.length) {
+                    found = file.markers.markers;
+                    break;
+                }
             }
+            if (!found) return null;
+
+            markers = found;
+            aslMarkersCache.set(cacheKey, markers);
+        } catch (e) {
+            console.error('tra.VER:ture: Error fetching ASL metadata:', e);
+            return null;
         }
-        if (!markers) return null;
-
-        const firstMarker = markers.find((m: AslMarker) => m.verseNumber === startVerse);
-        const lastMarker = markers.find((m: AslMarker) => m.verseNumber === endVerse);
-        if (!firstMarker || !lastMarker) return null;
-
-        const startSeconds = parseTimecode(firstMarker.startTime);
-        const endSeconds = parseTimecode(lastMarker.startTime) + parseTimecode(lastMarker.duration);
-        const startTime = formatTimecode(startSeconds);
-        const endTime = formatTimecode(endSeconds);
-
-        aslMetaCache.set(cacheKey, { startTime, endTime });
-        return `${startTime}-${endTime}`;
-    } catch (e) {
-        console.error('tra.VER:ture: Error fetching ASL metadata:', e);
-        return null;
     }
+
+    const firstMarker = markers.find((m) => m.verseNumber === startVerse);
+    const lastMarker = markers.find((m) => m.verseNumber === endVerse);
+    if (!firstMarker || !lastMarker) return null;
+
+    const startSeconds = parseTimecode(firstMarker.startTime);
+    const endSeconds = parseTimecode(lastMarker.startTime) + parseTimecode(lastMarker.duration);
+    const startTime = formatTimecode(startSeconds);
+    const endTime = formatTimecode(endSeconds);
+    return `${startTime}-${endTime}`;
 }
 
 function parseTimecode(tc: string): number {
