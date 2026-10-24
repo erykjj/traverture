@@ -56,6 +56,10 @@ export class TravertureSidebarView extends ItemView {
     private scriptureVerseData: VerseData | null = null;
     private scriptureBcv: string = '';
     private scriptureDisplayText: string = '';
+    private countEl: HTMLSpanElement | null = null;
+    private tbodyEl: HTMLTableSectionElement | null = null;
+    private visibleColsSnapshot: readonly SidebarColumn[] | null = null;
+    private clearBtnEl: HTMLButtonElement | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: TraverturePlugin) {
         super(leaf);
@@ -419,7 +423,6 @@ export class TravertureSidebarView extends ItemView {
     }
 
     private renderTable() {
-        const wasFocused = this.searchInputEl && activeDocument.activeElement === this.searchInputEl;
         this.contentEl.empty();
         this.contentEl.addClass('traverture-sidebar');
         if (this.allRefs.length === 0) { this.renderEmpty('No references found.'); return; }
@@ -434,14 +437,22 @@ export class TravertureSidebarView extends ItemView {
         const searchWrap = topRow.createDiv({ cls: 'traverture-sidebar-search-wrap' });
         this.searchInputEl = searchWrap.createEl('input', { type: 'text', placeholder: 'Search...', cls: 'traverture-sidebar-search' });
         this.searchInputEl.value = this.searchQuery;
-        this.searchInputEl.addEventListener('input', () => { this.searchQuery = this.searchInputEl!.value; this.renderTable(); });
-        if (this.searchQuery) {
-            const clearX = searchWrap.createEl('button', { cls: 'traverture-sidebar-search-clear' });
-            clearX.setText('\u2715');
-            clearX.addEventListener('click', () => { this.searchQuery = ''; this.renderTable(); });
-        }
+        const clearX = searchWrap.createEl('button', { cls: 'traverture-sidebar-search-clear' });
+        clearX.setText('\u2715');
+        if (!this.searchQuery) clearX.addClass('traverture-hidden');
+        this.clearBtnEl = clearX;
+        this.searchInputEl.addEventListener('input', () => {
+            this.searchQuery = this.searchInputEl!.value;
+            if (this.clearBtnEl) {
+                if (this.searchQuery) this.clearBtnEl.removeClass('traverture-hidden');
+                else this.clearBtnEl.addClass('traverture-hidden');
+            }
+            this.refreshTableBody();
+        });
+        clearX.addEventListener('click', () => { this.searchQuery = ''; this.renderTable(); });
 
-        topRow.createSpan({ text: `${refs.length} results`, cls: 'traverture-sidebar-count' });
+        const countEl = topRow.createSpan({ text: `${refs.length} results`, cls: 'traverture-sidebar-count' });
+        this.countEl = countEl;
         topRow.createDiv({ cls: 'traverture-sidebar-spacer' });
 
         const langSelect = topRow.createEl('select', { cls: 'traverture-sidebar-lang-select' });
@@ -551,6 +562,20 @@ export class TravertureSidebarView extends ItemView {
             });
         }
         const tbody = table.createEl('tbody');
+        this.renderTableRows(tbody, refs, visibleCols);
+        this.tbodyEl = tbody;
+        this.visibleColsSnapshot = visibleCols;
+    }
+
+    private refreshTableBody() {
+        if (!this.tbodyEl || !this.countEl || !this.visibleColsSnapshot) { this.renderTable(); return; }
+        const refs = this.getFilteredSortedRefs();
+        this.countEl.textContent = `${refs.length} results`;
+        this.tbodyEl.empty();
+        this.renderTableRows(this.tbodyEl, refs, this.visibleColsSnapshot);
+    }
+
+    private renderTableRows(tbody: HTMLElement, refs: SidebarRef[], visibleCols: readonly SidebarColumn[]) {
         for (const ref of refs) {
             const row = tbody.createEl('tr');
             for (const col of visibleCols) {
@@ -576,6 +601,5 @@ export class TravertureSidebarView extends ItemView {
                 } else { td.setText(displayVal); }
             }
         }
-        if (wasFocused && this.searchInputEl) { this.searchInputEl.focus(); const len = this.searchInputEl.value.length; this.searchInputEl.setSelectionRange(len, len); }
     }
 }
