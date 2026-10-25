@@ -335,7 +335,10 @@ function showXrefPopover(
     targets.forEach((t, i) => {
         if (i > 0) popover.appendChild(document.createTextNode('; '));
         const bcv = normalizeTargetVerses(t.vs);
-        const text = t.standardCitation.replace(/&nbsp;/g, ' ');
+        const text = t.standardCitation
+            .replace(/&nbsp;/g, '\u00A0')
+            .replace(/ /g, '\u00A0')
+            .replace(/;\u00A0/g, '; ');
         if (!bcv) {
             popover.appendChild(document.createTextNode(text));
             return;
@@ -354,7 +357,7 @@ function showXrefPopover(
             e.preventDefault();
             e.stopPropagation();
             popover.remove();
-            onNavigate(bcv, text);
+            onNavigate(bcv, text.replace(/\u00A0/g, ' '));
         });
         popover.appendChild(link);
     });
@@ -368,6 +371,20 @@ function positionPopover(popover: HTMLElement, anchor: HTMLElement): void {
     const rect = anchor.getBoundingClientRect();
     popover.style.top = `${rect.bottom + 4}px`;
     popover.style.left = `${rect.left}px`;
+
+    window.requestAnimationFrame(() => {
+        const popRect = popover.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const margin = 8;
+
+        if (popRect.right > viewportWidth - margin) {
+            const newLeft = Math.max(margin, viewportWidth - popRect.width - margin);
+            popover.style.left = `${newLeft}px`;
+        }
+        if (popRect.left < margin) {
+            popover.style.left = `${margin}px`;
+        }
+    });
 }
 
 function attachCloseHandler(popover: HTMLElement): void {

@@ -583,6 +583,7 @@
   border-radius: 4px;
   padding: 6px 10px;
   max-width: 350px;
+  width: max-content;
   font-size: calc(0.8rem * var(--traverture-pane-font-scale, 1));
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   user-select: text;
