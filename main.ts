@@ -220,6 +220,20 @@ export default class TraverturePlugin extends Plugin {
         }, 100);
     }
 
+    private splitFrontmatter(content: string): { frontmatter: string; body: string } {
+        if (content.startsWith('---')) {
+            const endIndex = content.indexOf('---', 3);
+            if (endIndex !== -1) {
+                const fmEnd = endIndex + 3;
+                return {
+                    frontmatter: content.substring(0, fmEnd),
+                    body: content.substring(fmEnd),
+                };
+            }
+        }
+        return { frontmatter: '', body: content };
+    }
+
     private stripFrontmatter(content: string): string {
         if (content.startsWith('---')) {
             const endIndex = content.indexOf('---', 3);
@@ -548,6 +562,26 @@ export default class TraverturePlugin extends Plugin {
         else { editor.replaceSelection(processed); }
     }
 
+    private reformatDocument(editor: Editor, format: NameFormat, sourceLang: string): void {
+        const full = editor.getValue();
+        const { frontmatter, body } = this.splitFrontmatter(full);
+        const parsed = this.safeParseWith(body, sourceLang);
+        if (!parsed) return;
+        const clauses = JSON.parse(parsed) as ParsedReference[];
+        if (clauses.length === 0) return;
+
+        let processed = body;
+        for (let i = clauses.length - 1; i >= 0; i--) {
+            const [, startPos, endPos, ranges] = clauses[i];
+            if (ranges.length === 0) continue;
+            const decoded = decodeScriptures([ranges[0] as [string, string]], sourceLang, format);
+            const formattedRef = decoded?.[0] || '';
+            if (!formattedRef) continue;
+            processed = processed.substring(0, startPos) + formattedRef + processed.substring(endPos);
+        }
+        editor.setValue(frontmatter + processed);
+    }
+
     private async prefetchCitationVerseText(
         clauses: ParsedReference[],
         withRef: boolean,
@@ -739,13 +773,13 @@ export default class TraverturePlugin extends Plugin {
             item.setTitle('Reformat document').setIcon('pencil');
             const submenu = getSubmenu(item);
             submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => {
-                if (editor) this.reformatReferences(editor, editor.getValue(), 'full', sourceLang, true);
+                if (editor) this.reformatDocument(editor, 'full', sourceLang);
             }));
             submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => {
-                if (editor) this.reformatReferences(editor, editor.getValue(), 'standard', sourceLang, true);
+                if (editor) this.reformatDocument(editor, 'standard', sourceLang);
             }));
             submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => {
-                if (editor) this.reformatReferences(editor, editor.getValue(), 'official', sourceLang, true);
+                if (editor) this.reformatDocument(editor, 'official', sourceLang);
             }));
         });
         menu.addSeparator();
