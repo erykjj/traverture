@@ -88,46 +88,46 @@ export default class TraverturePlugin extends Plugin {
         return this.settings.sourceLanguage;
     }
 
-async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<string> {
-    if (!sourcePath) return this.settings.sourceLanguage;
+    async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<string> {
+        if (!sourcePath) return this.settings.sourceLanguage;
 
-    const cached = this.sourceLangCache.get(sourcePath);
-    if (cached !== undefined) return cached;
+        const cached = this.sourceLangCache.get(sourcePath);
+        if (cached !== undefined) return cached;
 
-    const inFlight = this.sourceLangInFlight.get(sourcePath);
-    if (inFlight !== undefined) return inFlight;
+        const inFlight = this.sourceLangInFlight.get(sourcePath);
+        if (inFlight !== undefined) return inFlight;
 
-    const promise = (async (): Promise<string> => {
-        const file = this.app.vault.getAbstractFileByPath(sourcePath);
-        if (!(file instanceof TFile)) return this.settings.sourceLanguage;
+        const promise = (async (): Promise<string> => {
+            const file = this.app.vault.getAbstractFileByPath(sourcePath);
+            if (!(file instanceof TFile)) return this.settings.sourceLanguage;
 
-        const fileCache = this.app.metadataCache.getFileCache(file);
-        const raw: unknown = fileCache?.frontmatter?.language;
-        if (typeof raw === 'string' && raw.trim()) {
-            const resolved = resolveLanguage(raw.trim());
-            if (resolved) return resolved;
-        }
+            const fileCache = this.app.metadataCache.getFileCache(file);
+            const raw: unknown = fileCache?.frontmatter?.language;
+            if (typeof raw === 'string' && raw.trim()) {
+                const resolved = resolveLanguage(raw.trim());
+                if (resolved) return resolved;
+            }
 
+            try {
+                const text = await this.app.vault.read(file);
+                const resolved = parseFrontmatterLanguage(text);
+                if (resolved) return resolved;
+            } catch {
+                // fall through
+            }
+
+            return this.settings.sourceLanguage;
+        })();
+
+        this.sourceLangInFlight.set(sourcePath, promise);
         try {
-            const text = await this.app.vault.read(file);
-            const resolved = parseFrontmatterLanguage(text);
-            if (resolved) return resolved;
-        } catch {
-            // fall through
+            const resolved = await promise;
+            this.sourceLangCache.set(sourcePath, resolved);
+            return resolved;
+        } finally {
+            this.sourceLangInFlight.delete(sourcePath);
         }
-
-        return this.settings.sourceLanguage;
-    })();
-
-    this.sourceLangInFlight.set(sourcePath, promise);
-    try {
-        const resolved = await promise;
-        this.sourceLangCache.set(sourcePath, resolved);
-        return resolved;
-    } finally {
-        this.sourceLangInFlight.delete(sourcePath);
     }
-}
 
     private invalidateSourceLangCache(sourcePath: string): void {
         this.sourceLangCache.delete(sourcePath);
@@ -149,6 +149,16 @@ async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<s
         this.editorRefreshGeneration++;
         this.refreshEditorViews();
         this.refreshReadingViews();
+    }
+
+    public notifySidebarOutputLanguageChanged(newLang: string): void {
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
+        for (const leaf of leaves) {
+            const view = leaf.view;
+            if (view instanceof TravertureSidebarView) {
+                view.onOutputLanguageChanged(newLang);
+            }
+        }
     }
 
     private refreshEditorViews(): void {
@@ -656,6 +666,8 @@ async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<s
                         this.settings.outputLanguage = lang.code;
                         await this.saveSettings();
                         this.createEngine();
+                        this.notifySidebarOutputLanguageChanged(lang.code);
+                        activeDocument.dispatchEvent(new CustomEvent('traverture-output-language-changed'));
                         new Notice(`Output language: ${lang.vernacularName}`);
                     }
                 }));

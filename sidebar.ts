@@ -159,6 +159,15 @@ export class TravertureSidebarView extends ItemView {
         this.pushView({ kind: 'scripture', bcv, displayText: title, timecodes: resolvedTimecodes });
     }
 
+    public onOutputLanguageChanged(newLang: string): void {
+        if (this.outputLang === newLang) return;
+        this.outputLang = newLang;
+        const view = this.currentView();
+        if (view?.kind === 'table') {
+            this.renderTable();
+        }
+    }
+
     private pushView(view: NavView): void {
         this.history = this.history.slice(0, this.historyIndex + 1);
         this.history.push(view);
@@ -466,6 +475,7 @@ export class TravertureSidebarView extends ItemView {
             this.plugin.settings.outputLanguage = langSelect.value;
             void this.plugin.saveSettings();
             this.plugin.createEngine();
+            activeDocument.dispatchEvent(new CustomEvent('traverture-output-language-changed'));
             this.renderTable();
         });
 

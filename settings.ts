@@ -20,6 +20,11 @@ export class TravertureSettingTab extends PluginSettingTab {
     constructor(app: App, plugin: TraverturePlugin) {
         super(app, plugin);
         this.plugin = plugin;
+        this.plugin.registerDomEvent(
+            activeDocument,
+            'traverture-output-language-changed' as keyof DocumentEventMap,
+            () => { this.update(); },
+        );
     }
 
     getSettingDefinitions(): SettingDefinitionItem[] {
@@ -77,10 +82,20 @@ export class TravertureSettingTab extends PluginSettingTab {
                     {
                         name: 'Output language',
                         desc: 'Language for displaying and fetching scripture text',
-                        control: {
-                            type: 'dropdown',
-                            key: 'outputLanguage',
-                            options: outputLangOptions,
+                        render: (setting) => {
+                            setting.addDropdown(dropdown => {
+                                for (const [code, label] of Object.entries(outputLangOptions)) {
+                                    dropdown.addOption(code, label);
+                                }
+                                dropdown
+                                    .setValue(this.plugin.settings.outputLanguage)
+                                    .onChange(async (value) => {
+                                        this.plugin.settings.outputLanguage = value;
+                                        await this.plugin.saveSettings();
+                                        this.plugin.createEngine();
+                                        this.plugin.notifySidebarOutputLanguageChanged(value);
+                                    });
+                            });
                         },
                     },
                     {
