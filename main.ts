@@ -635,39 +635,79 @@ async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<s
     // Menu
     // ──────────────────────────────────────────────
 
-    showTravertureMenu(sourceLang: string): Menu {
-        const file = this.app.workspace.getActiveFile();
-        const editor = this.app.workspace.activeEditor?.editor;
-        const sel = editor?.getSelection();
-        const menu = new Menu();
+    private buildLanguageSubmenu(menu: Menu, kind: 'source' | 'output'): void {
+        const languages = kind === 'source'
+            ? getAvailableLanguages().filter(l => l.code !== 'ase')
+            : getAvailableLanguages();
+        const current = kind === 'source' ? this.settings.sourceLanguage : this.settings.outputLanguage;
 
-        if (sel) {
+        for (const lang of languages) {
+            menu.addItem((langItem: MenuItem) => langItem
+                .setTitle(`${lang.vernacularName} (${lang.code})`)
+                .setChecked(lang.code === current)
+                .onClick(async () => {
+                    if (kind === 'source') {
+                        this.settings.sourceLanguage = lang.code;
+                        await this.saveSettings();
+                        this.createEngine();
+                        this.onSourceLanguageChanged();
+                        new Notice(`Source language: ${lang.vernacularName}`);
+                    } else {
+                        this.settings.outputLanguage = lang.code;
+                        await this.saveSettings();
+                        this.createEngine();
+                        new Notice(`Output language: ${lang.vernacularName}`);
+                    }
+                }));
+        }
+    }
+
+    private addTravertureMenuItems(
+        menu: Menu,
+        editor: Editor | null,
+        selection: string | undefined,
+        sourceLang: string,
+        liveDocumentText?: string,
+    ): void {
+        if (selection) {
             menu.addItem((item: MenuItem) => item.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
-                await this.showSidebarWithResults(await this.parseReferences(sel, sourceLang));
+                await this.showSidebarWithResults(await this.parseReferences(selection, sourceLang));
             }));
             menu.addItem((item: MenuItem) => {
                 item.setTitle('Insert citation').setIcon('quote-glyph');
                 const citeMenu = getSubmenu(item);
                 citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
-                    if (editor && sel) await this.insertCitation(editor, sel, false, sourceLang);
+                    if (editor && selection) await this.insertCitation(editor, selection, false, sourceLang);
                 }));
                 citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
-                    if (editor && sel) await this.insertCitation(editor, sel, true, sourceLang);
+                    if (editor && selection) await this.insertCitation(editor, selection, true, sourceLang);
                 }));
             });
             menu.addItem((item: MenuItem) => {
                 item.setTitle('Reformat selection').setIcon('pencil');
                 const submenu = getSubmenu(item);
-                submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor!, sel, 'full', sourceLang)));
-                submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor!, sel, 'standard', sourceLang)));
-                submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor!, sel, 'official', sourceLang)));
+                submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => {
+                    if (editor && selection) this.reformatReferences(editor, selection, 'full', sourceLang);
+                }));
+                submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => {
+                    if (editor && selection) this.reformatReferences(editor, selection, 'standard', sourceLang);
+                }));
+                submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => {
+                    if (editor && selection) this.reformatReferences(editor, selection, 'official', sourceLang);
+                }));
             });
             menu.addSeparator();
         }
 
         menu.addItem((item: MenuItem) => item.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
-            if (!file) { new Notice('No file open.'); return; }
-            const content = this.stripFrontmatter(await this.app.vault.read(file));
+            let content: string;
+            if (liveDocumentText !== undefined) {
+                content = this.stripFrontmatter(liveDocumentText);
+            } else {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) { new Notice('No file open.'); return; }
+                content = this.stripFrontmatter(await this.app.vault.read(file));
+            }
             await this.showSidebarWithResults(await this.parseReferences(content, sourceLang));
         }));
         menu.addItem((item: MenuItem) => {
@@ -688,37 +728,93 @@ async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<s
         menu.addItem((item: MenuItem) => {
             item.setTitle('Source language').setIcon('book-open');
             const langMenu = getSubmenu(item);
-            const languages = getAvailableLanguages().filter(l => l.code !== 'ase');
-            for (const lang of languages) {
-                langMenu.addItem((langItem: MenuItem) => langItem
-                    .setTitle(`${lang.vernacularName} (${lang.code})`)
-                    .setChecked(lang.code === this.settings.sourceLanguage)
-                    .onClick(async () => {
-                        this.settings.sourceLanguage = lang.code;
-                        await this.saveSettings();
-                        this.createEngine();
-                        this.onSourceLanguageChanged();
-                        new Notice(`Source language: ${lang.vernacularName}`);
-                    }));
-            }
+            this.buildLanguageSubmenu(langMenu, 'source');
         });
 
         menu.addItem((item: MenuItem) => {
             item.setTitle('Output language').setIcon('languages');
             const langMenu = getSubmenu(item);
-            const languages = getAvailableLanguages();
-            for (const lang of languages) {
-                langMenu.addItem((langItem: MenuItem) => langItem
-                    .setTitle(`${lang.vernacularName} (${lang.code})`)
-                    .setChecked(lang.code === this.settings.outputLanguage)
-                    .onClick(async () => {
-                        this.settings.outputLanguage = lang.code;
-                        await this.saveSettings();
-                        this.createEngine();
-                        new Notice(`Output language: ${lang.vernacularName}`);
-                    }));
-            }
+            this.buildLanguageSubmenu(langMenu, 'output');
         });
+    }
+
+    private addReadingModeMenuItems(menu: Menu, domSelection: Selection | null, sourceLang: string): void {
+        let bcvs: string[] = [];
+        let hasSelection = false;
+        if (domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed) {
+            hasSelection = true;
+            const range = domSelection.getRangeAt(0);
+            const container = range.commonAncestorContainer;
+            const parentEl = container.nodeType === Node.TEXT_NODE ? container.parentElement : container as HTMLElement;
+            const links = parentEl?.querySelectorAll?.('.traverture-ref-link') || [];
+            links.forEach((link: Element) => {
+                if (domSelection.containsNode(link, true)) {
+                    const bcv = link.getAttribute('data-bcv');
+                    if (bcv) bcvs.push(bcv);
+                }
+            });
+        }
+
+        if (hasSelection) {
+            menu.addItem((subItem: MenuItem) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
+                if (bcvs.length > 0) {
+                    await this.showSidebarWithResults(await this.parseBcvs(bcvs));
+                } else {
+                    const textSelection = domSelection?.toString() || '';
+                    await this.showSidebarWithResults(await this.parseReferences(textSelection, sourceLang));
+                }
+            }));
+        }
+
+        menu.addItem((subItem: MenuItem) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
+            const file = this.app.workspace.getActiveFile();
+            if (!file) return;
+            const content = this.stripFrontmatter(await this.app.vault.read(file));
+            await this.showSidebarWithResults(await this.parseReferences(content, sourceLang));
+        }));
+
+        menu.addSeparator();
+
+        menu.addItem((subItem: MenuItem) => {
+            subItem.setTitle('Source language').setIcon('book-open');
+            const langMenu = getSubmenu(subItem);
+            this.buildLanguageSubmenu(langMenu, 'source');
+        });
+
+        menu.addItem((subItem: MenuItem) => {
+            subItem.setTitle('Output language').setIcon('languages');
+            const langMenu = getSubmenu(subItem);
+            this.buildLanguageSubmenu(langMenu, 'output');
+        });
+    }
+
+    showTravertureMenu(sourceLang: string): Menu {
+        const menu = new Menu();
+
+        const activeMarkdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+
+        if (!activeMarkdownView) {
+            // No markdown view active at all — only language menus
+            menu.addItem((item: MenuItem) => {
+                item.setTitle('Source language').setIcon('book-open');
+                const langMenu = getSubmenu(item);
+                this.buildLanguageSubmenu(langMenu, 'source');
+            });
+            menu.addItem((item: MenuItem) => {
+                item.setTitle('Output language').setIcon('languages');
+                const langMenu = getSubmenu(item);
+                this.buildLanguageSubmenu(langMenu, 'output');
+            });
+            return menu;
+        }
+
+        if (activeMarkdownView.getMode() === 'preview') {
+            this.addReadingModeMenuItems(menu, activeDocument.getSelection(), sourceLang);
+        } else {
+            const editor = this.app.workspace.activeEditor?.editor;
+            const sel = editor?.getSelection();
+            this.addTravertureMenuItems(menu, editor ?? null, sel, sourceLang, editor?.getValue());
+        }
 
         return menu;
     }
@@ -811,70 +907,7 @@ async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<s
             menu.addItem((item: MenuItem) => {
                 item.setTitle('tra.VER:ture').setIcon('book-open');
                 const submenu = getSubmenu(item);
-
-                if (selection) {
-                    submenu.addItem((subItem: MenuItem) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(selection, sourceLang)); }));
-                    submenu.addItem((subItem: MenuItem) => {
-                        subItem.setTitle('Insert citation').setIcon('quote-glyph');
-                        const citeMenu = getSubmenu(subItem);
-                        citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => { await this.insertCitation(editor, selection, false, sourceLang); }));
-                        citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => { await this.insertCitation(editor, selection, true, sourceLang); }));
-                    });
-                    submenu.addItem((subItem: MenuItem) => {
-                        subItem.setTitle('Reformat selection').setIcon('pencil');
-                        const reformatMenu = getSubmenu(subItem);
-                        reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor, selection, 'full', sourceLang)));
-                        reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor, selection, 'standard', sourceLang)));
-                        reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor, selection, 'official', sourceLang)));
-                    });
-                    submenu.addSeparator();
-                }
-
-                submenu.addItem((subItem: MenuItem) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => { await this.showSidebarWithResults(await this.parseReferences(editor.getValue(), sourceLang)); }));
-                submenu.addItem((subItem: MenuItem) => {
-                    subItem.setTitle('Reformat document').setIcon('pencil');
-                    const reformatMenu = getSubmenu(subItem);
-                    reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Full (1 Corinthians)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'full', sourceLang, true)));
-                    reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Standard (1 Cor.)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'standard', sourceLang, true)));
-                    reformatMenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => this.reformatReferences(editor, editor.getValue(), 'official', sourceLang, true)));
-                });
-
-                submenu.addSeparator();
-
-                submenu.addItem((subItem: MenuItem) => {
-                    subItem.setTitle('Source language').setIcon('book-open');
-                    const langMenu = getSubmenu(subItem);
-                    const languages = getAvailableLanguages().filter(l => l.code !== 'ase');
-                    for (const lang of languages) {
-                        langMenu.addItem((langItem: MenuItem) => langItem
-                            .setTitle(`${lang.vernacularName} (${lang.code})`)
-                            .setChecked(lang.code === this.settings.sourceLanguage)
-                            .onClick(async () => {
-                                this.settings.sourceLanguage = lang.code;
-                                await this.saveSettings();
-                                this.createEngine();
-                                this.onSourceLanguageChanged();
-                                new Notice(`Source language: ${lang.vernacularName}`);
-                            }));
-                    }
-                });
-
-                submenu.addItem((subItem: MenuItem) => {
-                    subItem.setTitle('Output language').setIcon('languages');
-                    const langMenu = getSubmenu(subItem);
-                    const languages = getAvailableLanguages();
-                    for (const lang of languages) {
-                        langMenu.addItem((langItem: MenuItem) => langItem
-                            .setTitle(`${lang.vernacularName} (${lang.code})`)
-                            .setChecked(lang.code === this.settings.outputLanguage)
-                            .onClick(async () => {
-                                this.settings.outputLanguage = lang.code;
-                                await this.saveSettings();
-                                this.createEngine();
-                                new Notice(`Output language: ${lang.vernacularName}`);
-                            }));
-                    }
-                });
+                this.addTravertureMenuItems(submenu, editor, selection, sourceLang, editor.getValue());
             });
         }));
 
@@ -883,21 +916,6 @@ async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<s
             if (!view || view.getMode() !== 'preview') return;
             const sourceLang = view.file ? this.getEffectiveSourceLanguage(view.file) : this.settings.sourceLanguage;
             const domSelection = activeDocument.getSelection();
-            let bcvs: string[] = [];
-            let hasSelection = false;
-            if (domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed) {
-                hasSelection = true;
-                const range = domSelection.getRangeAt(0);
-                const container = range.commonAncestorContainer;
-                const parentEl = container.nodeType === Node.TEXT_NODE ? container.parentElement : container as HTMLElement;
-                const links = parentEl?.querySelectorAll?.('.traverture-ref-link') || [];
-                links.forEach((link: Element) => {
-                    if (domSelection.containsNode(link, true)) {
-                        const bcv = link.getAttribute('data-bcv');
-                        if (bcv) bcvs.push(bcv);
-                    }
-                });
-            }
 
             evt.preventDefault();
             evt.stopPropagation();
@@ -906,116 +924,35 @@ async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<s
             menu.addItem((item: MenuItem) => {
                 item.setTitle('tra.VER:ture').setIcon('book-open');
                 const submenu = getSubmenu(item);
-                if (hasSelection) {
-                    submenu.addItem((subItem: MenuItem) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
-                        if (bcvs.length > 0) {
-                            await this.showSidebarWithResults(await this.parseBcvs(bcvs));
-                        } else {
-                            const textSelection = domSelection?.toString() || '';
-                            await this.showSidebarWithResults(await this.parseReferences(textSelection, sourceLang));
-                        }
-                    }));
-                }
-
-                submenu.addItem((subItem: MenuItem) => subItem.setTitle('Parse document').setIcon('sidebar-right').onClick(async () => {
-                    const file = view.file;
-                    if (!file) return;
-                    const content = this.stripFrontmatter(await this.app.vault.read(file));
-                    await this.showSidebarWithResults(await this.parseReferences(content, sourceLang));
-                }));
-
-                submenu.addSeparator();
-
-                submenu.addItem((subItem: MenuItem) => {
-                    subItem.setTitle('Source language').setIcon('book-open');
-                    const langMenu = getSubmenu(subItem);
-                    const languages = getAvailableLanguages().filter(l => l.code !== 'ase');
-                    for (const lang of languages) {
-                        langMenu.addItem((langItem: MenuItem) => langItem
-                            .setTitle(`${lang.vernacularName} (${lang.code})`)
-                            .setChecked(lang.code === this.settings.sourceLanguage)
-                            .onClick(async () => {
-                                this.settings.sourceLanguage = lang.code;
-                                await this.saveSettings();
-                                this.createEngine();
-                                this.onSourceLanguageChanged();
-                                new Notice(`Source language: ${lang.vernacularName}`);
-                            }));
-                    }
-                });
-
-                submenu.addItem((subItem: MenuItem) => {
-                    subItem.setTitle('Output language').setIcon('languages');
-                    const langMenu = getSubmenu(subItem);
-                    const languages = getAvailableLanguages();
-                    for (const lang of languages) {
-                        langMenu.addItem((langItem: MenuItem) => langItem
-                            .setTitle(`${lang.vernacularName} (${lang.code})`)
-                            .setChecked(lang.code === this.settings.outputLanguage)
-                            .onClick(async () => {
-                                this.settings.outputLanguage = lang.code;
-                                await this.saveSettings();
-                                this.createEngine();
-                                new Notice(`Output language: ${lang.vernacularName}`);
-                            }));
-                    }
-                });
+                this.addReadingModeMenuItems(submenu, domSelection, sourceLang);
             });
             menu.showAtMouseEvent(evt);
         });
 
         this.addRibbonIcon('scroll', 'tra.VER:ture', () => {
-            const sourceLang = this.getEffectiveSourceLanguage(this.app.workspace.getActiveFile());
+            const activeFile = this.app.workspace.getActiveFile();
+            const editor = this.app.workspace.activeEditor?.editor;
+            const sourceLang = this.getEffectiveSourceLanguage(
+                activeFile,
+                editor ? editor.getValue() : undefined,
+            );
             this.showTravertureMenu(sourceLang).showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
         });
 
-        this.addCommand({ id: 'open-menu', name: 'tra.VER:ture: Open menu', icon: 'scroll', editorCallback: (editor: Editor) => {
-            const sourceLang = this.getEffectiveSourceLanguage(this.app.workspace.getActiveFile(), editor.getValue());
-            this.showTravertureMenu(sourceLang).showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
-        }});
-
-        this.addCommand({ id: 'parse-document-references', name: 'tra.VER:ture: Parse document', icon: 'file-text', callback: async () => {
-            const file = this.app.workspace.getActiveFile(); if (!file) return;
-            const sourceLang = this.getEffectiveSourceLanguage(file);
-            const content = this.stripFrontmatter(await this.app.vault.read(file));
-            await this.showSidebarWithResults(await this.parseReferences(content, sourceLang));
-        }});
-
-        this.addCommand({ id: 'parse-selection-references', name: 'tra.VER:ture: Parse selection', icon: 'sidebar-right', editorCallback: async (editor: Editor) => {
-            const selection = editor.getSelection(); if (!selection) return;
-            const sourceLang = this.getEffectiveSourceLanguage(this.app.workspace.getActiveFile(), editor.getValue());
-            await this.showSidebarWithResults(await this.parseReferences(selection, sourceLang));
-        }});
-
-        this.addCommand({ id: 'insert-citation-ref', name: 'tra.VER:ture: Insert citation (Reference)', icon: 'quote-glyph', editorCallback: async (editor: Editor) => {
-            const selection = editor.getSelection(); if (!selection) return;
-            const sourceLang = this.getEffectiveSourceLanguage(this.app.workspace.getActiveFile(), editor.getValue());
-            await this.insertCitation(editor, selection, false, sourceLang);
-        }});
-
-        this.addCommand({ id: 'insert-citation-verse', name: 'tra.VER:ture: Insert citation (verse)', icon: 'quote-glyph', editorCallback: async (editor: Editor) => {
-            const selection = editor.getSelection(); if (!selection) return;
-            const sourceLang = this.getEffectiveSourceLanguage(this.app.workspace.getActiveFile(), editor.getValue());
-            await this.insertCitation(editor, selection, true, sourceLang);
-        }});
-
-        this.addCommand({ id: 'reformat-full', name: 'tra.VER:ture: Reformat (Full)', icon: 'pencil', editorCallback: (editor: Editor) => {
-            const selection = editor.getSelection(); if (!selection) return;
-            const sourceLang = this.getEffectiveSourceLanguage(this.app.workspace.getActiveFile(), editor.getValue());
-            this.reformatReferences(editor, selection, 'full', sourceLang);
-        }});
-
-        this.addCommand({ id: 'reformat-standard', name: 'tra.VER:ture: Reformat (Standard)', icon: 'pencil', editorCallback: (editor: Editor) => {
-            const selection = editor.getSelection(); if (!selection) return;
-            const sourceLang = this.getEffectiveSourceLanguage(this.app.workspace.getActiveFile(), editor.getValue());
-            this.reformatReferences(editor, selection, 'standard', sourceLang);
-        }});
-
-        this.addCommand({ id: 'reformat-official', name: 'tra.VER:ture: Reformat (Official)', icon: 'pencil', editorCallback: (editor: Editor) => {
-            const selection = editor.getSelection(); if (!selection) return;
-            const sourceLang = this.getEffectiveSourceLanguage(this.app.workspace.getActiveFile(), editor.getValue());
-            this.reformatReferences(editor, selection, 'official', sourceLang);
-        }});
+        this.addCommand({
+            id: 'open-menu',
+            name: 'Open menu',
+            icon: 'scroll',
+            callback: () => {
+                const activeFile = this.app.workspace.getActiveFile();
+                const editor = this.app.workspace.activeEditor?.editor;
+                const sourceLang = this.getEffectiveSourceLanguage(
+                    activeFile,
+                    editor ? editor.getValue() : undefined,
+                );
+                this.showTravertureMenu(sourceLang).showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
+            },
+        });
     }
 
     onunload() {
