@@ -5,33 +5,33 @@
 
 /* --- Reference Links --- */
 .traverture-ref-link {
-    color: var(--traverture-link-color, var(--link-external-color));
-    text-decoration: none;
-    cursor: pointer;
+  color: var(--traverture-link-color, var(--link-external-color));
+  text-decoration: none;
+  cursor: pointer;
 }
 .traverture-ref-link:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .traverture-xref-popover-link {
-    color: #4a6da7;
-    text-decoration: none;
-    cursor: pointer;
+  color: #4a6da7;
+  text-decoration: none;
+  cursor: pointer;
 }
 .traverture-xref-popover-link:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .traverture-hidden {
-    display: none;
+  display: none;
 }
 
 .cm-traverture-ref {
-    color: var(--traverture-link-color, var(--link-external-color));
-    cursor: pointer;
+  color: var(--traverture-link-color, var(--link-external-color));
+  cursor: pointer;
 }
 .cm-traverture-ref:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 /* --- Tooltip Container --- */
@@ -353,79 +353,88 @@
 /* --- Scripture pane (sidebar scripture view) --- */
 
 .traverture-scripture-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
-    flex-shrink: 0;
-    font-weight: 600;
-    font-size: calc(1rem * var(--traverture-pane-font-scale, 1));
-    color: var(--text-normal, #333);
-    border-bottom: 1px solid var(--background-modifier-border, #e5e7eb);
-    padding-bottom: 8px;
-    margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: calc(1rem * var(--traverture-pane-font-scale, 1));
+  color: var(--text-normal, #333);
+  border-bottom: 1px solid var(--background-modifier-border, #e5e7eb);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
 }
 
 .traverture-scripture-header-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1 1 auto;
-    min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .traverture-scripture-header-left .traverture-pane-title {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .traverture-scripture-nav {
-    display: flex;
-    gap: 2px;
-    flex-shrink: 0;
-    align-items: center;
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 .traverture-scripture-nav,
 .traverture-scripture-font {
-    display: flex;
-    gap: 2px;
-    flex-shrink: 0;
-    align-items: center;
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 .traverture-scripture-nav-btn:hover {
-    background: var(--background-modifier-hover, #eef2f7);
-    color: var(--text-normal, #333);
+  background: var(--background-modifier-hover, #eef2f7);
+  color: var(--text-normal, #333);
 }
 
 .traverture-scripture-header-buttons {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    flex-shrink: 0;
-    justify-content: flex-end;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  justify-content: flex-end;
 }
 
 .traverture-scripture-pane {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 0;
-    height: 100%;
-    overflow: hidden;
-    user-select: text;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  user-select: text;
 }
 
 .traverture-scripture-pane .traverture-pane-body {
-    flex: 0 0 auto;
-    overflow: visible;
-    padding: 0;
-    font-size: calc(1rem * var(--traverture-pane-font-scale, 1));
-    line-height: 1.5;
-    font-weight: 600;
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: 50%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  font-size: calc(1rem * var(--traverture-pane-font-scale, 1));
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.traverture-scripture-pane:not(.traverture-has-commentary) .traverture-pane-body {
+  flex: 1 1 auto;
+  max-height: none;
 }
 
 /* --- Shared: pane styles --- */
@@ -459,34 +468,34 @@
 
 .traverture-scripture-nav-btn,
 .traverture-scripture-font-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 1px;
-    width: var(--traverture-btn-size);
-    height: var(--traverture-btn-size);
-    line-height: 1;
-    color: var(--text-muted, #666);
-    border-radius: 4px;
-    box-shadow: none;
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: calc(0.85rem * var(--traverture-pane-font-scale, 1));
-    flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 1px;
+  width: var(--traverture-btn-size);
+  height: var(--traverture-btn-size);
+  line-height: 1;
+  color: var(--text-muted, #666);
+  border-radius: 4px;
+  box-shadow: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: calc(0.85rem * var(--traverture-pane-font-scale, 1));
+  flex-shrink: 0;
 }
 
 .traverture-scripture-nav-btn:hover,
 .traverture-scripture-font-btn:hover {
-    background: var(--background-modifier-hover, #eef2f7);
-    color: var(--text-normal, #333);
+  background: var(--background-modifier-hover, #eef2f7);
+  color: var(--text-normal, #333);
 }
 
 .traverture-scripture-font-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* --- Commentary / Study Notes --- */

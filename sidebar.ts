@@ -314,6 +314,7 @@ export class TravertureSidebarView extends ItemView {
         container.appendChild(body);
 
         if (verseData?.commentaries && verseData.commentaries.length > 0) {
+            container.addClass('traverture-has-commentary');
             const pane = buildCommentaryPane(
                 verseData.commentaries,
                 this.outputLang,
