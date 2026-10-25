@@ -18,20 +18,19 @@ interface DecoEntry {
     deco: Decoration;
 }
 
-const REF_PATTERN = /\{\{(.+?)\}\}/g;
-
 function buildDecorations(view: EditorView, plugin: TraverturePlugin): DecorationSet {
     const allDecos: DecoEntry[] = [];
     const cursor = view.state.selection.main;
     const bcvs: BcvEntry[] = [];
     const sourceLang = plugin.getSourceLanguageForEditor(view);
+    const refPattern = /\{\{(.+?)\}\}/g;
 
     for (const { from, to } of view.visibleRanges) {
         const text = view.state.doc.sliceString(from, to);
         const decorated: Array<{ from: number; to: number }> = [];
 
         let match: RegExpExecArray | null;
-        while ((match = REF_PATTERN.exec(text)) !== null) {
+        while ((match = refPattern.exec(text)) !== null) {
             const blockStart = from + match.index;
             const blockEnd = blockStart + match[0].length;
             const innerStart = blockStart + 2;
