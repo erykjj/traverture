@@ -1,6 +1,6 @@
 // sidebar.ts
 
-import { ItemView, WorkspaceLeaf, ViewStateResult, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, ViewStateResult } from 'obsidian';
 import { fetchVerseWithExtras, getAslTimecodes } from './cache';
 import { buildJwLibraryUrl, buildJwOrgUrl, buildVerseBody, buildCopyText, buildCommentaryPane, attachMarkerTooltips } from './common';
 import { getAvailableLanguagesCached as getAvailableLanguages, getBookName, decodeScriptures } from './engine-wrapper';
@@ -228,14 +228,12 @@ export class TravertureSidebarView extends ItemView {
 
         const nav = left.createDiv({ cls: 'traverture-scripture-nav' });
         if (this.canGoBack()) {
-            const backBtn = nav.createEl('button', { cls: 'traverture-scripture-nav-btn' });
-            setIcon(backBtn, 'arrow-left');
+            const backBtn = nav.createEl('button', { cls: 'traverture-scripture-nav-btn', text: '\u2190' });
             backBtn.setAttribute('aria-label', 'Back');
             backBtn.addEventListener('click', () => this.goBack());
         }
         if (this.canGoForward()) {
-            const fwdBtn = nav.createEl('button', { cls: 'traverture-scripture-nav-btn' });
-            setIcon(fwdBtn, 'arrow-right');
+            const fwdBtn = nav.createEl('button', { cls: 'traverture-scripture-nav-btn', text: '\u2192' });
             fwdBtn.setAttribute('aria-label', 'Forward');
             fwdBtn.addEventListener('click', () => this.goForward());
         }

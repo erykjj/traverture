@@ -489,11 +489,6 @@
     cursor: default;
 }
 
-.traverture-scripture-nav-btn svg {
-    width: 1em;
-    height: 1em;
-}
-
 /* --- Commentary / Study Notes --- */
 .traverture-pane-commentary {
   display: flex;
