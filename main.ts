@@ -614,9 +614,12 @@ export default class TraverturePlugin extends Plugin {
         await this.prefetchCitationVerseText(clauses, withRef, fetchedCache);
 
         let result = text;
+        let failed = 0;
+        let total = 0;
         for (let i = clauses.length - 1; i >= 0; i--) {
             const [clauseText, , , ranges] = clauses[i];
             if (ranges.length === 0) continue;
+            total++;
             let origStart = text.indexOf('{{' + clauseText + '}}');
             let origLength: number;
             let originalRef: string;
@@ -625,7 +628,7 @@ export default class TraverturePlugin extends Plugin {
                 originalRef = '{{' + clauseText + '}}';
             } else {
                 origStart = text.indexOf(clauseText);
-                if (origStart === -1) continue;
+                if (origStart === -1) { failed++; continue; }
                 origLength = clauseText.length;
                 originalRef = clauseText;
             }
@@ -636,8 +639,18 @@ export default class TraverturePlugin extends Plugin {
                 const before = result.substring(0, origStart);
                 const after = result.substring(origStart + origLength);
                 result = before + (withRef ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`) + after;
+            } else {
+                failed++;
             }
         }
+        if (failed > 0) {
+            new Notice(
+                failed === total
+                    ? 'Could not fetch verse text.'
+                    : `Could not fetch verse text for ${failed} of ${total} references.`
+            );
+        }
+        if (failed === total) return;
         editor.replaceSelection(result);
     }
 
