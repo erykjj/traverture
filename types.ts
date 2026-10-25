@@ -88,8 +88,3 @@ export interface TravertureEngineStatic {
     get_asl_metadata_url(bookNumber: number, chapter: number): string;
     default(options: { module_or_path: unknown }): Promise<void>;
 }
-
-export interface TravertureEngineModule {
-    TravertureEngine: TravertureEngineStatic;
-    default(options: { module_or_path: unknown }): Promise<void>;
-}
