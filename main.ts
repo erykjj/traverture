@@ -2,7 +2,7 @@
 
 import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, MenuItem, TFile, TAbstractFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
-import { fetchVerseWithExtras } from './cache';
+import { fetchVerseWithExtras, escapeHtml } from './cache';
 import { buildJwLibraryUrl, resolveClickContext } from './common';
 import { createTravertureEditorPlugin } from './editor';
 import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, createMainEngine, parseFrontmatterLanguage, resolveLanguage } from './engine-wrapper';
@@ -380,7 +380,7 @@ export default class TraverturePlugin extends Plugin {
 
                         for (const range of ranges) {
                             const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
-                            const link = `<a class="traverture-ref-link" data-bcv="${bcv}" data-ref="${displayText}">${clauseText}</a>`;
+                            const link = `<a class="traverture-ref-link" data-bcv="${escapeHtml(bcv)}" data-ref="${escapeHtml(displayText)}">${clauseText}</a>`;
                             const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
                             if (/^\d+$/.test(clauseText)) {
@@ -510,7 +510,7 @@ export default class TraverturePlugin extends Plugin {
         for (const p of positions) {
             if (p.start < pos) continue;
             result += text.substring(pos, p.start);
-            const link = `<a class="traverture-ref-link" data-bcv="${p.bcv}" data-ref="${p.displayText}">${text.substring(p.start, p.end)}</a>`;
+            const link = `<a class="traverture-ref-link" data-bcv="${escapeHtml(p.bcv)}" data-ref="${escapeHtml(p.displayText)}">${text.substring(p.start, p.end)}</a>`;
             result += link;
             pos = p.end;
         }
