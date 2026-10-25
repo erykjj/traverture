@@ -54,7 +54,6 @@ export class TravertureSidebarView extends ItemView {
     private historyIndex: number = -1;
     private scriptureAbort: AbortController | null = null;
     private scriptureVerseData: VerseData | null = null;
-    private scriptureBcv: string = '';
     private scriptureDisplayText: string = '';
     private countEl: HTMLSpanElement | null = null;
     private tbodyEl: HTMLTableSectionElement | null = null;
@@ -282,8 +281,6 @@ export class TravertureSidebarView extends ItemView {
     private renderScriptureContent(container: HTMLElement, view: ScriptureView): void {
         this.abortScriptureFetch();
         this.scriptureAbort = new AbortController();
-
-        this.scriptureBcv = view.bcv;
         this.scriptureDisplayText = view.displayText;
         this.scriptureVerseData = null;
 
@@ -324,7 +321,6 @@ export class TravertureSidebarView extends ItemView {
             container.appendChild(pane);
         }
 
-        this.scriptureBcv = view.bcv;
         this.scriptureDisplayText = view.displayText;
         this.scriptureVerseData = verseData;
     }
@@ -371,7 +367,6 @@ export class TravertureSidebarView extends ItemView {
             this.scriptureAbort = null;
         }
         this.scriptureVerseData = null;
-        this.scriptureBcv = '';
         this.scriptureDisplayText = '';
     }
 
