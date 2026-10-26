@@ -11,7 +11,7 @@
 ### Removed
 
 ____
-## [7.2.0] - 2026-10-26
+## [7.2.0] - 2026-10-25
 ### Added
 
 - Added notification if insert citation fails
