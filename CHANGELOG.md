@@ -11,6 +11,37 @@
 ### Removed
 
 ____
+## [7.2.0] - 2026-10-26
+### Added
+
+- Added notification if insert citation fails
+
+### Changed
+
+- Updated engine to v5.1.0
+- Performance optimizations
+  - Regex
+  - Menus
+  - ASL cache
+  - Citations
+  - Search box refresh
+  - Avoid full-file read for language property
+
+### Fixed
+
+- Various fixes
+  - Cross-reference pop-over layout
+  - Sidebar layout
+  - Back and forward arrows on mobile
+  - Language chage propagation
+  - Refresh on language change
+  - Protect frontmatter from reformat
+  - Escape HTML
+
+### Removed
+
+- Cleaned up dead code
+
 ## [7.1.1] - 2026-10-20
 ### Changed
 - Updated engine to v5.0.0
@@ -231,6 +262,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[7.2.0]:https://github.com/erykjj/traverture/releases/tag/7.2.0
 [7.1.1]:https://github.com/erykjj/traverture/releases/tag/7.1.1
 [7.0.2]:https://github.com/erykjj/traverture/releases/tag/7.0.2
 [6.3.0]:https://github.com/erykjj/traverture/releases/tag/6.3.0
