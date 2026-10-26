@@ -145,10 +145,6 @@ export function clearEnginePool(): void {
     enginePool.clear();
 }
 
-export function getEnginePoolSize(): number {
-    return enginePool.size;
-}
-
 export function isEngineReady(): boolean {
     return engineInitialized;
 }
