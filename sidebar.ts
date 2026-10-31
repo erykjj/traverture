@@ -168,6 +168,11 @@ export class TravertureSidebarView extends ItemView {
     }
 
     private pushView(view: NavView): void {
+        const current = this.currentView();
+        if (current && current.kind === view.kind) {
+            if (view.kind === 'table' && current.kind === 'table') return;
+            if (view.kind === 'scripture' && current.kind === 'scripture' && view.bcv === current.bcv) return;
+        }
         this.history = this.history.slice(0, this.historyIndex + 1);
         this.history.push(view);
         this.historyIndex = this.history.length - 1;
