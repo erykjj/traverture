@@ -11,6 +11,11 @@
 ### Removed
 
 ____
+## [7.3.0] - 2026-10-31
+### Fixed
+
+- Don't store the same scripture in navigation history
+
 ## [7.2.0] - 2026-10-25
 ### Added
 
@@ -262,6 +267,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[7.3.0]:https://github.com/erykjj/traverture/releases/tag/7.3.0
 [7.2.0]:https://github.com/erykjj/traverture/releases/tag/7.2.0
 [7.1.1]:https://github.com/erykjj/traverture/releases/tag/7.1.1
 [7.0.2]:https://github.com/erykjj/traverture/releases/tag/7.0.2
