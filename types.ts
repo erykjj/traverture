@@ -3,7 +3,6 @@
 export interface TravertureSettings {
     sourceLanguage: string;
     outputLanguage: string;
-    autoDetect: boolean;
     titleFormat: 'full' | 'standard' | 'official';
     linkColor: string;
     sidebarColumns: string[];
@@ -15,7 +14,6 @@ export interface TravertureSettings {
 export const DEFAULT_SETTINGS: TravertureSettings = {
     sourceLanguage: 'en',
     outputLanguage: 'en',
-    autoDetect: true,
     titleFormat: 'full',
     linkColor: '',
     sidebarColumns: [
@@ -36,7 +34,6 @@ export interface LanguageInfo {
 
 export interface VerseData {
     html: string;
-    citation: string;
     footnotes?: Array<{ id: number; content: string; source: string }>;
     crossReferences?: Array<{ id: number; source: string; targets: Array<{ vs: string; standardCitation: string; abbreviatedCitation: string }> }>;
     commentaries?: Array<{ id: number; content: string; source: string }>;
@@ -63,10 +60,12 @@ export type NameFormat = 'full' | 'standard' | 'official';
 
 export type ParsedReference = [ string, number, number, string[][] ];
 
+export type ReformatItem = [ string, number, number, string ];
+
 export interface TravertureEngineInstance {
     parse(sourceLang: string, outputLang: string, nameFormat: NameFormat, capitalize: boolean, text: string): string;
-    parse_with_markers(text: string): string;
     decode_scriptures(encodedJson: string): string;
+    reformat(text: string): string;
 }
 
 export interface TravertureEngineStatic {
@@ -78,8 +77,6 @@ export interface TravertureEngineStatic {
         inrefensEnabled: boolean,
         engineId: number,
     ): TravertureEngineInstance;
-    get_chapter_count(bookId: number): number;
-    get_verse_count(bookId: number, chapter: number): number;
     get_available_languages(): string;
     get_lang_suffix(langCode: string): string;
     get_book_name(bookNumber: number, langCode: string, format: NameFormat, capitalize: boolean): string;
