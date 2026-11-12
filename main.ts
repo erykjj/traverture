@@ -5,10 +5,14 @@ import { EditorView } from '@codemirror/view';
 import { fetchVerseWithExtras, escapeHtml } from './cache';
 import { buildJwLibraryUrl, resolveClickContext } from './common';
 import { createTravertureEditorPlugin } from './editor';
-import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, getAvailableLanguagesCached as getAvailableLanguages, createMainEngine, parseFrontmatterLanguage, resolveLanguage } from './engine-wrapper';
+import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, reformatScriptures, getAvailableLanguagesCached as getAvailableLanguages, createMainEngine, parseFrontmatterLanguage, resolveLanguage } from './engine-wrapper';
 import { TravertureSettingTab } from './settings';
 import { TravertureSidebarView } from './sidebar';
 import { DEFAULT_SETTINGS, VIEW_TYPE_TRAVERTURE_SIDEBAR, SidebarRef, TravertureEngineInstance, NameFormat, ParsedReference, TravertureSettings } from './types';
+
+function parseFragment(html: string): Document {
+    return new DOMParser().parseFromString('<body>' + html, 'text/html');
+}
 
 function getSubmenu(item: MenuItem): Menu {
     return (item as unknown as { setSubmenu(): Menu }).setSubmenu();
@@ -20,6 +24,114 @@ function isInsideTripleEmphasis(node: Node): boolean {
     return !!el.closest('strong > em, em > strong');
 }
 
+function stripMarkup(html: string): { clean: string; origIndex: number[] } {
+    let clean = '';
+    const origIndex: number[] = [];
+    let i = 0;
+    while (i < html.length) {
+        const ch = html[i];
+        if (ch === '<') {
+            const close = html.indexOf('>', i);
+            if (close !== -1) { i = close + 1; continue; }
+        }
+        if (ch !== '*') {
+            clean += ch;
+            origIndex.push(i);
+        }
+        i++;
+    }
+    return { clean, origIndex };
+}
+
+function toEngineText(original: string): { text: string; origIndex: number[] } {
+    let text = '';
+    const origIndex: number[] = [];
+    let last = 0;
+    const blockPattern = /\{\{(.+?)\}\}/g;
+    let m: RegExpExecArray | null;
+    while ((m = blockPattern.exec(original)) !== null) {
+        for (let i = last; i < m.index; i++) { text += original[i]; origIndex.push(i); }
+        text += '\u27EA'; origIndex.push(m.index);
+        const innerStart = m.index + 2;
+        for (let i = 0; i < m[1].length; i++) { text += m[1][i]; origIndex.push(innerStart + i); }
+        text += '\u27EB'; origIndex.push(innerStart + m[1].length);
+        last = m.index + m[0].length;
+    }
+    for (let i = last; i < original.length; i++) { text += original[i]; origIndex.push(i); }
+    return { text, origIndex };
+}
+
+function locateInText(engineText: string, clauses: ParsedReference[]): Array<{ start: number; end: number } | null> {
+    const { text, engineIndex } = withoutMarkers(engineText);
+    const spans: Array<{ start: number; end: number } | null> = [];
+    let searchFrom = 0;
+    for (const [clauseText, startPos, endPos] of clauses) {
+        let start = startPos;
+        let end = endPos;
+        if (start < 0 || end > text.length || end <= start || text.substring(start, end) !== clauseText) {
+            let found = text.indexOf(clauseText, searchFrom);
+            if (found === -1) found = text.indexOf(clauseText);
+            if (found === -1) { spans.push(null); continue; }
+            start = found;
+            end = found + clauseText.length;
+        }
+        searchFrom = end;
+        spans.push({ start: engineIndex[start], end: engineIndex[end - 1] + 1 });
+    }
+    return spans;
+}
+
+function parseBcvSpan(bcv: string): { s: number; e: number } {
+    const parts = bcv.split('-');
+    const s = parseInt(parts[0], 10);
+    const e = parts.length > 1 ? parseInt(parts[1], 10) : s;
+    return { s, e };
+}
+
+function formatBcvSpan(span: { s: number; e: number }): string {
+    const s = String(span.s).padStart(8, '0');
+    const e = String(span.e).padStart(8, '0');
+    return s === e ? s : `${s}-${e}`;
+}
+
+// Merges overlapping or covered verses inside one citation group so no verse
+// is quoted twice. With `ascending` true the spans are also sorted; otherwise
+// typed order is kept (a merged span stays at its earliest position).
+function normalizeCitationBcvs(bcvs: string[], ascending: boolean): string[] {
+    const spans = bcvs.map(parseBcvSpan);
+    if (ascending) spans.sort((a, b) => (a.s - b.s) || (a.e - b.e));
+
+    let merged = true;
+    while (merged) {
+        merged = false;
+        for (let i = 0; i < spans.length && !merged; i++) {
+            for (let j = i + 1; j < spans.length; j++) {
+                if (spans[i].s <= spans[j].e && spans[j].s <= spans[i].e) {
+                    spans[i] = {
+                        s: Math.min(spans[i].s, spans[j].s),
+                        e: Math.max(spans[i].e, spans[j].e),
+                    };
+                    spans.splice(j, 1);
+                    merged = true;
+                    break;
+                }
+            }
+        }
+    }
+    return spans.map(formatBcvSpan);
+}
+
+function withoutMarkers(engineText: string): { text: string; engineIndex: number[] } {
+    let text = '';
+    const engineIndex: number[] = [];
+    for (let i = 0; i < engineText.length; i++) {
+        if (engineText[i] === '\u27EA' || engineText[i] === '\u27EB') continue;
+        text += engineText[i];
+        engineIndex.push(i);
+    }
+    return { text, engineIndex };
+}
+
 export default class TraverturePlugin extends Plugin {
     settings = DEFAULT_SETTINGS;
     engine: TravertureEngineInstance | null = null;
@@ -29,20 +141,20 @@ export default class TraverturePlugin extends Plugin {
     private processedLangCache = new Map<string, string>();
     public editorRefreshGeneration = 0;
     public sessionRestored = false;
+    private settingTab: TravertureSettingTab | null = null;
+    private engineTimer: number | null = null;
 
     async loadSettings() {
         const savedData = await this.loadData() as Partial<TravertureSettings> | null;
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData);
+        const settings = Object.assign({}, DEFAULT_SETTINGS, savedData) as TravertureSettings & { autoDetect?: unknown };
+        delete settings.autoDetect;
+        this.settings = settings;
     }
     async saveSettings() { await this.saveData(this.settings); }
 
     createEngine() {
         this.engine = createMainEngine(this.settings.sourceLanguage, this.settings.outputLanguage);
         prewarmEngines(this.settings.sourceLanguage, this.settings.outputLanguage);
-    }
-
-    safeParse(text: string): string | null {
-        return this.safeParseWith(text, this.settings.sourceLanguage);
     }
 
     safeParseWith(text: string, sourceLanguage: string): string | null {
@@ -161,6 +273,43 @@ export default class TraverturePlugin extends Plugin {
         }
     }
 
+    private async startEngine(): Promise<void> {
+        const inrefensOn = (this.app as unknown as {
+            plugins?: { enabledPlugins?: Set<string> };
+        }).plugins?.enabledPlugins?.has('inrefens') ?? false;
+
+        try {
+            await initEngine(this.app, inrefensOn);
+            this.createEngine();
+        } catch (e) {
+            console.error('tra.VER:ture: Failed to initialize engine:', e);
+            new Notice('tra.VER:ture: Failed to initialize engine.');
+            return;
+        }
+        if (!this.engine) {
+            new Notice('tra.VER:ture: Failed to initialize engine.');
+            return;
+        }
+        this.onEngineReady();
+    }
+
+    private onEngineReady(): void {
+        this.settingTab?.refreshForEngine();
+        this.editorRefreshGeneration++;
+        this.refreshEditorViews();
+        this.rerenderReadingViews();
+    }
+
+    private rerenderReadingViews(): void {
+        const leaves = this.app.workspace.getLeavesOfType('markdown');
+        for (const leaf of leaves) {
+            const view = leaf.view;
+            if (!(view instanceof MarkdownView)) continue;
+            if (view.getMode() !== 'preview') continue;
+            void this.forceRerenderLeaf(leaf);
+        }
+    }
+
     private refreshEditorViews(): void {
         const leaves = this.app.workspace.getLeavesOfType('markdown');
         for (const leaf of leaves) {
@@ -179,6 +328,7 @@ export default class TraverturePlugin extends Plugin {
     }
 
     public refreshReadingViews(): void {
+        if (!this.engine) return;
         const leaves = this.app.workspace.getLeavesOfType('markdown');
         for (const leaf of leaves) {
             const view = leaf.view;
@@ -260,8 +410,7 @@ export default class TraverturePlugin extends Plugin {
         const clauses = JSON.parse(parsed) as ParsedReference[];
         if (clauses.length === 0) return results;
 
-        for (const [clauseText] of clauses) {
-            const ranges = clauses.find(c => c[0] === clauseText)?.[3] || [];
+        for (const [clauseText, , , ranges] of clauses) {
             if (ranges.length === 0) continue;
 
             for (const range of ranges) {
@@ -290,9 +439,9 @@ export default class TraverturePlugin extends Plugin {
         return results;
     }
 
-    async parseBcvs(bcvs: string[]): Promise<SidebarRef[]> {
+    async parseBcvs(items: Array<{ bcv: string; text: string }>): Promise<SidebarRef[]> {
         const results: SidebarRef[] = [];
-        for (const bcv of bcvs) {
+        for (const { bcv, text } of items) {
             const parts = bcv.split('-');
             const startBcv = parts[0];
             const endBcv = parts.length > 1 ? parts[1] : parts[0];
@@ -302,7 +451,7 @@ export default class TraverturePlugin extends Plugin {
             const offDecoded = decodeScriptures(singleRange, 'en', 'official');
             const bookNum = parseInt(startBcv.substring(0, 2));
             results.push({
-                scripture: fullDecoded?.[0] || bcv,
+                scripture: text || fullDecoded?.[0] || bcv,
                 fullRef: fullDecoded?.[0] || bcv,
                 standardRef: stdDecoded?.[0] || '',
                 officialRef: offDecoded?.[0] || '',
@@ -318,30 +467,28 @@ export default class TraverturePlugin extends Plugin {
         return results;
     }
 
-    async showSidebarWithResults(refs: SidebarRef[]) {
+    private async getSidebarLeaf(): Promise<WorkspaceLeaf | null> {
         const { workspace } = this.app;
-        let leaves = workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
-        let leaf: WorkspaceLeaf;
-        if (leaves.length > 0) { leaf = leaves[0]; }
-        else { const rightLeaf = workspace.getRightLeaf(false); if (!rightLeaf) return; await rightLeaf.setViewState({ type: VIEW_TYPE_TRAVERTURE_SIDEBAR, active: true }); leaf = rightLeaf; }
+        let leaf: WorkspaceLeaf | null = workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR)[0] ?? null;
+        if (!leaf) {
+            leaf = workspace.getRightLeaf(false);
+            if (!leaf) return null;
+            await leaf.setViewState({ type: VIEW_TYPE_TRAVERTURE_SIDEBAR, active: true });
+        }
         await leaf.loadIfDeferred();
         void workspace.revealLeaf(leaf);
+        return leaf;
+    }
+
+    async showSidebarWithResults(refs: SidebarRef[]) {
+        const leaf = await this.getSidebarLeaf();
+        if (!leaf) return;
         void (leaf.view as TravertureSidebarView).displayResults(refs);
     }
 
     async showScripture(bcv: string, displayText: string, timecodes?: string): Promise<void> {
-        const { workspace } = this.app;
-        let leaves = workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
-        let leaf: WorkspaceLeaf;
-        if (leaves.length > 0) { leaf = leaves[0]; }
-        else {
-            const rightLeaf = workspace.getRightLeaf(false);
-            if (!rightLeaf) return;
-            await rightLeaf.setViewState({ type: VIEW_TYPE_TRAVERTURE_SIDEBAR, active: true });
-            leaf = rightLeaf;
-        }
-        await leaf.loadIfDeferred();
-        void workspace.revealLeaf(leaf);
+        const leaf = await this.getSidebarLeaf();
+        if (!leaf) return;
         void (leaf.view as TravertureSidebarView).displayScripture(bcv, displayText, timecodes);
     }
 
@@ -350,6 +497,7 @@ export default class TraverturePlugin extends Plugin {
     // ──────────────────────────────────────────────
 
     async processElement(el: HTMLElement, sourcePath?: string) {
+        if (!this.engine) return;
         if (el.querySelector('.callout')) return;
         const hasRealSvg = [...el.querySelectorAll('svg')].some(
             svg => !svg.closest('.list-bullet')
@@ -363,56 +511,16 @@ export default class TraverturePlugin extends Plugin {
             let html = el.innerHTML;
 
             // Process {{ }} blocks (forced parsing)
-            if (/\{\{(.+?)\}\}/g.test(html)) {
-                html = html.replace(/\{\{(.+?)\}\}/g, (_fullMatch: string, inner: string) => {
-                    if (!this.engine) return _fullMatch;
-
-                    const refText = inner.replace(/\*\*/g, '').replace(/\*/g, '');
-                    const engineInput = '⟪⟪' + refText + '⟫⟫';
-                    const parsed = this.safeParseWith(engineInput, sourceLang);
-                    if (!parsed) return inner;
-                    const clauses = JSON.parse(parsed) as ParsedReference[];
-                    if (clauses.length === 0) return inner;
-
-                    let result = inner;
-                    let bookName = '';
-                    const sorted = [...clauses].sort((a, b) => b[0].length - a[0].length);
-
-                    for (let i = 0; i < sorted.length; i++) {
-                        const [clauseText, , , ranges] = sorted[i];
-                        const origIndex = clauses.indexOf(sorted[i]);
-
-                        if (origIndex === 0) {
-                            const match = clauseText.match(/^(.+?)\s+\d/);
-                            if (match) bookName = match[1];
-                        }
-
-                        let displayText = clauseText;
-                        if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
-                            displayText = `${bookName} ${clauseText}`;
-                        }
-
-                        for (const range of ranges) {
-                            const bcv = range[0] === range[1] ? range[0] : `${range[0]}-${range[1]}`;
-                            const link = `<a class="traverture-ref-link" data-bcv="${escapeHtml(bcv)}" data-ref="${escapeHtml(displayText)}">${clauseText}</a>`;
-                            const escaped = clauseText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-                            if (/^\d+$/.test(clauseText)) {
-                                const regex = new RegExp(`(^|[\\s,;])${escaped}(?=[\\s,;]|$)`, 'g');
-                                result = result.replace(regex, `$1${link}`);
-                            } else {
-                                result = result.replace(new RegExp(escaped), link);
-                            }
-                            break;
-                        }
-                    }
-                    return result;
+            if (/\{\{(.+?)\}\}/.test(html)) {
+                html = html.replace(/\{\{(.+?)\}\}/g, (fullMatch: string, inner: string) => {
+                    if (!this.engine) return fullMatch;
+                    return this.linkBlock(inner, sourceLang);
                 });
             }
 
-            if (this.settings.autoDetect && this.engine) {
+            if (this.engine) {
                 const tempDiv = createDiv();
-                const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
+                const parsedHtml = parseFragment(html);
                 for (const child of Array.from(parsedHtml.body.childNodes)) {
                     tempDiv.appendChild(child.cloneNode(true));
                 }
@@ -448,19 +556,17 @@ export default class TraverturePlugin extends Plugin {
                     const linked = this.insertLinks(text, clauses);
                     if (linked !== text) {
                         const fragment = createFragment();
-                        const span = createSpan();
-                        const parsedLinked = new DOMParser().parseFromString(linked, 'text/html');
+                        const parsedLinked = parseFragment(linked);
                         for (const child of Array.from(parsedLinked.body.childNodes)) {
                             fragment.appendChild(child.cloneNode(true));
                         }
-                        while (span.firstChild) fragment.appendChild(span.firstChild);
                         textNode.parentNode?.replaceChild(fragment, textNode);
                     }
                 }
                 html = tempDiv.innerHTML;
             }
 
-            const parsed = new DOMParser().parseFromString(html, 'text/html');
+            const parsed = parseFragment(html);
             while (el.firstChild) el.removeChild(el.firstChild);
             for (const child of Array.from(parsed.body.childNodes)) {
                 el.appendChild(child.cloneNode(true));
@@ -488,6 +594,48 @@ export default class TraverturePlugin extends Plugin {
         } finally {
             this.processingElements.delete(el);
         }
+    }
+
+    private linkBlock(inner: string, sourceLang: string): string {
+        const { clean, origIndex } = stripMarkup(inner);
+        const engineText = '\u27EA\u27EA' + clean + '\u27EB\u27EB';
+        const parsed = this.safeParseWith(engineText, sourceLang);
+        if (!parsed) return inner;
+        const clauses = JSON.parse(parsed) as ParsedReference[];
+        if (clauses.length === 0) return inner;
+
+        const spans = locateInText(engineText, clauses);
+        let bookName = '';
+        let result = '';
+        let pos = 0;
+
+        for (let i = 0; i < clauses.length; i++) {
+            const [clauseText, , , ranges] = clauses[i];
+
+            if (i === 0) {
+                const match = clauseText.match(/^(.+?)\s+\d/);
+                if (match) bookName = match[1];
+            }
+
+            const span = spans[i];
+            if (ranges.length === 0 || !span) continue;
+
+            const start = origIndex[span.start - 2];
+            const end = origIndex[span.end - 3] + 1;
+            if (start === undefined || end === undefined || start < pos) continue;
+            if (inner.substring(start, end).includes('<')) continue;
+
+            let displayText = clauseText;
+            if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
+                displayText = `${bookName} ${clauseText}`;
+            }
+
+            const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
+            result += inner.substring(pos, start)
+                + `<a class="traverture-ref-link" data-bcv="${escapeHtml(bcv)}" data-ref="${escapeHtml(displayText)}">${clauseText}</a>`;
+            pos = end;
+        }
+        return result + inner.substring(pos);
     }
 
     private insertLinks(text: string, clauses: ParsedReference[]): string {
@@ -536,98 +684,98 @@ export default class TraverturePlugin extends Plugin {
     // Reformat / insert
     // ──────────────────────────────────────────────
 
-    reformatReferences(editor: Editor, text: string, format: NameFormat, sourceLang: string, wholeDoc: boolean = false) {
+    private applyReformat(text: string, format: NameFormat, sourceLang: string): string | null {
+        const items = reformatScriptures(text, sourceLang, format);
+        if (!items || items.length === 0) return null;
         const parsed = this.safeParseWith(text, sourceLang);
-        if (!parsed) return;
-
+        if (!parsed) return null;
         const clauses = JSON.parse(parsed) as ParsedReference[];
-        if (clauses.length === 0) return;
+        if (clauses.length === 0) return null;
 
-        let processed = text;
-
-        for (let i = clauses.length - 1; i >= 0; i--) {
-            const [, startPos, endPos, ranges] = clauses[i];
-            if (ranges.length === 0) continue;
-
-            const decoded = decodeScriptures([ranges[0] as [string, string]], sourceLang, format);
-            const formattedRef = decoded?.[0] || '';
-            if (!formattedRef) continue;
-
-            const before = processed.substring(0, startPos);
-            const after = processed.substring(endPos);
-            processed = before + formattedRef + after;
+        let result = text;
+        for (let i = items.length - 1; i >= 0; i--) {
+            const [, start, end, rewritten] = items[i];
+            if (!clauses.some(c => c[1] >= start && c[2] <= end)) continue;
+            result = result.substring(0, start) + rewritten + result.substring(end);
         }
+        return result;
+    }
 
-        if (wholeDoc) { editor.setValue(processed); }
-        else { editor.replaceSelection(processed); }
+    reformatReferences(editor: Editor, text: string, format: NameFormat, sourceLang: string) {
+        const reformatted = this.applyReformat(text, format, sourceLang);
+        if (reformatted === null || reformatted === text) return;
+        editor.replaceSelection(reformatted);
     }
 
     private reformatDocument(editor: Editor, format: NameFormat, sourceLang: string): void {
         const full = editor.getValue();
         const { frontmatter, body } = this.splitFrontmatter(full);
-        const parsed = this.safeParseWith(body, sourceLang);
-        if (!parsed) return;
-        const clauses = JSON.parse(parsed) as ParsedReference[];
-        if (clauses.length === 0) return;
-
-        let processed = body;
-        for (let i = clauses.length - 1; i >= 0; i--) {
-            const [, startPos, endPos, ranges] = clauses[i];
-            if (ranges.length === 0) continue;
-            const decoded = decodeScriptures([ranges[0] as [string, string]], sourceLang, format);
-            const formattedRef = decoded?.[0] || '';
-            if (!formattedRef) continue;
-            processed = processed.substring(0, startPos) + formattedRef + processed.substring(endPos);
-        }
-        editor.setValue(frontmatter + processed);
+        const reformatted = this.applyReformat(body, format, sourceLang);
+        if (reformatted === null || reformatted === body) return;
+        editor.setValue(frontmatter + reformatted);
     }
 
     private async prefetchCitationVerseText(
-        clauses: ParsedReference[],
+        bcvs: string[],
         withRef: boolean,
         fetchedCache: Map<string, string>,
     ): Promise<void> {
         const CONCURRENCY = 4;
+        const lang = this.settings.outputLanguage;
 
-        const tasks: Array<{ cacheKey: string; bcv: string }> = [];
+        const tasks: string[] = [];
         const seen = new Set<string>();
-        for (const [, , , ranges] of clauses) {
-            if (ranges.length === 0) continue;
-            const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
-            const cacheKey = `${this.settings.outputLanguage}:${bcv}`;
-            if (seen.has(cacheKey)) continue;
-            seen.add(cacheKey);
-            tasks.push({ cacheKey, bcv });
+        for (const bcv of bcvs) {
+            if (seen.has(bcv)) continue;
+            seen.add(bcv);
+            tasks.push(bcv);
         }
+
+        const toText = (div: HTMLElement): string => (div.textContent || '')
+            .replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ')
+            .replace(/\+/g, '').replace(/\*/g, '')
+            .replace(/\s+/g, ' ').trim();
 
         const worker = async (): Promise<void> => {
             for (;;) {
-                const task = tasks.shift();
-                if (!task) return;
-                const verseData = await fetchVerseWithExtras(task.bcv, this.settings.outputLanguage);
+                const bcv = tasks.shift();
+                if (bcv === undefined) return;
+                const cacheKey = `${lang}:${bcv}`;
+
+                const verseData = await fetchVerseWithExtras(bcv, lang);
                 if (!verseData) {
-                    fetchedCache.set(task.cacheKey, '');
+                    fetchedCache.set(cacheKey, '');
+                    if (!withRef) fetchedCache.set(`${cacheKey}:plain`, '');
                     continue;
                 }
-                const html = verseData.html.replace(/<span class="parabreak"><\/span>/g, ' ').replace(/<span class="newblock"><\/span>/g, ' ');
+                const html = verseData.html
+                    .replace(/<span class="parabreak"><\/span>/g, ' ')
+                    .replace(/<span class="newblock"><\/span>/g, ' ');
                 const tempDiv = createDiv();
                 const parsedHtml = new DOMParser().parseFromString(html, 'text/html');
                 for (const child of Array.from(parsedHtml.body.childNodes)) {
                     tempDiv.appendChild(child.cloneNode(true));
                 }
-                if (withRef) {
-                    tempDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
-                } else {
-                    tempDiv.querySelectorAll('.chapterNum').forEach(el => {
-                        const textNode = el.querySelector('a') || el;
-                        if (textNode) textNode.textContent = '1 ';
-                    });
+
+                const needsPlain = withRef || !bcv.includes('-');
+                let plainText = '';
+                if (needsPlain) {
+                    const plainDiv = tempDiv.cloneNode(true) as HTMLElement;
+                    plainDiv.querySelectorAll('sup.verseNum, .chapterNum').forEach(el => el.remove());
+                    plainText = toText(plainDiv);
                 }
-                const verseText = (tempDiv.textContent || '')
-                    .replace(/\u00A0/g, ' ').replace(/\u202F/g, ' ')
-                    .replace(/\+/g, '').replace(/\*/g, '')
-                    .replace(/\s+/g, ' ').trim();
-                fetchedCache.set(task.cacheKey, verseText);
+
+                if (withRef) {
+                    fetchedCache.set(cacheKey, plainText);
+                    continue;
+                }
+
+                tempDiv.querySelectorAll('.chapterNum').forEach(el => {
+                    const textNode = el.querySelector('a') || el;
+                    if (textNode) textNode.textContent = '1 ';
+                });
+                fetchedCache.set(cacheKey, toText(tempDiv));
+                if (needsPlain) fetchedCache.set(`${cacheKey}:plain`, plainText);
             }
         };
 
@@ -638,44 +786,91 @@ export default class TraverturePlugin extends Plugin {
     }
 
     async insertCitation(editor: Editor, text: string, withRef: boolean, sourceLang: string) {
-        const engineText = text.replace(/\{\{(.+?)\}\}/g, '⟪$1⟫');
+        const { text: engineText, origIndex } = toEngineText(text);
         const parsed = this.safeParseWith(engineText, sourceLang);
         if (!parsed) { new Notice('No scripture references found.'); return; }
         const clauses = JSON.parse(parsed) as ParsedReference[];
         if (clauses.length === 0) { new Notice('No scripture references found.'); return; }
 
-        const fetchedCache = new Map<string, string>();
-        await this.prefetchCitationVerseText(clauses, withRef, fetchedCache);
+        const spans = locateInText(engineText, clauses);
 
-        let result = text;
+        const groups: Array<{ start: number; end: number; bcvs: string[]; prefix: string }> = [];
         let failed = 0;
-        let total = 0;
-        for (let i = clauses.length - 1; i >= 0; i--) {
+        let bookName = '';
+        let lastChapterKey = '';
+
+        for (let i = 0; i < clauses.length; i++) {
             const [clauseText, , , ranges] = clauses[i];
+            const bare = /^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText);
+            if (!bare) {
+                const match = clauseText.match(/^(.+?)\s+\d/);
+                if (match) bookName = match[1];
+            }
             if (ranges.length === 0) continue;
-            total++;
-            let origStart = text.indexOf('{{' + clauseText + '}}');
-            let origLength: number;
-            let originalRef: string;
-            if (origStart !== -1) {
-                origLength = clauseText.length + 4;
-                originalRef = '{{' + clauseText + '}}';
+
+            const span = spans[i];
+            const start = span ? origIndex[span.start] : undefined;
+            const end = span ? origIndex[span.end - 1] + 1 : undefined;
+            if (start === undefined || end === undefined) { failed++; continue; }
+
+            const [firstBcv, lastBcv] = ranges[0];
+            const startChapterKey = firstBcv.substring(0, 5);
+            const bcv = firstBcv === lastBcv ? firstBcv : `${firstBcv}-${lastBcv}`;
+
+            const prev = groups[groups.length - 1];
+            if (prev && bare && startChapterKey === lastChapterKey
+                && /^\s*[,;]\s*$/.test(text.substring(prev.end, start))) {
+                prev.end = end;
+                prev.bcvs.push(bcv);
             } else {
-                origStart = text.indexOf(clauseText);
-                if (origStart === -1) { failed++; continue; }
-                origLength = clauseText.length;
-                originalRef = clauseText;
+                let prefix = '';
+                if (bare && bookName) {
+                    prefix = !clauseText.includes(':') && startChapterKey === lastChapterKey
+                        ? `${bookName} ${parseInt(firstBcv.substring(2, 5), 10)}:`
+                        : `${bookName} `;
+                }
+                groups.push({ start, end, bcvs: [bcv], prefix });
             }
-            const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
-            const cacheKey = `${this.settings.outputLanguage}:${bcv}`;
-            const verseText = fetchedCache.get(cacheKey);
-            if (verseText) {
-                const before = result.substring(0, origStart);
-                const after = result.substring(origStart + origLength);
-                result = before + (withRef ? `"${verseText}" (${originalRef})` : `${originalRef}: "${verseText}"`) + after;
-            } else {
-                failed++;
+            lastChapterKey = lastBcv.substring(0, 5);
+        }
+
+        const allBcvs: string[] = [];
+        for (const group of groups) {
+            group.bcvs = normalizeCitationBcvs(group.bcvs, !withRef);
+            allBcvs.push(...group.bcvs);
+        }
+        const fetchedCache = new Map<string, string>();
+        await this.prefetchCitationVerseText(allBcvs, withRef, fetchedCache);
+
+        const lang = this.settings.outputLanguage;
+        const total = groups.length + failed;
+        let result = text;
+        for (let g = groups.length - 1; g >= 0; g--) {
+            const group = groups[g];
+
+            const usePlain = !withRef && group.bcvs.length === 1 && !group.bcvs[0].includes('-');
+            const verseTexts = group.bcvs.map(b => fetchedCache.get(`${lang}:${b}${usePlain ? ':plain' : ''}`));
+            if (verseTexts.some(v => !v)) { failed++; continue; }
+
+            let quote = verseTexts[0] as string;
+            for (let k = 1; k < verseTexts.length; k++) {
+                const consecutive = parseBcvSpan(group.bcvs[k]).s === parseBcvSpan(group.bcvs[k - 1]).e + 1;
+                quote += (consecutive ? ' ' : ' [...] ') + (verseTexts[k] as string);
             }
+
+            let start = group.start;
+            let end = group.end;
+            let prefix = group.prefix;
+            if (text.substring(start - 2, start) === '{{' && text.substring(end, end + 2) === '}}') {
+                start -= 2;
+                end += 2;
+                prefix = '';
+            }
+            const originalRef = prefix + text.substring(start, end);
+
+            result = result.substring(0, start)
+                + (withRef ? `"${quote}" (${originalRef})` : `${originalRef}: "${quote}"`)
+                + result.substring(end);
         }
         if (failed > 0) {
             new Notice(
@@ -798,7 +993,7 @@ export default class TraverturePlugin extends Plugin {
     }
 
     private addReadingModeMenuItems(menu: Menu, domSelection: Selection | null, sourceLang: string): void {
-        let bcvs: string[] = [];
+        const items: Array<{ bcv: string; text: string }> = [];
         let hasSelection = false;
         if (domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed) {
             hasSelection = true;
@@ -809,15 +1004,15 @@ export default class TraverturePlugin extends Plugin {
             links.forEach((link: Element) => {
                 if (domSelection.containsNode(link, true)) {
                     const bcv = link.getAttribute('data-bcv');
-                    if (bcv) bcvs.push(bcv);
+                    if (bcv) items.push({ bcv, text: link.textContent || '' });
                 }
             });
         }
 
         if (hasSelection) {
             menu.addItem((subItem: MenuItem) => subItem.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
-                if (bcvs.length > 0) {
-                    await this.showSidebarWithResults(await this.parseBcvs(bcvs));
+                if (items.length > 0) {
+                    await this.showSidebarWithResults(await this.parseBcvs(items));
                 } else {
                     const textSelection = domSelection?.toString() || '';
                     await this.showSidebarWithResults(await this.parseReferences(textSelection, sourceLang));
@@ -853,7 +1048,6 @@ export default class TraverturePlugin extends Plugin {
         const activeMarkdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
         if (!activeMarkdownView) {
-            // No markdown view active at all — only language menus
             menu.addItem((item: MenuItem) => {
                 item.setTitle('Source language').setIcon('book-open');
                 const langMenu = getSubmenu(item);
@@ -906,18 +1100,8 @@ export default class TraverturePlugin extends Plugin {
         this.applyLinkColor();
         this.applyPaneFontScale();
 
-        const inrefensOn = (this.app as unknown as {
-            plugins?: { enabledPlugins?: Set<string> };
-        }).plugins?.enabledPlugins?.has('inrefens') ?? false;
-
-        try {
-            await initEngine(this.app, inrefensOn); this.createEngine();
-        } catch (e) {
-            console.error('tra.VER:ture: Failed to initialize engine:', e);
-            new Notice('tra.VER:ture: Failed to initialize engine.');
-        }
-
-        this.addSettingTab(new TravertureSettingTab(this.app, this));
+        this.settingTab = new TravertureSettingTab(this.app, this);
+        this.addSettingTab(this.settingTab);
         this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
 
         this.registerEditorExtension(createTravertureEditorPlugin(this));
@@ -945,21 +1129,17 @@ export default class TraverturePlugin extends Plugin {
         }));
 
         this.app.workspace.onLayoutReady(() => {
+            this.app.workspace.detachLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
             this.sessionRestored = true;
 
-            void (async () => {
-                const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
-                for (const leaf of leaves) {
-                    await leaf.loadIfDeferred();
-                    const view = leaf.view;
-                    if (view instanceof TravertureSidebarView && view.isEmpty()) {
-                        leaf.detach();
-                    }
-                }
-            })();
+            this.engineTimer = window.setTimeout(() => {
+                this.engineTimer = null;
+                void this.startEngine();
+            }, 100);
         });
 
         this.registerEvent(this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, _view) => {
+            if (!this.engine) return;
             const selection = editor.getSelection();
             const activeFile = this.app.workspace.getActiveFile();
             const sourceLang = this.getEffectiveSourceLanguage(activeFile, editor.getValue());
@@ -971,8 +1151,13 @@ export default class TraverturePlugin extends Plugin {
         }));
 
         this.registerDomEvent(activeDocument, 'contextmenu', (evt: MouseEvent) => {
+            if (!this.engine) return;
             const view = this.app.workspace.getActiveViewOfType(MarkdownView);
             if (!view || view.getMode() !== 'preview') return;
+
+            const target = evt.target as HTMLElement | null;
+            if (!target?.closest?.('.markdown-preview-view') || !view.containerEl.contains(target)) return;
+
             const sourceLang = view.file ? this.getEffectiveSourceLanguage(view.file) : this.settings.sourceLanguage;
             const domSelection = activeDocument.getSelection();
 
@@ -988,14 +1173,15 @@ export default class TraverturePlugin extends Plugin {
             menu.showAtMouseEvent(evt);
         });
 
-        this.addRibbonIcon('scroll', 'tra.VER:ture', () => {
+        this.addRibbonIcon('scroll', 'tra.VER:ture', (evt: MouseEvent) => {
+            if (!this.engine) { new Notice('tra.VER:ture is still loading.'); return; }
             const activeFile = this.app.workspace.getActiveFile();
             const editor = this.app.workspace.activeEditor?.editor;
             const sourceLang = this.getEffectiveSourceLanguage(
                 activeFile,
                 editor ? editor.getValue() : undefined,
             );
-            this.showTravertureMenu(sourceLang).showAtMouseEvent({ clientX: 100, clientY: 100 } as MouseEvent);
+            this.showTravertureMenu(sourceLang).showAtMouseEvent(evt);
         });
 
         this.addCommand({
@@ -1003,6 +1189,7 @@ export default class TraverturePlugin extends Plugin {
             name: 'Open menu',
             icon: 'scroll',
             callback: () => {
+                if (!this.engine) { new Notice('tra.VER:ture is still loading.'); return; }
                 const activeFile = this.app.workspace.getActiveFile();
                 const editor = this.app.workspace.activeEditor?.editor;
                 const sourceLang = this.getEffectiveSourceLanguage(
@@ -1015,6 +1202,14 @@ export default class TraverturePlugin extends Plugin {
     }
 
     onunload() {
+        if (this.engineTimer !== null) {
+            window.clearTimeout(this.engineTimer);
+            this.engineTimer = null;
+        }
+        const root = activeDocument.documentElement;
+        root.style.removeProperty('--traverture-link-color');
+        root.style.removeProperty('--traverture-pane-font-scale');
+        activeDocument.querySelectorAll('.traverture-marker-popover').forEach(el => el.remove());
         clearEnginePool();
     }
 }
