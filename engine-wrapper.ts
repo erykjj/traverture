@@ -4,7 +4,7 @@
 import * as wasmModuleUntyped from './engine.js';
 import wasmBinary from './engine_bg.wasm';
 import { App } from 'obsidian';
-import { TravertureEngineInstance, TravertureEngineStatic, NameFormat, ParsedReference, LanguageInfo } from './types';
+import { TravertureEngineInstance, TravertureEngineStatic, NameFormat, LanguageInfo, ReformatItem } from './types';
 
 const WASM_START = '/*WASM-START*/';
 const WASM_END = '/*WASM-END*/';
@@ -149,34 +149,12 @@ export function isEngineReady(): boolean {
     return engineInitialized;
 }
 
-function getParsingEngine(sourceLanguage: string): TravertureEngineInstance | null {
-    return getOrCreateEngine(sourceLanguage, 'full');
-}
-
 function getDecodingEngine(
     outputLanguage: string,
     nameFormat: NameFormat = 'full',
     capitalize: boolean = false
 ): TravertureEngineInstance | null {
     return getOrCreateEngine(outputLanguage, nameFormat, capitalize);
-}
-
-export function parseReferences(
-    text: string,
-    sourceLanguage: string,
-    outputLanguage: string,
-    nameFormat: NameFormat = 'full',
-    capitalize: boolean = false
-): ParsedReference[] | null {
-    const engine = getParsingEngine(sourceLanguage);
-    if (!engine) return null;
-    try {
-        const result = engine.parse(sourceLanguage, outputLanguage, nameFormat, capitalize, text);
-        return JSON.parse(result) as ParsedReference[];
-    } catch (e) {
-        console.error('tra.VER:ture: Failed to parse references:', e);
-        return null;
-    }
 }
 
 export function decodeScriptures(
@@ -193,6 +171,17 @@ export function decodeScriptures(
         return JSON.parse(result) as string[];
     } catch (e) {
         console.error('tra.VER:ture: Failed to decode scriptures:', e);
+        return null;
+    }
+}
+
+export function reformatScriptures(text: string, language: string, nameFormat: NameFormat): ReformatItem[] | null {
+    const engine = getOrCreateEngine(language, nameFormat);
+    if (!engine) return null;
+    try {
+        return JSON.parse(engine.reformat(text)) as ReformatItem[];
+    } catch (e) {
+        console.error('tra.VER:ture: Failed to reformat scriptures:', e);
         return null;
     }
 }
@@ -250,10 +239,10 @@ export function getAvailableLanguages(): LanguageInfo[] {
 let cachedLanguages: LanguageInfo[] | null = null;
 
 export function getAvailableLanguagesCached(): LanguageInfo[] {
-    if (!cachedLanguages) {
-        cachedLanguages = getAvailableLanguages();
-    }
-    return cachedLanguages ?? [];
+    if (cachedLanguages) return cachedLanguages;
+    const languages = getAvailableLanguages();
+    if (languages.length > 0) cachedLanguages = languages;
+    return languages;
 }
 
 export function resolveLanguage(input: string): string | null {
@@ -316,27 +305,5 @@ export function getAslMetadataUrl(bookNumber: number, chapter: number): string {
         return wasmModule.TravertureEngine.get_asl_metadata_url(bookNumber, chapter);
     } catch {
         return '';
-    }
-}
-
-export function getChapterCount(bookId: number): number {
-    if (!engineInitialized) {
-        return 0;
-    }
-    try {
-        return wasmModule.TravertureEngine.get_chapter_count(bookId);
-    } catch {
-        return 0;
-    }
-}
-
-export function getVerseCount(bookId: number, chapter: number): number {
-    if (!engineInitialized) {
-        return 0;
-    }
-    try {
-        return wasmModule.TravertureEngine.get_verse_count(bookId, chapter);
-    } catch {
-        return 0;
     }
 }
