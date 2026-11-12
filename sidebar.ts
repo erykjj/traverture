@@ -23,6 +23,10 @@ export const SIDEBAR_COLUMNS = [
 type SidebarColumn = typeof SIDEBAR_COLUMNS[number];
 type SidebarColumnKey = SidebarColumn['key'];
 
+const NUMERIC_SORT_KEYS: ReadonlySet<SidebarColumnKey> = new Set<SidebarColumnKey>([
+    'startCh', 'endCh', 'startVerse', 'endVerse',
+]);
+
 type SidebarMode = 'table' | 'scripture';
 
 interface ScriptureView {
@@ -122,10 +126,6 @@ export class TravertureSidebarView extends ItemView {
         };
     }
 
-    isEmpty(): boolean {
-        return this.history.length === 0 && this.allRefs.length === 0;
-    }
-
     async displayResults(refs: SidebarRef[]) {
         this.allRefs = refs;
         this.sortColumn = null;
@@ -147,15 +147,16 @@ export class TravertureSidebarView extends ItemView {
         if (this.outputLang === 'ase' && !resolvedTimecodes) {
             resolvedTimecodes = await getAslTimecodes(bcv);
         }
-        let title = titleOverride;
-        if (!title) {
-            const parts = bcv.split('-');
-            const startBcv = parts[0];
-            const endBcv = parts.length > 1 ? parts[1] : parts[0];
-            const decoded = decodeScriptures([[startBcv, endBcv]], this.outputLang, this.plugin.settings.titleFormat);
-            title = decoded?.[0] || displayText;
-        }
+        const title = titleOverride || this.decodeTitle(bcv, displayText);
         this.pushView({ kind: 'scripture', bcv, displayText: title, timecodes: resolvedTimecodes });
+    }
+
+    private decodeTitle(bcv: string, fallback: string): string {
+        const parts = bcv.split('-');
+        const startBcv = parts[0];
+        const endBcv = parts.length > 1 ? parts[1] : parts[0];
+        const decoded = decodeScriptures([[startBcv, endBcv]], this.outputLang, this.plugin.settings.titleFormat);
+        return decoded?.[0] || fallback;
     }
 
     public onOutputLanguageChanged(newLang: string): void {
@@ -164,7 +165,19 @@ export class TravertureSidebarView extends ItemView {
         const view = this.currentView();
         if (view?.kind === 'table') {
             this.renderTable();
+        } else if (view?.kind === 'scripture') {
+            void this.refreshScriptureForLanguage(view);
         }
+    }
+
+    private async refreshScriptureForLanguage(view: ScriptureView): Promise<void> {
+        const lang = this.outputLang;
+        const title = this.decodeTitle(view.bcv, view.displayText);
+        const timecodes = lang === 'ase' ? await getAslTimecodes(view.bcv) : undefined;
+        if (this.outputLang !== lang || this.currentView() !== view) return;
+        view.displayText = title;
+        view.timecodes = timecodes;
+        this.renderScripture(view);
     }
 
     private pushView(view: NavView): void {
@@ -420,12 +433,14 @@ export class TravertureSidebarView extends ItemView {
         }
         if (this.sortColumn && this.sortDir !== 0) {
             const sortKey = this.sortColumn as SidebarColumnKey;
-            refs.sort((a, b) => {
-                const aVal = this.getRefValue(a, sortKey);
-                const bVal = this.getRefValue(b, sortKey);
-                const cmp = aVal.localeCompare(bVal);
-                return this.sortDir === 1 ? cmp : -cmp;
-            });
+            const dir = this.sortDir;
+            const keyed = refs.map(ref => ({ ref, val: this.getRefValue(ref, sortKey) }));
+            if (NUMERIC_SORT_KEYS.has(sortKey)) {
+                keyed.sort((a, b) => ((Number(a.val) || 0) - (Number(b.val) || 0)) * dir);
+            } else {
+                keyed.sort((a, b) => a.val.localeCompare(b.val) * dir);
+            }
+            refs = keyed.map(k => k.ref);
         }
         return refs;
     }
@@ -503,7 +518,7 @@ export class TravertureSidebarView extends ItemView {
         const copyBtn = topRow.createEl('button', { text: 'COPY', cls: 'traverture-sidebar-copy-btn' });
         copyBtn.addEventListener('click', () => {
             const headers = visibleCols.map(c => c.label).join('\t');
-            const body = refs.map(r => visibleCols.map(c => this.getRefValue(r, c.key)).join('\t')).join('\n');
+            const body = this.getFilteredSortedRefs().map(r => visibleCols.map(c => this.getRefValue(r, c.key)).join('\t')).join('\n');
             void navigator.clipboard.writeText(`${headers}\n${body}`);
             copyBtn.textContent = 'COPIED';
             window.setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1500);
