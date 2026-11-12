@@ -1,7 +1,7 @@
 // settings.ts
 
 import { App, PluginSettingTab, SettingDefinitionItem } from 'obsidian';
-import { getEngineVersion, getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
+import { getEngineVersion, isEngineReady, getAvailableLanguagesCached as getAvailableLanguages } from './engine-wrapper';
 import TraverturePlugin from './main';
 
 const LINK_COLOR_OPTIONS: Array<{ value: string; label: string }> = [
@@ -27,17 +27,27 @@ export class TravertureSettingTab extends PluginSettingTab {
         );
     }
 
+    refreshForEngine(): void {
+        this.update();
+    }
+
     getSettingDefinitions(): SettingDefinitionItem[] {
         const languages = getAvailableLanguages();
 
         const sourceLangOptions: Record<string, string> = {};
-        for (const lang of languages.filter(l => l.code !== 'ase')) {
-            sourceLangOptions[lang.code] = `${lang.vernacularName} (${lang.code})`;
-        }
-
         const outputLangOptions: Record<string, string> = {};
-        for (const lang of languages) {
-            outputLangOptions[lang.code] = `${lang.vernacularName} (${lang.code})`;
+        if (languages.length > 0) {
+            for (const lang of languages.filter(l => l.code !== 'ase')) {
+                sourceLangOptions[lang.code] = `${lang.vernacularName} (${lang.code})`;
+            }
+            for (const lang of languages) {
+                outputLangOptions[lang.code] = `${lang.vernacularName} (${lang.code})`;
+            }
+        } else {
+            const savedSource = this.plugin.settings.sourceLanguage;
+            const savedOutput = this.plugin.settings.outputLanguage;
+            sourceLangOptions[savedSource] = savedSource;
+            outputLangOptions[savedOutput] = savedOutput;
         }
 
         return [
@@ -56,8 +66,9 @@ export class TravertureSettingTab extends PluginSettingTab {
                                 text: 'tra.VER:ture  ',
                                 cls: 'traverture-settings-title',
                             });
+                            const engineInfo = isEngineReady() ? getEngineVersion() : 'loading\u2026';
                             headerEl.createSpan({
-                                text: `v${this.plugin.manifest.version} \u2013 ${getEngineVersion()}`,
+                                text: `v${this.plugin.manifest.version} \u2013 ${engineInfo}`,
                                 cls: 'traverture-version-info',
                             });
                         },
@@ -159,15 +170,6 @@ export class TravertureSettingTab extends PluginSettingTab {
                                         this.plugin.applyLinkColor();
                                     });
                                 });
-                        },
-                    },
-                    {
-                        name: 'Auto-detect references',
-                        desc: 'Automatically detect scripture references in View mode without {{ }} markers.',
-                        control: {
-                            type: 'toggle',
-                            key: 'autoDetect',
-                            defaultValue: true,
                         },
                     },
                 ],
