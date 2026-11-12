@@ -1,6 +1,6 @@
 // main.ts
 
-import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, MenuItem, TFile, TAbstractFile } from 'obsidian';
+import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, EditorPosition, MenuItem, TFile, TAbstractFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { fetchVerseWithExtras, escapeHtml } from './cache';
 import { buildJwLibraryUrl, resolveClickContext } from './common';
@@ -16,6 +16,19 @@ function parseFragment(html: string): Document {
 
 function getSubmenu(item: MenuItem): Menu {
     return (item as unknown as { setSubmenu(): Menu }).setSubmenu();
+}
+
+interface CitationGroup {
+    start: number;
+    end: number;
+    bcvs: string[];
+    prefix: string;
+}
+
+interface CitationEdit {
+    start: number;
+    end: number;
+    replacement: string;
 }
 
 function isInsideTripleEmphasis(node: Node): boolean {
@@ -94,9 +107,6 @@ function formatBcvSpan(span: { s: number; e: number }): string {
     return s === e ? s : `${s}-${e}`;
 }
 
-// Merges overlapping or covered verses inside one citation group so no verse
-// is quoted twice. With `ascending` true the spans are also sorted; otherwise
-// typed order is kept (a merged span stays at its earliest position).
 function normalizeCitationBcvs(bcvs: string[], ascending: boolean): string[] {
     const spans = bcvs.map(parseBcvSpan);
     if (ascending) spans.sort((a, b) => (a.s - b.s) || (a.e - b.e));
@@ -143,6 +153,7 @@ export default class TraverturePlugin extends Plugin {
     public sessionRestored = false;
     private settingTab: TravertureSettingTab | null = null;
     private engineTimer: number | null = null;
+    private contextRefPos: EditorPosition | null = null;
 
     async loadSettings() {
         const savedData = await this.loadData() as Partial<TravertureSettings> | null;
@@ -785,16 +796,16 @@ export default class TraverturePlugin extends Plugin {
         await Promise.all(workers);
     }
 
-    async insertCitation(editor: Editor, text: string, withRef: boolean, sourceLang: string) {
+    private buildCitationGroups(text: string, sourceLang: string): { groups: CitationGroup[]; failed: number } | null {
         const { text: engineText, origIndex } = toEngineText(text);
         const parsed = this.safeParseWith(engineText, sourceLang);
-        if (!parsed) { new Notice('No scripture references found.'); return; }
+        if (!parsed) return null;
         const clauses = JSON.parse(parsed) as ParsedReference[];
-        if (clauses.length === 0) { new Notice('No scripture references found.'); return; }
+        if (clauses.length === 0) return null;
 
         const spans = locateInText(engineText, clauses);
 
-        const groups: Array<{ start: number; end: number; bcvs: string[]; prefix: string }> = [];
+        const groups: CitationGroup[] = [];
         let failed = 0;
         let bookName = '';
         let lastChapterKey = '';
@@ -833,7 +844,17 @@ export default class TraverturePlugin extends Plugin {
             }
             lastChapterKey = lastBcv.substring(0, 5);
         }
+        return { groups, failed };
+    }
 
+    private async buildCitationEdits(
+        text: string,
+        groups: CitationGroup[],
+        failedBefore: number,
+        withRef: boolean,
+    ): Promise<CitationEdit[] | null> {
+        let failed = failedBefore;
+        const total = groups.length + failed;
         const allBcvs: string[] = [];
         for (const group of groups) {
             group.bcvs = normalizeCitationBcvs(group.bcvs, !withRef);
@@ -843,11 +864,8 @@ export default class TraverturePlugin extends Plugin {
         await this.prefetchCitationVerseText(allBcvs, withRef, fetchedCache);
 
         const lang = this.settings.outputLanguage;
-        const total = groups.length + failed;
-        let result = text;
-        for (let g = groups.length - 1; g >= 0; g--) {
-            const group = groups[g];
-
+        const edits: CitationEdit[] = [];
+        for (const group of groups) {
             const usePlain = !withRef && group.bcvs.length === 1 && !group.bcvs[0].includes('-');
             const verseTexts = group.bcvs.map(b => fetchedCache.get(`${lang}:${b}${usePlain ? ':plain' : ''}`));
             if (verseTexts.some(v => !v)) { failed++; continue; }
@@ -868,9 +886,11 @@ export default class TraverturePlugin extends Plugin {
             }
             const originalRef = prefix + text.substring(start, end);
 
-            result = result.substring(0, start)
-                + (withRef ? `"${quote}" (${originalRef})` : `${originalRef}: "${quote}"`)
-                + result.substring(end);
+            edits.push({
+                start,
+                end,
+                replacement: withRef ? `"${quote}" (${originalRef})` : `${originalRef}: "${quote}"`,
+            });
         }
         if (failed > 0) {
             new Notice(
@@ -879,8 +899,42 @@ export default class TraverturePlugin extends Plugin {
                     : `Could not fetch verse text for ${failed} of ${total} references.`
             );
         }
-        if (failed === total) return;
+        if (failed === total) return null;
+        return edits;
+    }
+
+    async insertCitation(editor: Editor, text: string, withRef: boolean, sourceLang: string) {
+        const built = this.buildCitationGroups(text, sourceLang);
+        if (!built) { new Notice('No scripture references found.'); return; }
+
+        const edits = await this.buildCitationEdits(text, built.groups, built.failed, withRef);
+        if (!edits) return;
+
+        let result = text;
+        for (let i = edits.length - 1; i >= 0; i--) {
+            result = result.substring(0, edits[i].start) + edits[i].replacement + result.substring(edits[i].end);
+        }
         editor.replaceSelection(result);
+    }
+
+    async insertCitationAt(editor: Editor, pos: EditorPosition, withRef: boolean, sourceLang: string) {
+        const lineText = editor.getLine(pos.line);
+        const built = this.buildCitationGroups(lineText, sourceLang);
+        if (!built) { new Notice('No scripture references found.'); return; }
+
+        const group = built.groups.find(g => g.start <= pos.ch && pos.ch < g.end)
+            ?? built.groups.find(g => pos.ch === g.end);
+        if (!group) { new Notice('No scripture reference found here.'); return; }
+
+        const edits = await this.buildCitationEdits(lineText, [group], 0, withRef);
+        if (!edits || edits.length === 0) return;
+
+        const edit = edits[0];
+        editor.replaceRange(
+            edit.replacement,
+            { line: pos.line, ch: edit.start },
+            { line: pos.line, ch: edit.end },
+        );
     }
 
     // ──────────────────────────────────────────────
@@ -916,26 +970,33 @@ export default class TraverturePlugin extends Plugin {
         }
     }
 
+    private addCitationItem(menu: Menu, insert: (withRef: boolean) => Promise<void>): void {
+        menu.addItem((item: MenuItem) => {
+            item.setTitle('Insert citation').setIcon('quote-glyph');
+            const citeMenu = getSubmenu(item);
+            citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
+                await insert(false);
+            }));
+            citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
+                await insert(true);
+            }));
+        });
+    }
+
     private addTravertureMenuItems(
         menu: Menu,
         editor: Editor | null,
         selection: string | undefined,
         sourceLang: string,
         liveDocumentText?: string,
+        clickedPos?: EditorPosition,
     ): void {
         if (selection) {
             menu.addItem((item: MenuItem) => item.setTitle('Parse selection').setIcon('sidebar-right').onClick(async () => {
                 await this.showSidebarWithResults(await this.parseReferences(selection, sourceLang));
             }));
-            menu.addItem((item: MenuItem) => {
-                item.setTitle('Insert citation').setIcon('quote-glyph');
-                const citeMenu = getSubmenu(item);
-                citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('Reference: "verse"').onClick(async () => {
-                    if (editor && selection) await this.insertCitation(editor, selection, false, sourceLang);
-                }));
-                citeMenu.addItem((citeItem: MenuItem) => citeItem.setTitle('"verse" (Reference)').onClick(async () => {
-                    if (editor && selection) await this.insertCitation(editor, selection, true, sourceLang);
-                }));
+            this.addCitationItem(menu, async (withRef: boolean) => {
+                if (editor && selection) await this.insertCitation(editor, selection, withRef, sourceLang);
             });
             menu.addItem((item: MenuItem) => {
                 item.setTitle('Reformat selection').setIcon('pencil');
@@ -949,6 +1010,11 @@ export default class TraverturePlugin extends Plugin {
                 submenu.addItem((fmtItem: MenuItem) => fmtItem.setTitle('Official (1Co)').onClick(() => {
                     if (editor && selection) this.reformatReferences(editor, selection, 'official', sourceLang);
                 }));
+            });
+            menu.addSeparator();
+        } else if (editor && clickedPos) {
+            this.addCitationItem(menu, async (withRef: boolean) => {
+                await this.insertCitationAt(editor, clickedPos, withRef, sourceLang);
             });
             menu.addSeparator();
         }
@@ -1095,6 +1161,34 @@ export default class TraverturePlugin extends Plugin {
         );
     }
 
+    private registerEditorMenu(): void {
+        this.registerDomEvent(activeDocument, 'contextmenu', (evt: MouseEvent) => {
+            this.contextRefPos = null;
+            const refEl = (evt.target as HTMLElement | null)?.closest?.('.cm-traverture-ref');
+            if (!refEl) return;
+            const view = EditorView.findFromDOM(refEl as HTMLElement);
+            if (!view) return;
+            const pos = view.posAtCoords({ x: evt.clientX, y: evt.clientY });
+            if (pos === null) return;
+            const line = view.state.doc.lineAt(pos);
+            this.contextRefPos = { line: line.number - 1, ch: pos - line.from };
+        }, true);
+
+        this.registerEvent(this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, _view) => {
+            if (!this.engine) return;
+            const selection = editor.getSelection();
+            const clickedPos = selection ? undefined : (this.contextRefPos ?? undefined);
+            this.contextRefPos = null;
+            const activeFile = this.app.workspace.getActiveFile();
+            const sourceLang = this.getEffectiveSourceLanguage(activeFile, editor.getValue());
+            menu.addItem((item: MenuItem) => {
+                item.setTitle('tra.VER:ture').setIcon('book-open');
+                const submenu = getSubmenu(item);
+                this.addTravertureMenuItems(submenu, editor, selection, sourceLang, editor.getValue(), clickedPos);
+            });
+        }));
+    }
+
     async onload() {
         await this.loadSettings();
         this.applyLinkColor();
@@ -1138,17 +1232,7 @@ export default class TraverturePlugin extends Plugin {
             }, 100);
         });
 
-        this.registerEvent(this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, _view) => {
-            if (!this.engine) return;
-            const selection = editor.getSelection();
-            const activeFile = this.app.workspace.getActiveFile();
-            const sourceLang = this.getEffectiveSourceLanguage(activeFile, editor.getValue());
-            menu.addItem((item: MenuItem) => {
-                item.setTitle('tra.VER:ture').setIcon('book-open');
-                const submenu = getSubmenu(item);
-                this.addTravertureMenuItems(submenu, editor, selection, sourceLang, editor.getValue());
-            });
-        }));
+        this.registerEditorMenu();
 
         this.registerDomEvent(activeDocument, 'contextmenu', (evt: MouseEvent) => {
             if (!this.engine) return;
