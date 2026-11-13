@@ -58,7 +58,7 @@ export interface SidebarRef {
 
 export type NameFormat = 'full' | 'standard' | 'official';
 
-export type ParsedReference = [ string, number, number, string[][] ];
+export type ParsedReference = [ string, number, number, string[][], string, boolean ];
 
 export type ReformatItem = [ string, number, number, string ];
 

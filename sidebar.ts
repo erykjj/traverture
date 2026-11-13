@@ -56,6 +56,7 @@ export class TravertureSidebarView extends ItemView {
     private uniqueOnly: boolean = false;
     private history: NavView[] = [];
     private historyIndex: number = -1;
+    private refsKey: string;
     private scriptureAbort: AbortController | null = null;
     private scriptureVerseData: VerseData | null = null;
     private scriptureDisplayText: string = '';
@@ -71,7 +72,9 @@ export class TravertureSidebarView extends ItemView {
         this.visibleColumns = new Set(plugin.settings.sidebarColumns);
         this.capitalize = plugin.settings.sidebarCapitalize;
         this.uniqueOnly = plugin.settings.sidebarUniqueOnly;
+        this.refsKey = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     }
+
 
     getViewType(): string { return VIEW_TYPE_TRAVERTURE_SIDEBAR; }
     getDisplayText(): string { return 'tra.VER:ture References'; }
@@ -97,7 +100,13 @@ export class TravertureSidebarView extends ItemView {
 
         if (state && !restoringAtStartup) {
             if (state.mode === 'table' || state.mode === 'scripture') this.mode = state.mode;
-            if (Array.isArray(state.allRefs)) this.allRefs = state.allRefs as SidebarRef[];
+            if (typeof state.refsKey === 'string') {
+                const refs = this.plugin.loadSidebarRefs(state.refsKey);
+                if (refs) {
+                    this.allRefs = refs;
+                    this.refsKey = state.refsKey;
+                }
+            }
             if (typeof state.searchQuery === 'string') this.searchQuery = state.searchQuery;
             if (typeof state.sortColumn === 'string' || state.sortColumn === null) this.sortColumn = state.sortColumn;
             if (typeof state.sortDir === 'number') this.sortDir = state.sortDir;
@@ -117,7 +126,7 @@ export class TravertureSidebarView extends ItemView {
         return {
             ...state,
             mode: this.mode,
-            allRefs: this.allRefs,
+            refsKey: this.refsKey,
             searchQuery: this.searchQuery,
             sortColumn: this.sortColumn,
             sortDir: this.sortDir,
@@ -128,6 +137,7 @@ export class TravertureSidebarView extends ItemView {
 
     async displayResults(refs: SidebarRef[]) {
         this.allRefs = refs;
+        this.plugin.storeSidebarRefs(this.refsKey, refs);
         this.sortColumn = null;
         this.sortDir = 0;
         this.abortScriptureFetch();

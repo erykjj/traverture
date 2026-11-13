@@ -154,6 +154,7 @@ export default class TraverturePlugin extends Plugin {
     private settingTab: TravertureSettingTab | null = null;
     private engineTimer: number | null = null;
     private contextRefPos: EditorPosition | null = null;
+    private sidebarRefsStore = new Map<string, SidebarRef[]>();
 
     async loadSettings() {
         const savedData = await this.loadData() as Partial<TravertureSettings> | null;
@@ -561,7 +562,7 @@ export default class TraverturePlugin extends Plugin {
                     if (clauses.length === 0) continue;
 
                     if (prefixLen > 0) {
-                        clauses = clauses.map(c => [c[0], c[1] - prefixLen, c[2] - prefixLen, c[3]] as ParsedReference);
+                        clauses = clauses.map(c => [c[0], c[1] - prefixLen, c[2] - prefixLen, c[3], c[4], c[5]] as ParsedReference);
                     }
 
                     const linked = this.insertLinks(text, clauses);
@@ -616,17 +617,11 @@ export default class TraverturePlugin extends Plugin {
         if (clauses.length === 0) return inner;
 
         const spans = locateInText(engineText, clauses);
-        let bookName = '';
         let result = '';
         let pos = 0;
 
         for (let i = 0; i < clauses.length; i++) {
-            const [clauseText, , , ranges] = clauses[i];
-
-            if (i === 0) {
-                const match = clauseText.match(/^(.+?)\s+\d/);
-                if (match) bookName = match[1];
-            }
+            const [clauseText, , , ranges, prefix] = clauses[i];
 
             const span = spans[i];
             if (ranges.length === 0 || !span) continue;
@@ -636,10 +631,7 @@ export default class TraverturePlugin extends Plugin {
             if (start === undefined || end === undefined || start < pos) continue;
             if (inner.substring(start, end).includes('<')) continue;
 
-            let displayText = clauseText;
-            if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
-                displayText = `${bookName} ${clauseText}`;
-            }
+            const displayText = prefix + clauseText;
 
             const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
             result += inner.substring(pos, start)
@@ -652,26 +644,12 @@ export default class TraverturePlugin extends Plugin {
     private insertLinks(text: string, clauses: ParsedReference[]): string {
         if (clauses.length === 0) return text;
 
-        const positions: Array<{ start: number; end: number; displayText: string; bcv: string; clauseText: string }> = [];
-        let bookName = '';
+        const positions: Array<{ start: number; end: number; displayText: string; bcv: string }> = [];
 
-        for (let i = 0; i < clauses.length; i++) {
-            const [clauseText, startPos, endPos, ranges] = clauses[i];
-
-            if (i === 0 || !/^\d/.test(clauseText)) {
-                const match = clauseText.match(/^(.+?)\s+\d/);
-                if (match) bookName = match[1];
-            }
-
-            let displayText = clauseText;
-            if (/^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText) && bookName && !clauseText.startsWith(bookName)) {
-                displayText = `${bookName} ${clauseText}`;
-            }
-
+        for (const [clauseText, startPos, endPos, ranges, prefix] of clauses) {
             if (ranges.length === 0) continue;
             const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
-
-            positions.push({ start: startPos, end: endPos, displayText, bcv, clauseText });
+            positions.push({ start: startPos, end: endPos, displayText: prefix + clauseText, bcv });
         }
 
         if (positions.length === 0) return text;
@@ -804,45 +782,33 @@ export default class TraverturePlugin extends Plugin {
         if (clauses.length === 0) return null;
 
         const spans = locateInText(engineText, clauses);
-
         const groups: CitationGroup[] = [];
         let failed = 0;
-        let bookName = '';
-        let lastChapterKey = '';
+        let previousGrouped = false;
 
         for (let i = 0; i < clauses.length; i++) {
-            const [clauseText, , , ranges] = clauses[i];
-            const bare = /^\d/.test(clauseText) && !/^\d+\s*[a-zA-Z]/.test(clauseText);
-            if (!bare) {
-                const match = clauseText.match(/^(.+?)\s+\d/);
-                if (match) bookName = match[1];
-            }
-            if (ranges.length === 0) continue;
+            const [, , , ranges, prefix, continues] = clauses[i];
+            if (ranges.length === 0) { previousGrouped = false; continue; }
 
             const span = spans[i];
             const start = span ? origIndex[span.start] : undefined;
             const end = span ? origIndex[span.end - 1] + 1 : undefined;
-            if (start === undefined || end === undefined) { failed++; continue; }
+            if (start === undefined || end === undefined) {
+                failed++;
+                previousGrouped = false;
+                continue;
+            }
 
             const [firstBcv, lastBcv] = ranges[0];
-            const startChapterKey = firstBcv.substring(0, 5);
             const bcv = firstBcv === lastBcv ? firstBcv : `${firstBcv}-${lastBcv}`;
-
             const prev = groups[groups.length - 1];
-            if (prev && bare && startChapterKey === lastChapterKey
-                && /^\s*[,;]\s*$/.test(text.substring(prev.end, start))) {
+            if (prev && previousGrouped && continues && /^\s*,\s*$/.test(text.substring(prev.end, start))) {
                 prev.end = end;
                 prev.bcvs.push(bcv);
             } else {
-                let prefix = '';
-                if (bare && bookName) {
-                    prefix = !clauseText.includes(':') && startChapterKey === lastChapterKey
-                        ? `${bookName} ${parseInt(firstBcv.substring(2, 5), 10)}:`
-                        : `${bookName} `;
-                }
                 groups.push({ start, end, bcvs: [bcv], prefix });
             }
-            lastChapterKey = lastBcv.substring(0, 5);
+            previousGrouped = true;
         }
         return { groups, failed };
     }
@@ -1187,6 +1153,20 @@ export default class TraverturePlugin extends Plugin {
                 this.addTravertureMenuItems(submenu, editor, selection, sourceLang, editor.getValue(), clickedPos);
             });
         }));
+    }
+
+    storeSidebarRefs(key: string, refs: SidebarRef[]): void {
+        this.sidebarRefsStore.delete(key);
+        this.sidebarRefsStore.set(key, refs);
+        while (this.sidebarRefsStore.size > 4) {
+            const oldest = this.sidebarRefsStore.keys().next().value;
+            if (oldest === undefined) break;
+            this.sidebarRefsStore.delete(oldest);
+        }
+    }
+
+    loadSidebarRefs(key: string): SidebarRef[] | undefined {
+        return this.sidebarRefsStore.get(key);
     }
 
     async onload() {
