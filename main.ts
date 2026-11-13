@@ -3,7 +3,7 @@
 import { Plugin, WorkspaceLeaf, Notice, Menu, MarkdownView, Editor, EditorPosition, MenuItem, TFile, TAbstractFile } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { fetchVerseWithExtras, escapeHtml } from './cache';
-import { buildJwLibraryUrl, resolveClickContext } from './common';
+import { buildJwLibraryUrl, resolveClickContext, stripMarkup } from './common';
 import { createTravertureEditorPlugin } from './editor';
 import { initEngine, prewarmEngines, clearEnginePool, decodeScriptures, reformatScriptures, getAvailableLanguagesCached as getAvailableLanguages, createMainEngine, parseFrontmatterLanguage, resolveLanguage } from './engine-wrapper';
 import { TravertureSettingTab } from './settings';
@@ -35,25 +35,6 @@ function isInsideTripleEmphasis(node: Node): boolean {
     const el = node.parentElement;
     if (!el) return false;
     return !!el.closest('strong > em, em > strong');
-}
-
-function stripMarkup(html: string): { clean: string; origIndex: number[] } {
-    let clean = '';
-    const origIndex: number[] = [];
-    let i = 0;
-    while (i < html.length) {
-        const ch = html[i];
-        if (ch === '<') {
-            const close = html.indexOf('>', i);
-            if (close !== -1) { i = close + 1; continue; }
-        }
-        if (ch !== '*') {
-            clean += ch;
-            origIndex.push(i);
-        }
-        i++;
-    }
-    return { clean, origIndex };
 }
 
 function toEngineText(original: string): { text: string; origIndex: number[] } {
@@ -609,7 +590,7 @@ export default class TraverturePlugin extends Plugin {
     }
 
     private linkBlock(inner: string, sourceLang: string): string {
-        const { clean, origIndex } = stripMarkup(inner);
+        const { clean, origIndex } = stripMarkup(inner, true);
         const engineText = '\u27EA\u27EA' + clean + '\u27EB\u27EB';
         const parsed = this.safeParseWith(engineText, sourceLang);
         if (!parsed) return inner;

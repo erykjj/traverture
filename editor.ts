@@ -2,7 +2,7 @@
 
 import { ViewPlugin, EditorView, Decoration, DecorationSet, ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
-import { buildJwLibraryUrl, resolveClickContext } from './common';
+import { buildJwLibraryUrl, resolveClickContext, stripMarkup } from './common';
 import type TraverturePlugin from './main';
 import { ParsedReference } from './types';
 
@@ -110,7 +110,7 @@ function decorateBlock(
     allDecos: DecoEntry[],
     decorated: Array<{ from: number; to: number }>,
 ): void {
-    const { clean, origIndex } = stripAsterisks(inner);
+    const { clean, origIndex } = stripMarkup(inner);
     const clauses = parseClauses('\u27EA\u27EA' + clean + '\u27EB\u27EB', plugin, sourceLang);
     if (clauses.length === 0) return;
 

@@ -257,6 +257,25 @@ function relinkAndAppend(
     }
 }
 
+export function stripMarkup(text: string, skipHtmlTags: boolean = false): { clean: string; origIndex: number[] } {
+    let clean = '';
+    const origIndex: number[] = [];
+    let i = 0;
+    while (i < text.length) {
+        const ch = text[i];
+        if (skipHtmlTags && ch === '<') {
+            const close = text.indexOf('>', i);
+            if (close !== -1) { i = close + 1; continue; }
+        }
+        if (ch !== '*') {
+            clean += ch;
+            origIndex.push(i);
+        }
+        i++;
+    }
+    return { clean, origIndex };
+}
+
 function stripEmptyClasses(root: HTMLElement): void {
     root.querySelectorAll('[class]').forEach(el => {
         const cls = el.getAttribute('class') || '';
