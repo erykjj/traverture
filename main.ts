@@ -396,7 +396,7 @@ export default class TraverturePlugin extends Plugin {
             if (newScroller instanceof HTMLElement) {
                 newScroller.scrollTop = scrollTop;
             }
-        }, 100);
+        }, 0);
     }
 
     private splitFrontmatter(content: string): { frontmatter: string; body: string } {
