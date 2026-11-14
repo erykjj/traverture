@@ -61,6 +61,7 @@ See [the security and privacy notes](https://github.com/erykjj/traverture?tab=se
 - When the [in(REF)ens](https://github.com/erykjj/inrefens) [plugin](https://community.obsidian.md/plugins/inrefens) is also enabled, a lowercase **colliding abbreviation** (a publication symbol that doubles as a Bible-book abbreviation, e.g. `re`, `pr`, `le`) inside `*** … ***` (e.g. `*** re 21 ***`) is *not* linked (it is left for in(REF)ens); capitalized forms (e.g. `*** Re 21 ***`) link normally
 - **Changing the source language** in settings affects all open Reading Views of notes *without* a frontmatter override, and **changing a note's `language` frontmatter** affects that note's Reading View; in both cases the affected view is re-rendered, which may cause a brief flicker
 - **References inside callouts** are not linked
+- **Emphasis around part of a reference** (`**Mt** 5:3`) only works if you wrap it in {{ }}: `{{**Mt** 5:3}}`; emphasis around a whole reference (`**Mt 5:3**`) works normally
 
 ---
 
