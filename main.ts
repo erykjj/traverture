@@ -55,6 +55,8 @@ function toEngineText(original: string): { text: string; origIndex: number[] } {
     return { text, origIndex };
 }
 
+const EMPHASIS_TAGS = new Set(['b', 'i', 'em', 'strong', 'u', 's', 'del', 'mark']);
+
 function locateInText(engineText: string, clauses: ParsedReference[]): Array<{ start: number; end: number } | null> {
     const { text, engineIndex } = withoutMarkers(engineText);
     const spans: Array<{ start: number; end: number } | null> = [];
@@ -73,6 +75,40 @@ function locateInText(engineText: string, clauses: ParsedReference[]): Array<{ s
         spans.push({ start: engineIndex[start], end: engineIndex[end - 1] + 1 });
     }
     return spans;
+}
+
+function balanceTagSpan(html: string, start: number, end: number): { start: number; end: number } | null {
+    const tagRe = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
+    const slice = html.substring(start, end);
+    const open: string[] = [];
+    const unmatchedClose: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = tagRe.exec(slice)) !== null) {
+        const name = m[2].toLowerCase();
+        if (!EMPHASIS_TAGS.has(name)) return null;
+        if (m[1] === '') {
+            open.push(name);
+        } else if (open.length > 0 && open[open.length - 1] === name) {
+            open.pop();
+        } else {
+            unmatchedClose.push(name);
+        }
+    }
+
+    let newStart = start;
+    for (const name of unmatchedClose) {
+        const before = html.substring(0, newStart).match(/<([a-zA-Z][a-zA-Z0-9]*)[^>]*>$/);
+        if (!before || before[1].toLowerCase() !== name) return null;
+        newStart -= before[0].length;
+    }
+
+    let newEnd = end;
+    for (let k = open.length - 1; k >= 0; k--) {
+        const after = html.substring(newEnd).match(/^<\/([a-zA-Z][a-zA-Z0-9]*)\s*>/);
+        if (!after || after[1].toLowerCase() !== open[k]) return null;
+        newEnd += after[0].length;
+    }
+    return { start: newStart, end: newEnd };
 }
 
 function parseBcvSpan(bcv: string): { s: number; e: number } {
@@ -610,14 +646,23 @@ export default class TraverturePlugin extends Plugin {
             const start = origIndex[span.start - 2];
             const end = origIndex[span.end - 3] + 1;
             if (start === undefined || end === undefined || start < pos) continue;
-            if (inner.substring(start, end).includes('<')) continue;
+
+            let spanStart = start;
+            let spanEnd = end;
+            let content = clauseText;
+            if (inner.substring(start, end).includes('<')) {
+                const balanced = balanceTagSpan(inner, start, end);
+                if (!balanced || balanced.start < pos) continue;
+                spanStart = balanced.start;
+                spanEnd = balanced.end;
+                content = inner.substring(spanStart, spanEnd);
+            }
 
             const displayText = prefix + clauseText;
-
             const bcv = ranges[0][0] === ranges[0][1] ? ranges[0][0] : `${ranges[0][0]}-${ranges[0][1]}`;
-            result += inner.substring(pos, start)
-                + `<a class="traverture-ref-link" data-bcv="${escapeHtml(bcv)}" data-ref="${escapeHtml(displayText)}">${clauseText}</a>`;
-            pos = end;
+            result += inner.substring(pos, spanStart)
+                + `<a class="traverture-ref-link" data-bcv="${escapeHtml(bcv)}" data-ref="${escapeHtml(displayText)}">${content}</a>`;
+            pos = spanEnd;
         }
         return result + inner.substring(pos);
     }
@@ -869,14 +914,20 @@ export default class TraverturePlugin extends Plugin {
         const built = this.buildCitationGroups(lineText, sourceLang);
         if (!built) { new Notice('No scripture references found.'); return; }
 
-        const group = built.groups.find(g => g.start <= pos.ch && pos.ch < g.end)
-            ?? built.groups.find(g => pos.ch === g.end);
-        if (!group) { new Notice('No scripture reference found here.'); return; }
+        let groupIndex = built.groups.findIndex(g => g.start <= pos.ch && pos.ch < g.end);
+        if (groupIndex === -1) groupIndex = built.groups.findIndex(g => pos.ch === g.end);
+        if (groupIndex === -1) { new Notice('No scripture reference found here.'); return; }
+        const group = built.groups[groupIndex];
 
         const edits = await this.buildCitationEdits(lineText, [group], 0, withRef);
         if (!edits || edits.length === 0) return;
-
         const edit = edits[0];
+        const next = built.groups[groupIndex + 1];
+        if (next && next.prefix && /^\s*[,;]\s*$/.test(lineText.substring(group.end, next.start))) {
+            const at = { line: pos.line, ch: next.start };
+            editor.replaceRange(next.prefix, at, at);
+        }
+
         editor.replaceRange(
             edit.replacement,
             { line: pos.line, ch: edit.start },
