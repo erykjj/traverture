@@ -48,7 +48,7 @@ See [the security and privacy notes](https://github.com/erykjj/traverture?tab=se
   - Can be overridden per-note (see above)
 - **Output language** – Language for displaying book names and fetching verse text
 - **Title format** – How references are displayed in the scripture pane title (Full, Standard, Official); clicking a link in the parse-results table uses that column's format instead
-- **Link color** – Color for reference links; choose from presets or enter a custom hex value ("Theme default" uses the vault's external-link color); changing this requires restarting Obsidian
+- **Link color** – Color for reference links; choose from presets or enter a custom hex value ("Theme default" uses the vault's external-link color)
 - **Auto-detect references** – Toggle automatic detection without `{{ }}` markers
 
 ---
