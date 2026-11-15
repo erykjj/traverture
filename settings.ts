@@ -20,11 +20,13 @@ export class TravertureSettingTab extends PluginSettingTab {
     constructor(app: App, plugin: TraverturePlugin) {
         super(app, plugin);
         this.plugin = plugin;
-        this.plugin.registerDomEvent(
-            activeDocument,
-            'traverture-output-language-changed' as keyof DocumentEventMap,
-            () => { this.update(); },
-        );
+        this.plugin.forEachWindowDocument(doc => {
+            this.plugin.registerDomEvent(
+                doc,
+                'traverture-output-language-changed' as keyof DocumentEventMap,
+                () => { this.update(); },
+            );
+        });
     }
 
     refreshForEngine(): void {
@@ -124,7 +126,7 @@ export class TravertureSettingTab extends PluginSettingTab {
                     },
                     {
                         name: 'Link color',
-                        desc: 'Color for citation links. "Theme default" uses the vault\u2019s external-link color. Changing this requires restarting Obsidian.',
+                        desc: 'Color for citation links. "Theme default" uses the vault\u2019s external-link color.',
                         render: (setting) => {
                             const savedColor = this.plugin.settings.linkColor ?? '';
                             const isPreset = LINK_COLOR_OPTIONS.some(o => o.value === savedColor);

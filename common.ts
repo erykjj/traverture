@@ -322,7 +322,8 @@ function showFootnotePopover(
     outputLang: string,
     onNavigate: NavigateCallback,
 ): void {
-    activeDocument.querySelector('.traverture-marker-popover')?.remove();
+    const doc = anchor.ownerDocument;
+    doc.querySelector('.traverture-marker-popover')?.remove();
 
     const popover = createDiv();
     popover.className = 'traverture-marker-popover';
@@ -334,8 +335,8 @@ function showFootnotePopover(
     relinkAndAppend(parsed.body, popover, outputLang, onNavigate);
 
     positionPopover(popover, anchor);
-    activeDocument.body.appendChild(popover);
-    attachCloseHandler(popover);
+    doc.body.appendChild(popover);
+    attachCloseHandler(popover, doc);
 }
 
 function showXrefPopover(
@@ -344,7 +345,8 @@ function showXrefPopover(
     outputLang: string,
     onNavigate: NavigateCallback,
 ): void {
-    activeDocument.querySelector('.traverture-marker-popover')?.remove();
+    const doc = anchor.ownerDocument;
+    doc.querySelector('.traverture-marker-popover')?.remove();
 
     const popover = createDiv();
     popover.className = 'traverture-marker-popover';
@@ -352,14 +354,14 @@ function showXrefPopover(
     popover.addEventListener('mousedown', (e) => e.stopPropagation());
 
     targets.forEach((t, i) => {
-        if (i > 0) popover.appendChild(document.createTextNode('; '));
+        if (i > 0) popover.appendChild(doc.createTextNode('; '));
         const bcv = normalizeTargetVerses(t.vs);
         const text = t.standardCitation
             .replace(/&nbsp;/g, '\u00A0')
             .replace(/ /g, '\u00A0')
             .replace(/;\u00A0/g, '; ');
         if (!bcv) {
-            popover.appendChild(document.createTextNode(text));
+            popover.appendChild(doc.createTextNode(text));
             return;
         }
         const link = createEl('a');
@@ -382,18 +384,19 @@ function showXrefPopover(
     });
 
     positionPopover(popover, anchor);
-    activeDocument.body.appendChild(popover);
-    attachCloseHandler(popover);
+    doc.body.appendChild(popover);
+    attachCloseHandler(popover, doc);
 }
 
 function positionPopover(popover: HTMLElement, anchor: HTMLElement): void {
+    const win = anchor.ownerDocument.defaultView ?? window;
     const rect = anchor.getBoundingClientRect();
     popover.style.top = `${rect.bottom + 4}px`;
     popover.style.left = `${rect.left}px`;
 
-    window.requestAnimationFrame(() => {
+    win.requestAnimationFrame(() => {
         const popRect = popover.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
+        const viewportWidth = win.innerWidth;
         const margin = 8;
 
         if (popRect.right > viewportWidth - margin) {
@@ -406,14 +409,14 @@ function positionPopover(popover: HTMLElement, anchor: HTMLElement): void {
     });
 }
 
-function attachCloseHandler(popover: HTMLElement): void {
+function attachCloseHandler(popover: HTMLElement, doc: Document): void {
     const closePopover = (e: MouseEvent) => {
         if (!popover.contains(e.target as Node)) {
             popover.remove();
-            activeDocument.removeEventListener('click', closePopover);
+            doc.removeEventListener('click', closePopover);
         }
     };
-    window.setTimeout(() => activeDocument.addEventListener('click', closePopover), 10);
+    window.setTimeout(() => doc.addEventListener('click', closePopover), 10);
 }
 
 function stripHtml(html: string): string {

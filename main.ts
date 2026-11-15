@@ -1140,37 +1140,71 @@ export default class TraverturePlugin extends Plugin {
     // Lifecycle
     // ──────────────────────────────────────────────
 
-    applyLinkColor(): void {
-        const color = this.settings.linkColor;
-        const root = activeDocument.documentElement;
-        if (color && color.trim() !== '') {
-            root.style.setProperty('--traverture-link-color', color.trim());
+    private allDocuments(): Document[] {
+        const docs = new Set<Document>([document, activeDocument]);
+        this.app.workspace.iterateAllLeaves(leaf => {
+            docs.add(leaf.view.containerEl.ownerDocument);
+        });
+        return Array.from(docs);
+    }
+
+    forEachWindowDocument(register: (doc: Document) => void): void {
+        const done = new Set<Document>();
+        const once = (doc: Document) => {
+            if (done.has(doc)) return;
+            done.add(doc);
+            register(doc);
+        };
+        once(document);
+        this.app.workspace.iterateAllLeaves(leaf => once(leaf.view.containerEl.ownerDocument));
+        this.registerEvent(this.app.workspace.on('window-open', (_win, popoutWindow) => once(popoutWindow.document)));
+    }
+
+    private applyStyleVariablesTo(doc: Document): void {
+        const root = doc.documentElement;
+        const color = (this.settings.linkColor ?? '').trim();
+        if (color !== '') {
+            root.style.setProperty('--traverture-link-color', color);
         } else {
             root.style.removeProperty('--traverture-link-color');
         }
+        const scale = Math.min(1.6, Math.max(0.7, this.settings.paneFontScale));
+        root.style.setProperty('--traverture-pane-font-scale', String(scale));
+    }
+
+    private applyStyleVariables(): void {
+        for (const doc of this.allDocuments()) this.applyStyleVariablesTo(doc);
+    }
+
+    applyLinkColor(): void {
+        this.applyStyleVariables();
     }
 
     applyPaneFontScale(): void {
-        const scale = this.settings.paneFontScale;
-        const clamped = Math.min(1.6, Math.max(0.7, scale));
-        activeDocument.documentElement.style.setProperty(
-            '--traverture-pane-font-scale',
-            String(clamped)
-        );
+        this.applyStyleVariables();
+    }
+
+    private registerStyleVariables(): void {
+        this.applyStyleVariables();
+        this.registerEvent(this.app.workspace.on('window-open', (_win, popoutWindow) => {
+            this.applyStyleVariablesTo(popoutWindow.document);
+        }));
     }
 
     private registerEditorMenu(): void {
-        this.registerDomEvent(activeDocument, 'contextmenu', (evt: MouseEvent) => {
-            this.contextRefPos = null;
-            const refEl = (evt.target as HTMLElement | null)?.closest?.('.cm-traverture-ref');
-            if (!refEl) return;
-            const view = EditorView.findFromDOM(refEl as HTMLElement);
-            if (!view) return;
-            const pos = view.posAtCoords({ x: evt.clientX, y: evt.clientY });
-            if (pos === null) return;
-            const line = view.state.doc.lineAt(pos);
-            this.contextRefPos = { line: line.number - 1, ch: pos - line.from };
-        }, true);
+        this.forEachWindowDocument(doc => {
+            this.registerDomEvent(doc, 'contextmenu', (evt: MouseEvent) => {
+                this.contextRefPos = null;
+                const refEl = (evt.target as HTMLElement | null)?.closest?.('.cm-traverture-ref');
+                if (!refEl) return;
+                const view = EditorView.findFromDOM(refEl as HTMLElement);
+                if (!view) return;
+                const pos = view.posAtCoords({ x: evt.clientX, y: evt.clientY });
+                if (pos === null) return;
+                const line = view.state.doc.lineAt(pos);
+                this.contextRefPos = { line: line.number - 1, ch: pos - line.from };
+            }, true);
+        });
 
         this.registerEvent(this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, _view) => {
             if (!this.engine) return;
@@ -1185,6 +1219,33 @@ export default class TraverturePlugin extends Plugin {
                 this.addTravertureMenuItems(submenu, editor, selection, sourceLang, editor.getValue(), clickedPos);
             });
         }));
+    }
+
+    private registerReadingModeMenu(): void {
+        this.forEachWindowDocument(doc => {
+            this.registerDomEvent(doc, 'contextmenu', (evt: MouseEvent) => {
+                if (!this.engine) return;
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                if (!view || view.getMode() !== 'preview') return;
+
+                const target = evt.target as HTMLElement | null;
+                if (!target?.closest?.('.markdown-preview-view') || !view.containerEl.contains(target)) return;
+
+                const sourceLang = view.file ? this.getEffectiveSourceLanguage(view.file) : this.settings.sourceLanguage;
+                const domSelection = doc.getSelection();
+
+                evt.preventDefault();
+                evt.stopPropagation();
+
+                const menu = new Menu();
+                menu.addItem((item: MenuItem) => {
+                    item.setTitle('tra.VER:ture').setIcon('book-open');
+                    const submenu = getSubmenu(item);
+                    this.addReadingModeMenuItems(submenu, domSelection, sourceLang);
+                });
+                menu.showAtMouseEvent(evt);
+            });
+        });
     }
 
     storeSidebarRefs(key: string, refs: SidebarRef[]): void {
@@ -1203,8 +1264,7 @@ export default class TraverturePlugin extends Plugin {
 
     async onload() {
         await this.loadSettings();
-        this.applyLinkColor();
-        this.applyPaneFontScale();
+        this.registerStyleVariables();
 
         this.settingTab = new TravertureSettingTab(this.app, this);
         this.addSettingTab(this.settingTab);
@@ -1241,33 +1301,12 @@ export default class TraverturePlugin extends Plugin {
             this.engineTimer = window.setTimeout(() => {
                 this.engineTimer = null;
                 void this.startEngine();
-            }, 100);
+            }, 0);
         });
 
         this.registerEditorMenu();
 
-        this.registerDomEvent(activeDocument, 'contextmenu', (evt: MouseEvent) => {
-            if (!this.engine) return;
-            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (!view || view.getMode() !== 'preview') return;
-
-            const target = evt.target as HTMLElement | null;
-            if (!target?.closest?.('.markdown-preview-view') || !view.containerEl.contains(target)) return;
-
-            const sourceLang = view.file ? this.getEffectiveSourceLanguage(view.file) : this.settings.sourceLanguage;
-            const domSelection = activeDocument.getSelection();
-
-            evt.preventDefault();
-            evt.stopPropagation();
-
-            const menu = new Menu();
-            menu.addItem((item: MenuItem) => {
-                item.setTitle('tra.VER:ture').setIcon('book-open');
-                const submenu = getSubmenu(item);
-                this.addReadingModeMenuItems(submenu, domSelection, sourceLang);
-            });
-            menu.showAtMouseEvent(evt);
-        });
+        this.registerReadingModeMenu();
 
         this.addRibbonIcon('scroll', 'tra.VER:ture', (evt: MouseEvent) => {
             if (!this.engine) { new Notice('tra.VER:ture is still loading.'); return; }
@@ -1302,10 +1341,11 @@ export default class TraverturePlugin extends Plugin {
             window.clearTimeout(this.engineTimer);
             this.engineTimer = null;
         }
-        const root = activeDocument.documentElement;
-        root.style.removeProperty('--traverture-link-color');
-        root.style.removeProperty('--traverture-pane-font-scale');
-        activeDocument.querySelectorAll('.traverture-marker-popover').forEach(el => el.remove());
+        for (const doc of this.allDocuments()) {
+            doc.documentElement.style.removeProperty('--traverture-link-color');
+            doc.documentElement.style.removeProperty('--traverture-pane-font-scale');
+            doc.querySelectorAll('.traverture-marker-popover').forEach(el => el.remove());
+        }
         clearEnginePool();
     }
 }
