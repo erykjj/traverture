@@ -6,6 +6,10 @@
 
 ### Changed
 
+- Updated engine to v7.0.0
+  - Smoother co-existence with in(REF)ens
+- Various fixes and improvements
+
 ### Fixed
 
 ### Removed
