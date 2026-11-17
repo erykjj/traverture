@@ -166,12 +166,16 @@ export default class TraverturePlugin extends Plugin {
     private sourceLangCache = new Map<string, string>();
     private sourceLangInFlight = new Map<string, Promise<string>>();
     private processedLangCache = new Map<string, string>();
+    private signalEngineReady!: () => void;
+    private engineReadySignal: Promise<void> = new Promise<void>((resolve) => { this.signalEngineReady = resolve; });
+    private pendingEnginePaths = new Set<string>();
     public editorRefreshGeneration = 0;
     public sessionRestored = false;
     private settingTab: TravertureSettingTab | null = null;
     private engineTimer: number | null = null;
     private contextRefPos: EditorPosition | null = null;
     private sidebarRefsStore = new Map<string, SidebarRef[]>();
+    private processingPaths = new Map<string, number>();
 
     async loadSettings() {
         const savedData = await this.loadData() as Partial<TravertureSettings> | null;
@@ -229,6 +233,28 @@ export default class TraverturePlugin extends Plugin {
         return this.settings.sourceLanguage;
     }
 
+    private async computeSourceLanguage(sourcePath: string): Promise<string> {
+        const file = this.app.vault.getAbstractFileByPath(sourcePath);
+        if (!(file instanceof TFile)) return this.settings.sourceLanguage;
+
+        const fileCache = this.app.metadataCache.getFileCache(file);
+        const raw: unknown = fileCache?.frontmatter?.language;
+        if (typeof raw === 'string' && raw.trim()) {
+            const resolved = resolveLanguage(raw.trim());
+            if (resolved) return resolved;
+        }
+
+        try {
+            const text = await this.app.vault.read(file);
+            const resolved = parseFrontmatterLanguage(text);
+            if (resolved) return resolved;
+        } catch {
+            // fall through
+        }
+
+        return this.settings.sourceLanguage;
+    }
+
     async getSourceLanguageForPath(sourcePath: string | null | undefined): Promise<string> {
         if (!sourcePath) return this.settings.sourceLanguage;
 
@@ -238,28 +264,7 @@ export default class TraverturePlugin extends Plugin {
         const inFlight = this.sourceLangInFlight.get(sourcePath);
         if (inFlight !== undefined) return inFlight;
 
-        const promise = (async (): Promise<string> => {
-            const file = this.app.vault.getAbstractFileByPath(sourcePath);
-            if (!(file instanceof TFile)) return this.settings.sourceLanguage;
-
-            const fileCache = this.app.metadataCache.getFileCache(file);
-            const raw: unknown = fileCache?.frontmatter?.language;
-            if (typeof raw === 'string' && raw.trim()) {
-                const resolved = resolveLanguage(raw.trim());
-                if (resolved) return resolved;
-            }
-
-            try {
-                const text = await this.app.vault.read(file);
-                const resolved = parseFrontmatterLanguage(text);
-                if (resolved) return resolved;
-            } catch {
-                // fall through
-            }
-
-            return this.settings.sourceLanguage;
-        })();
-
+        const promise = this.computeSourceLanguage(sourcePath);
         this.sourceLangInFlight.set(sourcePath, promise);
         try {
             const resolved = await promise;
@@ -268,6 +273,15 @@ export default class TraverturePlugin extends Plugin {
         } finally {
             this.sourceLangInFlight.delete(sourcePath);
         }
+    }
+
+    private revalidateSourceLanguage(sourcePath: string): void {
+        void this.computeSourceLanguage(sourcePath).then((fresh) => {
+            const previous = this.sourceLangCache.get(sourcePath);
+            if (previous === fresh) return;
+            this.sourceLangCache.set(sourcePath, fresh);
+            if (previous !== undefined) this.refreshReadingViews();
+        });
     }
 
     private invalidateSourceLangCache(sourcePath: string): void {
@@ -313,30 +327,23 @@ export default class TraverturePlugin extends Plugin {
         } catch (e) {
             console.error('tra.VER:ture: Failed to initialize engine:', e);
             new Notice('tra.VER:ture: Failed to initialize engine.');
+            this.signalEngineReady();
             return;
         }
         if (!this.engine) {
             new Notice('tra.VER:ture: Failed to initialize engine.');
+            this.signalEngineReady();
             return;
         }
         this.onEngineReady();
     }
 
     private onEngineReady(): void {
+        this.signalEngineReady();
         this.settingTab?.refreshForEngine();
         this.editorRefreshGeneration++;
         this.refreshEditorViews();
-        this.rerenderReadingViews();
-    }
-
-    private rerenderReadingViews(): void {
-        const leaves = this.app.workspace.getLeavesOfType('markdown');
-        for (const leaf of leaves) {
-            const view = leaf.view;
-            if (!(view instanceof MarkdownView)) continue;
-            if (view.getMode() !== 'preview') continue;
-            void this.forceRerenderLeaf(leaf);
-        }
+        this.refreshReadingViews();
     }
 
     private refreshEditorViews(): void {
@@ -358,6 +365,10 @@ export default class TraverturePlugin extends Plugin {
 
     public refreshReadingViews(): void {
         if (!this.engine) return;
+
+        const renderedBeforeEngine = new Set(this.pendingEnginePaths);
+        this.pendingEnginePaths.clear();
+
         const leaves = this.app.workspace.getLeavesOfType('markdown');
         for (const leaf of leaves) {
             const view = leaf.view;
@@ -366,9 +377,14 @@ export default class TraverturePlugin extends Plugin {
             const path = view.file?.path;
             if (!path) continue;
 
+            if (this.processingPaths.has(path)) continue;
+
             void this.getSourceLanguageForPath(path).then((lang) => {
+                if (this.processingPaths.has(path)) return;
                 const lastLang = this.processedLangCache.get(path);
-                if (lastLang === lang) return;
+                const needsReload = renderedBeforeEngine.has(path)
+                    || (lastLang !== undefined && lastLang !== lang);
+                if (!needsReload) return;
                 this.processedLangCache.set(path, lang);
                 void this.forceRerenderLeaf(leaf);
             });
@@ -376,6 +392,13 @@ export default class TraverturePlugin extends Plugin {
     }
 
     private async forceRerenderLeaf(leaf: WorkspaceLeaf): Promise<void> {
+        console.log(
+            '[traverture-timing] forceRerenderLeaf',
+            Math.round(performance.now()),
+            (leaf.view as MarkdownView).file?.path,
+            'processed lang:', this.processedLangCache.get((leaf.view as MarkdownView).file?.path ?? ''),
+            new Error().stack?.split('\n').slice(2, 5).join(' | '),
+        );
         const view = leaf.view as MarkdownView;
         if (!view) return;
 
@@ -396,7 +419,7 @@ export default class TraverturePlugin extends Plugin {
             if (newScroller instanceof HTMLElement) {
                 newScroller.scrollTop = scrollTop;
             }
-        }, 0);
+        }, 100);
     }
 
     private splitFrontmatter(content: string): { frontmatter: string; body: string } {
@@ -527,101 +550,112 @@ export default class TraverturePlugin extends Plugin {
 
     async processElement(el: HTMLElement, sourcePath?: string) {
         if (!this.engine) return;
+        if (this.processingElements.has(el)) return;
+        this.processingElements.add(el);
+        if (sourcePath) this.processingPaths.set(sourcePath, (this.processingPaths.get(sourcePath) ?? 0) + 1);
+        try {
+            const sourceLang = await this.getSourceLanguageForPath(sourcePath);
+            this.decorateElement(el, sourcePath, sourceLang);
+        } finally {
+            this.processingElements.delete(el);
+            if (sourcePath) {
+                const left = (this.processingPaths.get(sourcePath) ?? 1) - 1;
+                if (left <= 0) this.processingPaths.delete(sourcePath);
+                else this.processingPaths.set(sourcePath, left);
+            }
+        }
+    }
+
+    private decorateElement(el: HTMLElement, sourcePath: string | undefined, sourceLang: string): void {
+        if (!this.engine) return;
         if (el.querySelector('.callout')) return;
         const hasRealSvg = [...el.querySelectorAll('svg')].some(
             svg => !svg.closest('.list-bullet')
         );
         if (hasRealSvg && !el.querySelector('h1, h2, h3, h4, h5, h6, ul, ol')) return;
-        if (this.processingElements.has(el)) return;
-        this.processingElements.add(el);
 
-        try {
-            const sourceLang = await this.getSourceLanguageForPath(sourcePath);
-            let html = el.innerHTML;
+        let html = el.innerHTML;
 
-            // Process {{ }} blocks (forced parsing)
-            if (/\{\{(.+?)\}\}/.test(html)) {
-                html = html.replace(/\{\{(.+?)\}\}/g, (fullMatch: string, inner: string) => {
-                    if (!this.engine) return fullMatch;
-                    return this.linkBlock(inner, sourceLang);
-                });
+        // Process {{ }} blocks (forced parsing)
+        if (/\{\{(.+?)\}\}/.test(html)) {
+            html = html.replace(/\{\{(.+?)\}\}/g, (fullMatch: string, inner: string) => {
+                if (!this.engine) return fullMatch;
+                return this.linkBlock(inner, sourceLang);
+            });
+        }
+
+        if (this.engine) {
+            const tempDiv = createDiv();
+            const parsedHtml = parseFragment(html);
+            for (const child of Array.from(parsedHtml.body.childNodes)) {
+                tempDiv.appendChild(child.cloneNode(true));
             }
-
-            if (this.engine) {
-                const tempDiv = createDiv();
-                const parsedHtml = parseFragment(html);
-                for (const child of Array.from(parsedHtml.body.childNodes)) {
-                    tempDiv.appendChild(child.cloneNode(true));
+            const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
+                acceptNode: (node) => {
+                    const parent = node.parentElement;
+                    if (parent?.tagName === 'A' && parent.classList.contains('traverture-ref-link')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
                 }
-                const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
-                    acceptNode: (node) => {
-                        const parent = node.parentElement;
-                        if (parent?.tagName === 'A' && parent.classList.contains('traverture-ref-link')) {
-                            return NodeFilter.FILTER_REJECT;
-                        }
-                        return NodeFilter.FILTER_ACCEPT;
-                    }
-                });
-
-                const textNodes: Text[] = [];
-                let node = walker.nextNode();
-                while (node) { textNodes.push(node as Text); node = walker.nextNode(); }
-
-                for (const textNode of textNodes) {
-                    const text = textNode.nodeValue || '';
-                    const delimited = isInsideTripleEmphasis(textNode);
-                    const prefixLen = delimited ? 4 : 0; // '*** '.length
-                    const engineInput = delimited ? `*** ${text} ***` : text;
-
-                    const parsed = this.safeParseWith(engineInput, sourceLang);
-                    if (!parsed) continue;
-                    let clauses = JSON.parse(parsed) as ParsedReference[];
-                    if (clauses.length === 0) continue;
-
-                    if (prefixLen > 0) {
-                        clauses = clauses.map(c => [c[0], c[1] - prefixLen, c[2] - prefixLen, c[3], c[4], c[5]] as ParsedReference);
-                    }
-
-                    const linked = this.insertLinks(text, clauses);
-                    if (linked !== text) {
-                        const fragment = createFragment();
-                        const parsedLinked = parseFragment(linked);
-                        for (const child of Array.from(parsedLinked.body.childNodes)) {
-                            fragment.appendChild(child.cloneNode(true));
-                        }
-                        textNode.parentNode?.replaceChild(fragment, textNode);
-                    }
-                }
-                html = tempDiv.innerHTML;
-            }
-
-            const parsed = parseFragment(html);
-            while (el.firstChild) el.removeChild(el.firstChild);
-            for (const child of Array.from(parsed.body.childNodes)) {
-                el.appendChild(child.cloneNode(true));
-            }
-
-            el.querySelectorAll('.traverture-ref-link').forEach(link => {
-                link.addEventListener('click', (e) => { void (async () => {
-                    if ((e as MouseEvent).button !== 0) return;
-                    const bcv = link.getAttribute('data-bcv')!;
-                    if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
-                        window.open(buildJwLibraryUrl(bcv, this.settings.outputLanguage), '_blank');
-                        return;
-                    }
-                    e.preventDefault(); e.stopPropagation();
-                    const { refText, timecodes } = await resolveClickContext(
-                        bcv, this.settings.outputLanguage, this.settings.titleFormat, link.textContent || undefined,
-                    );
-                    await this.showScripture(bcv, refText, timecodes);
-                })(); });
             });
 
-            if (sourcePath) {
-                this.processedLangCache.set(sourcePath, sourceLang);
+            const textNodes: Text[] = [];
+            let node = walker.nextNode();
+            while (node) { textNodes.push(node as Text); node = walker.nextNode(); }
+
+            for (const textNode of textNodes) {
+                const text = textNode.nodeValue || '';
+                const delimited = isInsideTripleEmphasis(textNode);
+                const prefixLen = delimited ? 4 : 0; // '*** '.length
+                const engineInput = delimited ? `*** ${text} ***` : text;
+
+                const parsed = this.safeParseWith(engineInput, sourceLang);
+                if (!parsed) continue;
+                let clauses = JSON.parse(parsed) as ParsedReference[];
+                if (clauses.length === 0) continue;
+
+                if (prefixLen > 0) {
+                    clauses = clauses.map(c => [c[0], c[1] - prefixLen, c[2] - prefixLen, c[3], c[4], c[5]] as ParsedReference);
+                }
+
+                const linked = this.insertLinks(text, clauses);
+                if (linked !== text) {
+                    const fragment = createFragment();
+                    const parsedLinked = parseFragment(linked);
+                    for (const child of Array.from(parsedLinked.body.childNodes)) {
+                        fragment.appendChild(child.cloneNode(true));
+                    }
+                    textNode.parentNode?.replaceChild(fragment, textNode);
+                }
             }
-        } finally {
-            this.processingElements.delete(el);
+            html = tempDiv.innerHTML;
+        }
+
+        const parsed = parseFragment(html);
+        while (el.firstChild) el.removeChild(el.firstChild);
+        for (const child of Array.from(parsed.body.childNodes)) {
+            el.appendChild(child.cloneNode(true));
+        }
+
+        el.querySelectorAll('.traverture-ref-link').forEach(link => {
+            link.addEventListener('click', (e) => { void (async () => {
+                if ((e as MouseEvent).button !== 0) return;
+                const bcv = link.getAttribute('data-bcv')!;
+                if ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey) {
+                    window.open(buildJwLibraryUrl(bcv, this.settings.outputLanguage), '_blank');
+                    return;
+                }
+                e.preventDefault(); e.stopPropagation();
+                const { refText, timecodes } = await resolveClickContext(
+                    bcv, this.settings.outputLanguage, this.settings.titleFormat, link.textContent || undefined,
+                );
+                await this.showScripture(bcv, refText, timecodes);
+            })(); });
+        });
+
+        if (sourcePath) {
+            this.processedLangCache.set(sourcePath, sourceLang);
         }
     }
 
@@ -1273,7 +1307,24 @@ export default class TraverturePlugin extends Plugin {
         this.registerEditorExtension(createTravertureEditorPlugin(this));
 
         this.registerMarkdownPostProcessor((element, ctx) => {
-            void this.processElement(element, ctx.sourcePath);
+            const path = ctx.sourcePath;
+            console.log('[traverture-timing] post-process', Math.round(performance.now()), ctx.sourcePath, this.sourceLangCache.has(ctx.sourcePath));
+            if (this.engine) {
+                const known = this.sourceLangCache.get(path);
+                if (known !== undefined) {
+                    this.decorateElement(element, path, known);
+                    return;
+                }
+                return this.processElement(element, path);
+            }
+            return (async () => {
+                await Promise.race([
+                    this.engineReadySignal,
+                    new Promise<void>((resolve) => { window.setTimeout(resolve, 8000); }),
+                ]);
+                if (!this.engine) this.pendingEnginePaths.add(path);
+                await this.processElement(element, path);
+            })();
         });
 
         this.registerEvent(this.app.workspace.on('layout-change', () => {
@@ -1281,7 +1332,7 @@ export default class TraverturePlugin extends Plugin {
         }));
 
         this.registerEvent(this.app.metadataCache.on('changed', (file) => {
-            this.invalidateSourceLangCache(file.path);
+            this.revalidateSourceLanguage(file.path);
             this.refreshReadingViews();
         }));
 
