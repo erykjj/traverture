@@ -567,9 +567,7 @@ export default class TraverturePlugin extends Plugin {
         const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
             acceptNode: (node) => {
                 const parent = node.parentElement;
-                if (parent?.tagName === 'A' && parent.classList.contains('traverture-ref-link')) {
-                    return NodeFilter.FILTER_REJECT;
-                }
+                if (!parent || parent.closest('a')) return NodeFilter.FILTER_REJECT;
                 return NodeFilter.FILTER_ACCEPT;
             }
         });
