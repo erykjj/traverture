@@ -41,17 +41,6 @@ function parseClauses(text: string, plugin: TraverturePlugin, sourceLang: string
     }
 }
 
-function stripAsterisks(text: string): { clean: string; origIndex: number[] } {
-    let clean = '';
-    const origIndex: number[] = [];
-    for (let i = 0; i < text.length; i++) {
-        if (text[i] === '*') continue;
-        clean += text[i];
-        origIndex.push(i);
-    }
-    return { clean, origIndex };
-}
-
 function locateClauses(clean: string, origIndex: number[], clauses: ParsedReference[]): LocatedClause[] {
     const located: LocatedClause[] = [];
     let searchFrom = 0;
