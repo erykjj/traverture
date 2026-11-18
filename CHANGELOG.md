@@ -6,15 +6,18 @@
 
 ### Changed
 
-- Updated engine to v7.0.0
-  - Smoother co-existence with in(REF)ens
-- Various fixes and improvements
-
 ### Fixed
 
 ### Removed
 
 ____
+## [8.0.0] - 2026-11-18
+### Changed
+
+- Updated engine to v7.0.0
+  - Smoother co-existence with in(REF)ens
+- Various fixes and improvements
+
 ## [7.3.0] - 2026-10-31
 ### Fixed
 
@@ -271,6 +274,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[8.0.0]:https://github.com/erykjj/traverture/releases/tag/8.0.0
 [7.3.0]:https://github.com/erykjj/traverture/releases/tag/7.3.0
 [7.2.0]:https://github.com/erykjj/traverture/releases/tag/7.2.0
 [7.1.1]:https://github.com/erykjj/traverture/releases/tag/7.1.1
