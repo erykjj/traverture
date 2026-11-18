@@ -162,20 +162,15 @@ function withoutMarkers(engineText: string): { text: string; engineIndex: number
 export default class TraverturePlugin extends Plugin {
     settings = DEFAULT_SETTINGS;
     engine: TravertureEngineInstance | null = null;
-    private processingElements = new Set<HTMLElement>();
     private sourceLangCache = new Map<string, string>();
     private sourceLangInFlight = new Map<string, Promise<string>>();
     private processedLangCache = new Map<string, string>();
-    private signalEngineReady!: () => void;
-    private engineReadySignal: Promise<void> = new Promise<void>((resolve) => { this.signalEngineReady = resolve; });
-    private pendingEnginePaths = new Set<string>();
+    private pendingSections: Array<{ el: HTMLElement; path: string; frontmatter: unknown }> = [];
     public editorRefreshGeneration = 0;
     public sessionRestored = false;
     private settingTab: TravertureSettingTab | null = null;
-    private engineTimer: number | null = null;
     private contextRefPos: EditorPosition | null = null;
     private sidebarRefsStore = new Map<string, SidebarRef[]>();
-    private processingPaths = new Map<string, number>();
 
     async loadSettings() {
         const savedData = await this.loadData() as Partial<TravertureSettings> | null;
@@ -184,11 +179,6 @@ export default class TraverturePlugin extends Plugin {
         this.settings = settings;
     }
     async saveSettings() { await this.saveData(this.settings); }
-
-    createEngine() {
-        this.engine = createMainEngine(this.settings.sourceLanguage, this.settings.outputLanguage);
-        prewarmEngines(this.settings.sourceLanguage, this.settings.outputLanguage);
-    }
 
     safeParseWith(text: string, sourceLanguage: string): string | null {
         if (!this.engine) return null;
@@ -275,15 +265,6 @@ export default class TraverturePlugin extends Plugin {
         }
     }
 
-    private revalidateSourceLanguage(sourcePath: string): void {
-        void this.computeSourceLanguage(sourcePath).then((fresh) => {
-            const previous = this.sourceLangCache.get(sourcePath);
-            if (previous === fresh) return;
-            this.sourceLangCache.set(sourcePath, fresh);
-            if (previous !== undefined) this.refreshReadingViews();
-        });
-    }
-
     private invalidateSourceLangCache(sourcePath: string): void {
         this.sourceLangCache.delete(sourcePath);
         this.sourceLangInFlight.delete(sourcePath);
@@ -316,6 +297,11 @@ export default class TraverturePlugin extends Plugin {
         }
     }
 
+    createEngine(prewarm = true) {
+        this.engine = createMainEngine(this.settings.sourceLanguage, this.settings.outputLanguage);
+        if (prewarm) prewarmEngines(this.settings.sourceLanguage, this.settings.outputLanguage);
+    }
+
     private async startEngine(): Promise<void> {
         const inrefensOn = (this.app as unknown as {
             plugins?: { enabledPlugins?: Set<string> };
@@ -323,28 +309,31 @@ export default class TraverturePlugin extends Plugin {
 
         try {
             await initEngine(this.app, inrefensOn);
-            this.createEngine();
+            this.createEngine(false);
         } catch (e) {
             console.error('tra.VER:ture: Failed to initialize engine:', e);
             new Notice('tra.VER:ture: Failed to initialize engine.');
-            this.signalEngineReady();
             return;
         }
         if (!this.engine) {
             new Notice('tra.VER:ture: Failed to initialize engine.');
-            this.signalEngineReady();
             return;
         }
         this.onEngineReady();
+        window.setTimeout(() => {
+            prewarmEngines(this.settings.sourceLanguage, this.settings.outputLanguage);
+        }, 0);
     }
 
+
     private onEngineReady(): void {
-        this.signalEngineReady();
         this.settingTab?.refreshForEngine();
         this.editorRefreshGeneration++;
         this.refreshEditorViews();
+        this.decoratePendingSections();
         this.refreshReadingViews();
     }
+
 
     private refreshEditorViews(): void {
         const leaves = this.app.workspace.getLeavesOfType('markdown');
@@ -365,10 +354,6 @@ export default class TraverturePlugin extends Plugin {
 
     public refreshReadingViews(): void {
         if (!this.engine) return;
-
-        const renderedBeforeEngine = new Set(this.pendingEnginePaths);
-        this.pendingEnginePaths.clear();
-
         const leaves = this.app.workspace.getLeavesOfType('markdown');
         for (const leaf of leaves) {
             const view = leaf.view;
@@ -377,14 +362,9 @@ export default class TraverturePlugin extends Plugin {
             const path = view.file?.path;
             if (!path) continue;
 
-            if (this.processingPaths.has(path)) continue;
-
             void this.getSourceLanguageForPath(path).then((lang) => {
-                if (this.processingPaths.has(path)) return;
                 const lastLang = this.processedLangCache.get(path);
-                const needsReload = renderedBeforeEngine.has(path)
-                    || (lastLang !== undefined && lastLang !== lang);
-                if (!needsReload) return;
+                if (lastLang === undefined || lastLang === lang) return;
                 this.processedLangCache.set(path, lang);
                 void this.forceRerenderLeaf(leaf);
             });
@@ -392,13 +372,6 @@ export default class TraverturePlugin extends Plugin {
     }
 
     private async forceRerenderLeaf(leaf: WorkspaceLeaf): Promise<void> {
-        console.log(
-            '[traverture-timing] forceRerenderLeaf',
-            Math.round(performance.now()),
-            (leaf.view as MarkdownView).file?.path,
-            'processed lang:', this.processedLangCache.get((leaf.view as MarkdownView).file?.path ?? ''),
-            new Error().stack?.split('\n').slice(2, 5).join(' | '),
-        );
         const view = leaf.view as MarkdownView;
         if (!view) return;
 
@@ -548,25 +521,26 @@ export default class TraverturePlugin extends Plugin {
     // Reading View post-processor
     // ──────────────────────────────────────────────
 
-    async processElement(el: HTMLElement, sourcePath?: string) {
-        if (!this.engine) return;
-        if (this.processingElements.has(el)) return;
-        this.processingElements.add(el);
-        if (sourcePath) this.processingPaths.set(sourcePath, (this.processingPaths.get(sourcePath) ?? 0) + 1);
-        try {
-            const sourceLang = await this.getSourceLanguageForPath(sourcePath);
-            this.decorateElement(el, sourcePath, sourceLang);
-        } finally {
-            this.processingElements.delete(el);
-            if (sourcePath) {
-                const left = (this.processingPaths.get(sourcePath) ?? 1) - 1;
-                if (left <= 0) this.processingPaths.delete(sourcePath);
-                else this.processingPaths.set(sourcePath, left);
+    private resolveLanguageSync(sourcePath: string | undefined, frontmatter: unknown): string {
+        if (!sourcePath) return this.settings.sourceLanguage;
+        const cached = this.sourceLangCache.get(sourcePath);
+        if (cached !== undefined) return cached;
+
+        let raw: unknown = (frontmatter as { language?: unknown } | null | undefined)?.language;
+        if (raw === undefined) {
+            const file = this.app.vault.getAbstractFileByPath(sourcePath);
+            if (file instanceof TFile) {
+                raw = this.app.metadataCache.getFileCache(file)?.frontmatter?.language;
             }
         }
+        if (typeof raw === 'string' && raw.trim()) {
+            const resolved = resolveLanguage(raw.trim());
+            if (resolved) return resolved;
+        }
+        return this.settings.sourceLanguage;
     }
 
-    private decorateElement(el: HTMLElement, sourcePath: string | undefined, sourceLang: string): void {
+    processElement(el: HTMLElement, sourcePath: string | undefined, frontmatter?: unknown): void {
         if (!this.engine) return;
         if (el.querySelector('.callout')) return;
         const hasRealSvg = [...el.querySelectorAll('svg')].some(
@@ -574,6 +548,7 @@ export default class TraverturePlugin extends Plugin {
         );
         if (hasRealSvg && !el.querySelector('h1, h2, h3, h4, h5, h6, ul, ol')) return;
 
+        const sourceLang = this.resolveLanguageSync(sourcePath, frontmatter);
         let html = el.innerHTML;
 
         // Process {{ }} blocks (forced parsing)
@@ -584,53 +559,51 @@ export default class TraverturePlugin extends Plugin {
             });
         }
 
-        if (this.engine) {
-            const tempDiv = createDiv();
-            const parsedHtml = parseFragment(html);
-            for (const child of Array.from(parsedHtml.body.childNodes)) {
-                tempDiv.appendChild(child.cloneNode(true));
-            }
-            const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
-                acceptNode: (node) => {
-                    const parent = node.parentElement;
-                    if (parent?.tagName === 'A' && parent.classList.contains('traverture-ref-link')) {
-                        return NodeFilter.FILTER_REJECT;
-                    }
-                    return NodeFilter.FILTER_ACCEPT;
-                }
-            });
-
-            const textNodes: Text[] = [];
-            let node = walker.nextNode();
-            while (node) { textNodes.push(node as Text); node = walker.nextNode(); }
-
-            for (const textNode of textNodes) {
-                const text = textNode.nodeValue || '';
-                const delimited = isInsideTripleEmphasis(textNode);
-                const prefixLen = delimited ? 4 : 0; // '*** '.length
-                const engineInput = delimited ? `*** ${text} ***` : text;
-
-                const parsed = this.safeParseWith(engineInput, sourceLang);
-                if (!parsed) continue;
-                let clauses = JSON.parse(parsed) as ParsedReference[];
-                if (clauses.length === 0) continue;
-
-                if (prefixLen > 0) {
-                    clauses = clauses.map(c => [c[0], c[1] - prefixLen, c[2] - prefixLen, c[3], c[4], c[5]] as ParsedReference);
-                }
-
-                const linked = this.insertLinks(text, clauses);
-                if (linked !== text) {
-                    const fragment = createFragment();
-                    const parsedLinked = parseFragment(linked);
-                    for (const child of Array.from(parsedLinked.body.childNodes)) {
-                        fragment.appendChild(child.cloneNode(true));
-                    }
-                    textNode.parentNode?.replaceChild(fragment, textNode);
-                }
-            }
-            html = tempDiv.innerHTML;
+        const tempDiv = createDiv();
+        const parsedHtml = parseFragment(html);
+        for (const child of Array.from(parsedHtml.body.childNodes)) {
+            tempDiv.appendChild(child.cloneNode(true));
         }
+        const walker = activeDocument.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, {
+            acceptNode: (node) => {
+                const parent = node.parentElement;
+                if (parent?.tagName === 'A' && parent.classList.contains('traverture-ref-link')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+
+        const textNodes: Text[] = [];
+        let node = walker.nextNode();
+        while (node) { textNodes.push(node as Text); node = walker.nextNode(); }
+
+        for (const textNode of textNodes) {
+            const text = textNode.nodeValue || '';
+            const delimited = isInsideTripleEmphasis(textNode);
+            const prefixLen = delimited ? 4 : 0; // '*** '.length
+            const engineInput = delimited ? `*** ${text} ***` : text;
+
+            const parsed = this.safeParseWith(engineInput, sourceLang);
+            if (!parsed) continue;
+            let clauses = JSON.parse(parsed) as ParsedReference[];
+            if (clauses.length === 0) continue;
+
+            if (prefixLen > 0) {
+                clauses = clauses.map(c => [c[0], c[1] - prefixLen, c[2] - prefixLen, c[3], c[4], c[5]] as ParsedReference);
+            }
+
+            const linked = this.insertLinks(text, clauses);
+            if (linked !== text) {
+                const fragment = createFragment();
+                const parsedLinked = parseFragment(linked);
+                for (const child of Array.from(parsedLinked.body.childNodes)) {
+                    fragment.appendChild(child.cloneNode(true));
+                }
+                textNode.parentNode?.replaceChild(fragment, textNode);
+            }
+        }
+        html = tempDiv.innerHTML;
 
         const parsed = parseFragment(html);
         while (el.firstChild) el.removeChild(el.firstChild);
@@ -658,6 +631,15 @@ export default class TraverturePlugin extends Plugin {
             this.processedLangCache.set(sourcePath, sourceLang);
         }
     }
+
+    private decoratePendingSections(): void {
+        const pending = this.pendingSections;
+        this.pendingSections = [];
+        for (const { el, path, frontmatter } of pending) {
+            if (el.isConnected) this.processElement(el, path, frontmatter);
+        }
+    }
+
 
     private linkBlock(inner: string, sourceLang: string): string {
         const { clean, origIndex } = stripMarkup(inner, true);
@@ -1300,6 +1282,8 @@ export default class TraverturePlugin extends Plugin {
         await this.loadSettings();
         this.registerStyleVariables();
 
+        void this.startEngine();
+
         this.settingTab = new TravertureSettingTab(this.app, this);
         this.addSettingTab(this.settingTab);
         this.registerView(VIEW_TYPE_TRAVERTURE_SIDEBAR, (leaf) => new TravertureSidebarView(leaf, this));
@@ -1307,24 +1291,13 @@ export default class TraverturePlugin extends Plugin {
         this.registerEditorExtension(createTravertureEditorPlugin(this));
 
         this.registerMarkdownPostProcessor((element, ctx) => {
-            const path = ctx.sourcePath;
-            console.log('[traverture-timing] post-process', Math.round(performance.now()), ctx.sourcePath, this.sourceLangCache.has(ctx.sourcePath));
-            if (this.engine) {
-                const known = this.sourceLangCache.get(path);
-                if (known !== undefined) {
-                    this.decorateElement(element, path, known);
-                    return;
+            if (!this.engine) {
+                if (this.pendingSections.length < 1000) {
+                    this.pendingSections.push({ el: element, path: ctx.sourcePath, frontmatter: ctx.frontmatter });
                 }
-                return this.processElement(element, path);
+                return;
             }
-            return (async () => {
-                await Promise.race([
-                    this.engineReadySignal,
-                    new Promise<void>((resolve) => { window.setTimeout(resolve, 8000); }),
-                ]);
-                if (!this.engine) this.pendingEnginePaths.add(path);
-                await this.processElement(element, path);
-            })();
+            this.processElement(element, ctx.sourcePath, ctx.frontmatter);
         });
 
         this.registerEvent(this.app.workspace.on('layout-change', () => {
@@ -1332,7 +1305,7 @@ export default class TraverturePlugin extends Plugin {
         }));
 
         this.registerEvent(this.app.metadataCache.on('changed', (file) => {
-            this.revalidateSourceLanguage(file.path);
+            this.invalidateSourceLangCache(file.path);
             this.refreshReadingViews();
         }));
 
@@ -1348,11 +1321,6 @@ export default class TraverturePlugin extends Plugin {
         this.app.workspace.onLayoutReady(() => {
             this.app.workspace.detachLeavesOfType(VIEW_TYPE_TRAVERTURE_SIDEBAR);
             this.sessionRestored = true;
-
-            this.engineTimer = window.setTimeout(() => {
-                this.engineTimer = null;
-                void this.startEngine();
-            }, 0);
         });
 
         this.registerEditorMenu();
@@ -1388,10 +1356,6 @@ export default class TraverturePlugin extends Plugin {
     }
 
     onunload() {
-        if (this.engineTimer !== null) {
-            window.clearTimeout(this.engineTimer);
-            this.engineTimer = null;
-        }
         for (const doc of this.allDocuments()) {
             doc.documentElement.style.removeProperty('--traverture-link-color');
             doc.documentElement.style.removeProperty('--traverture-pane-font-scale');
