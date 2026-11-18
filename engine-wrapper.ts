@@ -78,7 +78,11 @@ export async function initEngine(app: App, inrefens: boolean): Promise<void> {
         wasmBinary.indexOf(WASM_START) + WASM_START.length,
         wasmBinary.indexOf(WASM_END)
     );
-    const wasmBin = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+    const decoded = atob(payload);
+    const wasmBin = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) {
+        wasmBin[i] = decoded.charCodeAt(i);
+    }
     await wasmModule.default({ module_or_path: wasmBin });
     engineInitialized = true;
 
