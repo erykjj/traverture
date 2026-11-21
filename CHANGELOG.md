@@ -11,6 +11,12 @@
 ### Removed
 
 ____
+## [8.1.0] - 2026-11-21
+### Changed
+
+- Updated engine to v7.1.0
+  - Updated some Bible book names
+
 ## [8.0.0] - 2026-11-18
 ### Changed
 
@@ -274,6 +280,7 @@ ____
 - Initial Obidian Community release
 
 ____
+[8.1.0]:https://github.com/erykjj/traverture/releases/tag/8.1.0
 [8.0.0]:https://github.com/erykjj/traverture/releases/tag/8.0.0
 [7.3.0]:https://github.com/erykjj/traverture/releases/tag/7.3.0
 [7.2.0]:https://github.com/erykjj/traverture/releases/tag/7.2.0
